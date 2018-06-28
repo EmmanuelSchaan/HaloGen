@@ -1,0 +1,23 @@
+nat-oitwireless-inside-vapornet100-b-10337:camb Emmanuel$ ./camb planck15_params.ini 
+ Output _params.ini not created as would overwrite input
+Reion redshift       =   8.748
+Om_b h^2             =  0.022200
+Om_c h^2             =  0.120300
+Om_nu h^2            =  0.000000
+Om_Lambda            =  0.683691
+Om_K                 =  0.000000
+Om_m (1-Om_K-Om_L)   =  0.316309
+100 theta (CosmoMC)  =  1.039253
+Reion opt depth      =  0.0650
+Age of universe/GYr  =  13.832
+zstar                =  1089.75
+r_s(zstar)/Mpc       =  144.51
+100*theta            =  1.039754
+zdrag                =  1059.17
+r_s(zdrag)/Mpc       =  147.23
+k_D(zstar) Mpc       =  0.1408
+100*theta_D          =  0.160552
+z_EQ (if v_nu=1)     =  3402.81
+100*theta_EQ         =  0.811372
+tau_recomb/Mpc       =  280.63  tau_now/Mpc =  14178.8
+ at z =    0.00000000      sigma8 (all matter)=  0.836071789 
