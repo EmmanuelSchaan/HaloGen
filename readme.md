@@ -13,4 +13,4 @@ Just clone and run:
 ```
 python driver.py
 ```
-Hope you find this code useful! Please cite https://arxiv.org/abs/1406.3330 or https://arxiv.org/abs/1802.05706 if you use this code in a publication. Do not hesitate to contact me with any question: eschaan@lbl.gov
+Hope you find this code useful! Please cite https://arxiv.org/abs/1406.3330 and/or https://arxiv.org/abs/1802.05706 if you use this code in a publication. Do not hesitate to contact me with any question: eschaan@lbl.gov
