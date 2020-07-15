@@ -80,7 +80,7 @@ class IHaloModel():
       # integrand in lnm, for speed
       def integrand(lnm):
          m = np.exp(lnm)
-         result = self.MassFunc.fmassfunc(m, a) * self.MassFunc.fb1(m, a) * m / self.U.rho_z(1./a-1.)
+         result = self.MassFunc.fmassfunc(m, a) * self.MassFunc.fb1(m, a) * m / self.U.rho_m(1./a-1.)
          result *= m # because integrating in lnm and not m
          return result
 

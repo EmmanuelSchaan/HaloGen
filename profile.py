@@ -92,7 +92,7 @@ class Profile(object):
 
 class ProfNFW(Profile):
 
-   def __init__(self, U, trunc=1.):
+   def __init__(self, U, trunc=4.):
       super(ProfNFW, self).__init__(U)
       self.LoadNonLinMass()
       self.trunc = trunc   # truncation radius, in units of rVir
@@ -220,7 +220,7 @@ class ProfNFW(Profile):
       k in h Mpc^-1, m in h^-1 solarM
       this is the quantity typically used in the halo model
       """
-      return self.nfw(k, m, z) * m / self.U.rho_z(z)
+      return self.nfw(k, m, z) * m / self.U.rho_m(z)
    
 
    def phiOfR(self, r, m, z):
@@ -246,13 +246,16 @@ class ProfNFW(Profile):
       #
       for im in range(len(M)):
          m = M[im]
-         #f = lambda k: self.u(k, m, z) / (m/self.U.rho_z(z))
+         #f = lambda k: self.u(k, m, z) / (m/self.U.rho_m(z))
          f = lambda k: self.nfw(k, m, z)
          Y = np.array(map(f, K))
-         ax.loglog(K, Y, 'b')
+         ax.loglog(K, Y, label=r'$M=$'+floatExpForm(m)+r'$M_\odot/h$')
       #
+      ax.legend(loc=3)
       ax.set_xlim((min(K), max(K)))
       ax.set_ylim((1.e-3, 2.5))
+      ax.set_xlabel(r'$k$ [h/Mpc]')
+      ax.set_ylabel(r'u(k), normalized to 1 for k=0')
       ax.grid()
       
       plt.show()
@@ -294,7 +297,7 @@ class ProfNFWPlusGaussian(Profile):
       """
       result = self.fGauss * self.gauss(k, m, z)
       result += (1. - self.fGauss) * self.nfw(k, m, z)
-      result *= m / self.U.rho_z(z)
+      result *= m / self.U.rho_m(z)
       return result
 
 
@@ -450,23 +453,23 @@ class ProfHODPenin12(ProfHOD):
       self.mMax = np.inf
       
 #      # HOD params, Penin+12
-#      self.mMinHod = 10.**11.5 * self.U.h # in Msun/h
+#      self.mMinHod = 10.**11.5 * self.U.bg.h # in Msun/h
 #      self.sLogM = 0.65#np.sqrt(0.65)
 #      self.mSat = 10. * self.mMinHod # in Msun/h
 #      self.aSat = 1.4
       
       # best fit to Planck CIB. Table 1 in Penin+14
       if self.nu==217:
-         self.mMinHod = 10.**12. * self.U.h # in Msun/h
+         self.mMinHod = 10.**12. * self.U.bg.h # in Msun/h
          self.aSat = 1.5
       if self.nu==353:
-         self.mMinHod = 10.**12.2 * self.U.h # in Msun/h
+         self.mMinHod = 10.**12.2 * self.U.bg.h # in Msun/h
          self.aSat = 1.7
       if self.nu==545:
-         self.mMinHod = 10.**12.6 * self.U.h # in Msun/h
+         self.mMinHod = 10.**12.6 * self.U.bg.h # in Msun/h
          self.aSat = 1.9
       if self.nu==857:
-         self.mMinHod = 10.**12.8 * self.U.h # in Msun/h
+         self.mMinHod = 10.**12.8 * self.U.bg.h # in Msun/h
          self.aSat = 1.7
       
       # HOD params, Penin+14
@@ -778,17 +781,17 @@ class ProfY(Profile):
 #      cNFW = self.cNFW0 * (m / (2.e12))**self.cNFWam * (1.+z)**self.cNFWaz
 #
 #      # physical virial radius and scale radius in h^-1 Mpc
-#      Rvir = ( 3.*m / (4*np.pi*self.U.rhocrit_z(z) * self.U.Deltacrit_z(z)) )**(1./3.)
+#      Rvir = ( 3.*m / (4*np.pi*self.U.rho_crit(z) * self.U.Deltacrit_z(z)) )**(1./3.)
 #      Rs = Rvir / cNFW
 #
 #      # NFW scale density (physical)
 #      rhoS = m / (4.*np.pi*Rs**3) / (np.log(1.+cNFW) - cNFW/(1.+cNFW))
 #
 #      # get R200 and M200
-#      f = lambda x: -1. + 1./(1.+x) + np.log(1.+x) - 200./3.*(self.U.rhocrit_z(z)/rhoS)*x**3
+#      f = lambda x: -1. + 1./(1.+x) + np.log(1.+x) - 200./3.*(self.U.rho_crit(z)/rhoS)*x**3
 #      x = optimize.brentq(f , 0.1, 100.)
 #      R200 = x * Rs  # physical
-#      M200 = 4./3.*np.pi*R200**3 * self.U.rhocrit_z(z) * 200.
+#      M200 = 4./3.*np.pi*R200**3 * self.U.rho_crit(z) * 200.
 #      R200 *= (1.+z) # comoving
 #
 #      return M200, R200
@@ -798,9 +801,9 @@ class ProfY(Profile):
    # x=r/r_200c is dimless, m=m_200c in h^-1 solarM
    def P_PDelta_x(self, x, m, z):
       # parameters of the fit, from Battaglia et al 2012
-      P0 = self.P00 * (m / (1.e14 * self.U.h))**self.P0am * (1.+z)**self.P0az
-      xc = self.xc0 * (m / (1.e14 * self.U.h))**self.xcam * (1.+z)**self.xcaz
-      beta = self.beta0 * (m / (1.e14 * self.U.h))**self.betaam * (1.+z)**self.betaaz
+      P0 = self.P00 * (m / (1.e14 * self.U.bg.h))**self.P0am * (1.+z)**self.P0az
+      xc = self.xc0 * (m / (1.e14 * self.U.bg.h))**self.xcam * (1.+z)**self.xcaz
+      beta = self.beta0 * (m / (1.e14 * self.U.bg.h))**self.betaam * (1.+z)**self.betaaz
       # normalized pressure profile from Battaglia et al. 2012, x = R/Rvir, with R and Rvir comoving
       P_PDelta_x = P0 * (x/xc)**self.gamma / ( 1. + (x/xc)**self.alpha )**beta
       return P_PDelta_x
@@ -819,13 +822,13 @@ class ProfY(Profile):
       # P200, in s^-2 kg / (Mpc/h)
       msun = 1.988435e30 # 1 solar mass in kg
       pc = 3.08567758e16   # 1 parsec in meters
-      P200 = self.U.G * (M200*msun)/self.U.h
+      P200 = self.U.G * (M200*msun)/self.U.bg.h
       P200 *= 200.
-      P200 *= self.U.rhocrit_z(z) * self.U.h**2 * msun/(1.e6*pc)**3 # critical density in kg m^-3 (comoving)
+      P200 *= self.U.rho_crit(z) * self.U.bg.h**2 * msun/(1.e6*pc)**3 # critical density in kg m^-3 (comoving)
       P200 *= (1.+z)**3 # physical
-      P200 *= self.U.OmB/self.U.OmM # baryon fraction
-      P200 /= 2. * R200/(1.+z)* 1.e6*pc/self.U.h  # twice R200 in m (physical)
-      P200 *= 1.e6*pc/self.U.h
+      P200 *= self.U.bg.Omega0_b/self.U.bg.Omega0_m # baryon fraction
+      P200 /= 2. * R200/(1.+z)* 1.e6*pc/self.U.bg.h  # twice R200 in m (physical)
+      P200 *= 1.e6*pc/self.U.bg.h
       
       # y3d(x), in (Mpc/h)^-1
       factor = 8.125532e-16   # sigma_T/(me * c**2) in s^2 kg^-1
@@ -939,7 +942,7 @@ class ProfY(Profile):
       
       # my calculation
       a = 1./(1.+z)
-      da = self.U.ComovDist(1./(1.+z), 1.)
+      da = self.U.bg.comoving_distance(z)
       K = L / da
       f = lambda k: self.u(k, m_vir, z, cut=True) * a/ da**2.
       Y_me = np.array(map(f, K))
@@ -964,6 +967,730 @@ class ProfY(Profile):
 
 
 
+##################################################################################
+##################################################################################
+
+class ProfCIBPlanck15(ProfNFW):
+   """CIB profile: from Planck XXIII 2015, Planck XXX 2013
+   this is an NFW profile, with an extra mass dependence,
+   coming from the mass-emissivity relation
+   !!!!!!!!!! Doesn't match the plots in the paper... argh
+   """
+   
+   def __init__(self, U, nu=150.e9):
+      self.nu = nu
+      super(ProfCIBPlanck15, self).__init__(U)
+
+      # constants
+      self.c = 3.e8  # m/s
+      self.h = 6.63e-34 # SI
+      self.kB = 1.38e-23   # SI
+      self.Tcmb = 2.726 # K
+      
+      # typical dust temperature
+      # table I of Planck XXIII 2015
+      self.Td0 = 24.4
+      self.aCIB = 0.36
+      self.Td = lambda a: self.Td0 * a**(-self.aCIB)
+      
+      # SED power index
+      # for typical galaxy SED
+      # table I of Planck XXIII 2015
+      self.bCIB = 1.75  # at low freq
+      self.cCIB = 1.70  # at high freq
+      
+      # L500-M500 relation
+      # table I of Planck XXIII 2015
+      # mass exponent
+      self.eCIB = 1.0
+      # z-dependent factor
+      self.dCIB = 3.2
+      self.psi = lambda a: a**(-self.dCIB)
+      # normalization
+      # not quoted in the Planck papers, for being only "a normalization parameter" (Planck15 XXII),
+      # "which being not physically meaningful will not be further discussed" (Planck13 XXX)
+#!!!!!!!!!!!!!!!! factor set to 1 for now!!!
+      self.L0 = 2.9e18
+#      self.L0 = 7.4e-4
+
+      # interpolating the sed normalization for speed
+      Td = np.linspace(1., 100., 201)
+      Norm = np.array(map(self.sedNormalization, Td))
+      self.sedNormalizationInterp = UnivariateSpline(Td, Norm, k=1, s=0)
+
+      ##################################################################################
+      # not needed for this halo model, just for curiosity
+      
+      # effective linear bias of CIB-emitting galaxies
+      # table 8 of Planck XXX 2013
+      self.b0 = 0.82
+      self.b1 = 0.34
+      self.b2 = 0.31
+      self.bias = lambda z: self.b0 + self.b1*z + self.b2*z**2
+      
+      # values of SFR density
+      # table 8 of Planck XXX
+      # in Msun / yr / Mpc^3
+      self.rhoSFR0 = 1.88e-2
+      self.rhoSFR1 = 16.07e-2
+      self.rhoSFR2 = 16.61e-2
+      self.rhoSFR4 = 4.0e-2
+      
+      # Kennicutt constant, Msun/year
+      # from Planck XXIII 2015, from Kennicutt 98
+      # in (Msun/h) / yr
+      self.K = 1.7e-10 * self.U.bg.h
+
+   
+   def __str__(self):
+      return "cibplanck15"+str(int(self.nu/1.e9))
+   
+   def plotTd(self):
+      Z = np.linspace(0., 10., 501)
+      A = 1./(1.+Z)
+      Td = np.array(map(self.Td, A))
+   
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      ax.plot(Z, Td, 'k', lw=2)
+      #
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'dust temperature $T_d$ [K]')
+      #
+      #fig.savefig("./figures/cmb/cib_td_planck15xxiii.pdf", bbox_inches='tight')
+      
+      plt.show()
+   
+   
+   def blackbody(self, nu, T):
+      """blackbody function
+      input and output in SI
+      """
+      x = self.h*nu/(self.kB*T)
+      result = 2.*self.h*nu**3 /self.c**2
+      result /= np.exp(x) - 1.
+      return result
+   
+
+   def dLnBlackdLnNu(self, nu, T):
+      """some derivative of blackbody
+      """
+      x = self.h*nu/(self.kB*T)
+      result = 3.
+      if x>=10.:
+         result -= x
+      else:
+         result -= x*np.exp(x) / (np.exp(x)-1.)
+      return result
+   
+
+   def nu0(self, Td):
+      """transition frequency for the typical galaxy SED
+      found by matching the log slopes of the SED
+      output in Hz
+      """
+      f = lambda nu: self.bCIB + self.cCIB + self.dLnBlackdLnNu(nu, Td)
+      nuMin = 1.e1 * 1.e9  # in Hz
+      nuMax = 1.e5 * 1.e9  # in Hz
+      '''
+      Nu = np.linspace(nuMin, nuMax, 201)
+      F = np.array(map(f, Nu))
+      plt.semilogx(Nu, F)
+      plt.semilogx(Nu, 0.*Nu)
+      plt.show()
+      '''
+      result = optimize.brentq(f , nuMin, nuMax)
+      return result
+   
+   
+   def sedRaw(self, nu, Td):
+      """typical SED of galaxy contributing to CIB
+      called Theta in Planck XXIII 2015
+      the normalization of this function is ambiguous from the Planck paper,
+      but is very important for the amplitude of the profile, and may introduce a z-dpdce
+      I am going to assume it is normalized to unit integral
+      nu is the rest-frame frequency
+      """
+      nu0 = self.nu0(Td)
+      result = (nu<nu0) * nu**self.bCIB * self.blackbody(nu, Td)
+      result += (nu>=nu0) * (nu/nu0)**(-self.cCIB) * nu0**self.bCIB*self.blackbody(nu0, Td)
+      return result
+   
+   def sedNormalization(self, Td):
+      nuMin = 1.  # Hz
+      nuMax = 1e5 * 1.e9 # Hz
+      result = integrate.quad(lambda nu: self.sedRaw(nu, Td), nuMin, nuMax, epsabs=0, epsrel=1.e-2)[0]
+      return result
+   
+   def sed(self, nu, Td):
+      """sed, normalized so that int dnu sed(nu) = 1
+      """
+      return self.sedRaw(nu, Td) / self.sedNormalizationInterp(Td)
+   
+#   # here I try a Td-dpdt normalization,
+#   # which changes the nu-dpdce of the CIB power spectrum... but still not good
+#   def sed(self, nu, Td):
+#      nu0 = self.nu0(Td)
+#      result = (nu<nu0) * (nu/nu0)**self.bCIB * self.blackbody(nu, Td)
+#      result += (nu>=nu0) * (nu/nu0)**(-self.cCIB) * self.blackbody(nu0, Td)
+#      return result
+
+   def plotSED(self):
+      Nu = np.logspace(np.log10(1.e2), np.log10(1.e4), 501, 10.)*1.e9   # in Hz
+      Z = np.linspace(0., 5., 6)
+      
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         a = 1./(1.+z)
+         # rest frame sed, normalized to integrate to unity
+         f = lambda nu: self.sed(nu, self.Td(a))
+         sed = np.array(map(f, Nu))
+         ax.plot(Nu/1.e9, sed, c=plt.cm.rainbow((z-min(Z))/(max(Z)-min(Z))), lw=2, label=r'z='+str(z))
+      #
+      ax.legend(loc=1)
+      ax.set_xlabel(r'frequency $\nu$ [GHz]')
+      ax.set_ylabel(r'rest frame specific intensity [arbitrary units]')
+      #
+      #fig.savefig("./figures/cib_planck15/cib_rf_gal_sed_planck15xxiii.pdf", bbox_inches='tight')
+      
+      fig=plt.figure(1)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         a = 1./(1.+z)
+         # observed sed, normalized to unity then redshifted... the relative amplitudes are meaningless now
+         f = lambda nu: self.sed(nu/a, self.Td(a))
+         sed = np.array(map(f, Nu))
+         ax.plot(Nu/1.e9, sed, c=plt.cm.rainbow((z-min(Z))/(max(Z)-min(Z))), lw=2, label=r'z='+str(z))
+      #
+      ax.legend(loc=1)
+      ax.set_xlabel(r'frequency $\nu$ [GHz]')
+      ax.set_ylabel(r'redshifted specific intensity [arbitrary units]')
+      #
+      #fig.savefig("./figures/cib_planck15/cib_obs_gal_sed_planck15xxiii.pdf", bbox_inches='tight')
+
+
+      plt.show()
+   
+   
+   # M500 in Msun
+#!!!!!!!!!!!!!!!!!!!!!!!! value of self.L0? Units?
+   # unit of output?
+   def L500(self, nu, m500, a):
+      result = self.L0 * (m500/1.e14*self.U.bg.h)**self.eCIB
+      result *= self.psi(a)
+      result *= self.sed(nu/a, self.Td(a))
+      return result
+   
+   # S500
+   def S500(self, nu, m500, a):
+      chi = self.U.bg.comoving_distance(1./a-1.)
+      result = self.L500(nu, m500, a)
+      result *= a/(4.*np.pi*chi**2)
+      return result
+   
+   def u(self, k, m, z):
+      """k in h/Mpc, m is Mvir in Msun/h
+      """
+      a = 1./(1.+z)
+      m500 = self.U.massRadiusConversion(m, z, value=500., ref="m")[0]
+      result = self.S500(self.nu, m500, a)
+      result *= self.nfw(k, m, z)
+      return result
+
+#   # k in h/Mpc, m is Mvir in Msun/h
+## this is my interpretation of what the halo model profile should be...
+#   def u(self, k, m, z):
+#      a = 1./(1.+z)
+#      m500 = self.U.massRadiusConversion(m, z, value=500., ref="m")[0]
+#      result = self.L500(self.nu, m500, a)
+#      result *= self.nfw(k, m, z)
+##      result /= 4.*np.pi
+#      return result
+
+   
+   
+   ##################################################################################
+   # Not needed for halo model, just for curiosity
+   
+   def rhoSFR(self, a):
+      """SFR density, in Msun/yr/Mpc^3
+      """
+      z = 1./a-1.
+      if (z<0):
+         print "error: asking for rhoSFR at z<0!"
+         return 0.
+      elif (z<=1):
+         z0 = 0.
+         z1 = 1.
+         rhoSFR0 = self.rhoSFR0
+         rhoSFR1 = self.rhoSFR1
+      elif (z<=2):
+         z0 = 1.
+         z1 = 2.
+         rhoSFR0 = self.rhoSFR1
+         rhoSFR1 = self.rhoSFR2
+      else:
+         z0 = 2.
+         z1 = 4.
+         rhoSFR0 = self.rhoSFR2
+         rhoSFR1 = self.rhoSFR4
+      exponent = np.log(rhoSFR1/self.rhoSFR0)
+      exponent /= np.log((1.+z1)/(1.+z0))
+      result = rhoSFR0 * (1.+z)**exponent
+      return result
+   
+   
+   def j(self, nu, a):
+      """emissivity of galaxies in CIB
+      """
+      result = self.rhoSFR(a)
+      result /= a*self.K
+      result *= self.sed(nu, a)
+      chi = self.comoving_distance(1./a-1.)
+      result *= chi**2
+      return result
+   
+   def I(nu):
+      """CIB intensity
+      """
+      f = lambda a: a*self.j(nu, a) / (self.Hubble(a)/3.e5 * a**2)
+      aMin = 1./(1.+10.)
+      aMax = 1.
+      result = integrate.quad(f, aMin, aMax, epsabs=0, epsrel=1.e-5)[0]
+      return result
+
+
+##################################################################################
+##################################################################################
+
+class ProfGasBattaglia16(Profile):
+   """Tau profile, from Battaglia 2016
+   watch typos in paper. This code is correct.
+   """
+   
+   def __init__(self, U, trunc=2.):
+      super(ProfGasBattaglia16, self).__init__(U)
+      self.use_correction_factor = False
+      self.mMin = 0.
+      self.mMax = np.inf
+      self.trunc = trunc
+   
+      # parameters from Battaglia 17
+      self.xc = 0.5
+      self.gamma = -0.2
+      
+      # m is M200c in Msun/h, z is redshift
+      self.rho0 = lambda m,z: 4.e3 * ((m/self.U.bg.h)/1.e14)**0.29 * (1.+z)**(-0.66)
+      self.alpha = lambda m,z: 0.88 * ((m/self.U.bg.h)/1.e14)**(-0.03) * (1.+z)**0.19
+      self.beta = lambda m,z: 3.83 * ((m/self.U.bg.h)/1.e14)**0.04 * (1.+z)**(-0.025)
+
+
+   def __str__(self):
+      return "taubattaglia17"
+   
+   
+   def rhoFit3d(self, x, m, z):
+      """3d scaled gas density profile
+      dimensionless
+      """
+      result = 1. + (x/self.xc)**self.alpha(m, z)
+      result **= -(self.beta(m,z)+self.gamma) / self.alpha(m,z)
+      result *= (x/self.xc)**(self.gamma)
+      result *= self.rho0(m, z)
+      return result
+   
+   def rhoFit2d(self, X, m, z):
+      """2d scaled gas density profile
+      dimensionless
+      """
+      f = lambda x:  self.rhoFit3d(x, m, z) * 2.*x / np.sqrt(x**2 - X**2)
+      result = integrate.quad(f, X, np.inf, epsabs=0., epsrel=1.e-2)[0]
+      return result
+   
+   
+   
+   def rho3d(self, r, m, z):
+      """3d physical gas density profile
+      in (Msun/h) / (Mpc/h)^3
+      m is mVir in Msun/h
+      r is comoving radius in Mpc/h
+      """
+      # convert mass from Mvir to M200c (both in [Msun/h])
+      # and get comoving R200c [Mpc/h]
+      m200c, r200c = self.U.massRadiusConversion(m, z, value=200, ref="c")
+      # fitting function from Battaglia 17
+      result = self.rhoFit3d(x, m200c, z)
+      # rescale with comoving critical density, in (Msun/h) / (Mpc/h)^3
+      result *= self.U.rho_crit(z)
+      # rescale with the baryon fraction
+      result *= self.U.bg.Omega0_b/self.U.bg.Omega0_m
+      return result
+   
+   
+   
+   def rho3dFourier(self, k, m, z):
+      """Fourier transform of 3d density profile,
+      k in h Mpc^-1, m in h^-1 solarM
+      """
+      # truncation radius
+      rVir = self.U.frvir(m, z)
+      m200c, r200c = self.U.massRadiusConversion(m, z, value=200, ref="c")
+      xTrunc = self.trunc * rVir / r200c
+      # do Fourier transform
+      integrand = lambda x: 4.*np.pi*x**2 * self.rhoFit3d(x, m, z) * j0(k * r200c * x)
+      result = integrate.quad(integrand, 0., xTrunc, epsabs=0., epsrel=1.e-3)[0]
+      result *= r200c**2
+      result *= self.U.rho_crit(z) * self.U.bg.Omega0_b/self.U.bg.Omega0_m
+      return result
+   
+   def u(self, k, m, z):
+      return self.rho3dFourier(k, m, z)
+
+
+   def rho3dFourierNorm(self, k, m, z):
+      """Fourier transform of 3d density profile,
+      normalized such that rho3dFourierNorm(k=0, m, z) = 1,
+      k in h Mpc^-1, m in h^-1 solarM;
+      output dimensionless
+      """
+      # truncation radius
+      rVir = self.U.frvir(m, z)
+      m200c, r200c = self.U.massRadiusConversion(m, z, value=200, ref="c")
+      xTrunc = self.trunc * rVir / r200c
+      # do Fourier transform
+      integrand = lambda x: 4.*np.pi*x**2 * self.rhoFit3d(x, m, z) * j0(k * r200c * x)
+      result = integrate.quad(integrand, 0., xTrunc, epsabs=0., epsrel=1.e-2)[0]
+      # compute normalization
+      integrand = lambda x: 4.*np.pi*x**2 * self.rhoFit3d(x, m, z)
+      result /= integrate.quad(integrand, 0., xTrunc, epsabs=0., epsrel=1.e-2)[0]
+      return result
+   
+
+   def rho2d(self, R, m, z):
+      """2d physical gas density profile
+      in (Msun/h) / (Mpc/h)^2
+      m is mVir in Msun/h
+      R is comoving projected radius in Mpc/h
+      """
+      # convert mass from Mvir to M200c (both in [Msun/h])
+      # and get comoving R200c [Mpc/h]
+      m200c, r200c = self.U.massRadiusConversion(m, z, value=200, ref="c")
+      X = R / r200c
+      # projected fitting function from Battaglia 17
+      result = self.rhoFit2d(X, m200c, z)
+      # rescale by comoving critical density, in (Msun/h) / (Mpc/h)^3
+      result *= self.U.rho_crit(z)
+      # rescale by comoving radius, to get (Msun/h) / (Mpc/h)^2
+      result *= r200c
+      return result
+
+
+   def ne3d(self, r, m, z):
+      """3d physical electron number density profile
+      in 1/(Mpc/h)^3
+      assuming fully ionized gas and primordial He abundance
+      m is mVir in Msun/h
+      r is comoving radius in Mpc/h
+      """
+      result = self.rho3d(r, m, z)  # (Msun/h) / (Mpc/h)^3
+
+      # convert from baryon mass to electron number
+      me = 9.10938291e-31  # electron mass (kg)
+      mH = 1.67262178e-27  # proton mass (kg)
+      mHe = 4.*mH # helium nucleus mass (kg)
+      xH = 0.76   # primordial hydrogen fraction by mass
+      nH_ne = 2.*xH/(xH+1.)
+      nHe_ne = (1.-xH)/(2.*(1.+xH))
+      factor = (me + nH_ne*mH + nHe_ne*mHe)  # in kg
+      msun = 1.989e30   # solar mass (kg)
+      factor /= msun # in Msun
+      factor *= self.U.bg.h   # in Msun/h
+      
+      # get the physical 3d electron number density
+      result /= factor  # in (Mpc/h)^(-3)
+
+      return result
+   
+   
+   
+   def ne2d(self, R, m, z):
+      """2d physical electron number density profile
+      in 1/(Mpc/h)^2
+      assuming fully ionized gas and primordial He abundance
+      m is mVir in Msun/h
+      R is comoving projected radius in Mpc/h
+      """
+      result = self.rho2d(R, m, z)  # (Msun/h) / (Mpc/h)^2
+   
+      # convert from baryon mass to electron number
+      me = 9.10938291e-31  # electron mass (kg)
+      mH = 1.67262178e-27  # proton mass (kg)
+      mHe = 4.*mH # helium nucleus mass (kg)
+      xH = 0.76   # primordial hydrogen fraction by mass
+      nH_ne = 2.*xH/(xH+1.)
+      nHe_ne = (1.-xH)/(2.*(1.+xH))
+      factor = (me + nH_ne*mH + nHe_ne*mHe)  # in kg
+      msun = 1.989e30   # solar mass (kg)
+      factor /= msun # in Msun
+      factor *= self.U.bg.h   # in Msun/h
+   
+      # get the physical 2d electron number density
+      result /= factor  # in (Mpc/h)^(-2)
+      
+      return result
+
+
+   def tau3d(self, r, m, z):
+      """Thompson scattering optical depth "3d profile"
+      in 1/(Mpc/h) comoving
+      ie you get the 2d tau profile by projecting this profile
+      along the physical (not comoving) radial coordinate
+      assuming fully ionized gas and primordial He abundance
+      m is mVir in Msun/h
+      r is comoving radius in Mpc/h
+      """
+      result = self.ne3d(r, m, z)
+      
+      # multiply by Thompson cross section (physical)
+      sigma_T = 6.6524e-29 # Thomson cross section in m^2
+      mpc = 3.08567758e16*1.e6   # 1Mpc in m
+      sigma_T *= (self.U.bg.h/mpc)**2  # in (Mpc/h)^2
+      result *= sigma_T # dimensionless
+      
+      return result
+
+
+   def tau(self, R, m, z):
+      """Thompson scattering optical depth profile
+      dimensionless
+      assuming fully ionized gas and primordial He abundance
+      m is mVir in Msun/h
+      R is comoving projected radius in Mpc/h
+      """
+      result = self.ne2d(R, m, z)
+   
+      # multiply by Thompson cross section (physical)
+      sigma_T = 6.6524e-29 # Thomson cross section in m^2
+      mpc = 3.08567758e16*1.e6   # 1Mpc in m
+      sigma_T *= (self.U.bg.h/mpc)**2  # in (Mpc/h)^2
+      
+      result *= sigma_T # dimensionless
+      return result
+   
+   
+   def tauBeam(self, R, m, z, fwhm):
+      """Thompson scattering optical depth profile,
+      convolved with a Gaussian beam
+      dimensionless
+      assuming fully ionized gas and primordial He abundance
+      m is mVir in Msun/h
+      R is comoving projected radius in Mpc/h
+      fwhm in arcmin
+      """
+      # comoving beam size at redshift z
+      fwhm *= np.pi / (180.*60.) # radians
+      sigmaBeam = fwhm / np.sqrt(8.*np.log(2.)) # radians
+      sigmaBeam *= self.U.bg.comoving_distance(z) # in comoving Mpc/h
+      # beam, function of comoving projected radius
+      fbeam = lambda R: np.exp(-0.5*R**2/sigmaBeam**2) / (2.*np.pi*sigmaBeam**2)
+      
+      # do the smoothing
+      f = lambda r: r * self.tau(r, m, z) * np.exp(-0.5*(r**2+R**2)/sigmaBeam**2) / sigmaBeam**2 * i0(r*R/sigmaBeam**2)
+      result = integrate.quad(f, 0., np.inf, epsabs=0., epsrel=1.e-2)[0]
+      print "convolved with beam"
+      return result
+   
+   
+   def tauBeamDiskRing(self, m, z, fwhm, R0):
+      """convolve tau profile with beam,
+      then apply equal area disk-ring filter
+      output is dimensionless
+      m is mVir in Msun/h
+      fwhm in arcmin
+      R0 comoving projected radius of disk in Mpc/h
+      """
+      f = lambda r: 2.*np.pi*r * self.tauBeam(r, m, z, fwhm)
+      result = integrate.quad(f, 0., R0, epsabs=0, epsrel=1.e-2)[0]
+      result -= integrate.quad(f, R0, np.sqrt(2.)*R0, epsabs=0, epsrel=1.e-2)[0]
+      result /= np.pi*R0**2
+      print "wahoo!"
+      return result
+   
+
+   ##################################################################################
+
+   def testFig5Battaglia16(self):
+      # radii to evaluate
+      X= np.logspace(np.log10(7.e-2), np.log10(4.), 101, 10.)
+      
+      # masses to evaluate
+      M200c = np.array([7.5e13, 8.5e13, 9.5e13, 1.5e14, 2.5e14, 1.15e15])  # Msun
+      M200c *= self.U.bg.h   # Msun/h
+      
+      # redshifts to evaluate
+      Z = np.array([0., 0.5, 1.])
+
+
+      # vary mass
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for iM in range(len(M200c)):
+         m = M200c[iM]
+         z = 0.
+         f = lambda x: self.rhoFit3d(x, m, z)
+         Rho = np.array(map(f, X))
+         ax.loglog(X, X**2 * Rho, label=r'$M_\text{200c}=$'+str(m)+r'$M_\odot$')
+      #
+      ax.legend(loc=3)
+      #ax.set_ylim((1.e1, 1.e2))
+      ax.set_xlabel(r'$x\equiv R/R_\text{200c}$')
+      ax.set_ylabel(r'$x^2 \rho(x) / f_b \rho_\text{crit}(z)$')
+      #
+      #fig.savefig("/Users/Emmanuel/Desktop/fig5a_battaglia16.pdf", bbox_inches='tight')
+
+
+      # vary redshift
+      fig=plt.figure(1)
+      ax=fig.add_subplot(111)
+      #
+      for iZ in range(len(Z)):
+         m = 2.5e14
+         z = Z[iZ]
+         f = lambda x: self.rhoFit3d(x, m, z)
+         Rho = np.array(map(f, X))
+         ax.loglog(X, X**2 * Rho, label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=3)
+      #ax.set_ylim((1.e1, 1.e2))
+      ax.set_xlabel(r'$x\equiv R/R_\text{200c}$')
+      ax.set_ylabel(r'$x^2 \rho(x) / f_b \rho_\text{crit}(z)$')
+      #
+      #fig.savefig("/Users/Emmanuel/Desktop/fig5b_battaglia16.pdf", bbox_inches='tight')
+
+      plt.show()
+
+
+##################################################################################
+##################################################################################
+
+class ProfNFWPlusBattaglia16(Profile):
+   """Matter density profile, with:
+   DM following NFW
+   baryons following Battaglia 16
+   """
+   
+   def __init__(self, U):
+      super(ProfNFWPlusBattaglia16, self).__init__(U)
+      self.use_correction_factor = True
+      self.mMin = 0.
+      self.mMax = np.inf
+   
+      # instantiate the two profiles to combine
+      self.ProfNFW = ProfNFW(U)
+      self.ProfGasBattaglia16 = ProfGasBattaglia16(U)
+   
+      # baryon fraction
+      self.fb = self.U.bg.Omega0_b / self.U.bg.Omega0_m
+   
+   
+   def __str__(self):
+      return "nfwplusbattagliadensity"
+
+   def u(self, k, m, z):
+      """returns m/\bar{rho} * NFW u, in (h^-1 Mpc)^3
+      k in h Mpc^-1, m in h^-1 solarM
+      """
+      result = (1. - self.fb) * self.ProfNFW.nfw(k, m, z)
+      result += self.fb * self.ProfGasBattaglia16.rho3dFourierNorm(k, m, z)
+      result *= m / self.U.rho_m(z)
+      return result
+
+
+##################################################################################
+##################################################################################
+
+class ProfHODAlam16GasBattaglia16(Profile):
+   """Mean gas profile for CMASS galaxies:
+   gas from Battaglia+16
+   CMASS HOD from Alam+16
+   """
+   
+   def __init__(self, U, MassFunc, save=False):
+      super(ProfHODAlam16GasBattaglia16, self).__init__(U)
+      self.U = U
+      self.MassFunc = MassFunc
+      self.ProfGasBattaglia16 = ProfGasBattaglia16(U)
+      self.ProfHODAlam16 = ProfHODAlam16(U, MassFunc)
+      self.mMin = 0.
+      self.mMax = np.inf
+      self.K = np.genfromtxt("./input/Kc.txt") # center of the bins for k
+      
+      if save:
+         self.saveAll()
+      self.loadAll()
+   
+   def __str__(self):
+      return "alam16battaglia16gas"
+
+   def saveAll(self):
+      # compute the convolution in Fourier space
+      data = np.zeros((len(self.K), 2))
+      data[:,0] = self.K
+      data[:,1] = np.array(map(self.rho3dFourier, self.K))
+      np.savetxt("./output/profile/profhodalam16gasbattaglia16_k.txt", data)
+      self.rho3dFourierInterp = interp1d(data[:,0], data[:,1], kind='linear', bounds_error=False, fill_value=0.)
+      
+      # compute the real space convolution
+      R = np.logspace(np.log10(0.001), np.log10(10.), 101, 10.)
+      data = np.zeros((len(R), 2))
+      data[:,0] = R
+      f = lambda r: self.inverseFourier(self.rho3dFourierInterp, r)
+      data[:,1] = np.array(map(f, R))
+      np.savetxt("./output/profile/profhodalam16gasbattaglia16_r.txt", data)
+   
+   
+   def loadAll(self):
+      # interpolate the Fourier profile (after convolution)
+      data = np.genfromtxt("./output/profile/profhodalam16gasbattaglia16_k.txt")
+      forRho3dFourierInterp = interp1d(data[:,0], data[:,1], kind='linear', bounds_error=False, fill_value=0.)
+      self.rho3dFourierInterp = lambda k, m, z: forRho3dFourierInterp(k)
+   
+      # interpolate the real space 2d profile
+      data = np.genfromtxt("./output/profile/profhodalam16gasbattaglia16_r.txt")
+      forRho2dInterp = interp1d(data[:,0], data[:,1], kind='linear', bounds_error=False, fill_value=0.)
+      self.rho2dInterp = lambda r, m, z: forRho2dInterp(r)
+   
+   
+   def u(self, k, m, z):
+      result = self.ProfHODAlam16.u(k, m, z)
+      result *= self.ProfGasBattaglia16.rho3dFourier(k, m, z)
+      return result
+
+   def rho3dFourier(self, k):
+      z = 0.57
+      a = 1./(1.+z)
+      integrand = lambda lnm: np.exp(lnm)*self.MassFunc.fmassfunc(np.exp(lnm), a) * self.u(k, np.exp(lnm), z)
+      result = integrate.quad(integrand, np.log(self.MassFunc.mMin), np.log(self.MassFunc.mMax), epsabs=0, epsrel=1.e-2)[0]
+      print k, result
+      return result
+
+
+   def plotHODSmoothing(self):
+      """Compare the gas profile of CMASS galaxies in these scenarios:
+      - CMASS galaxies are all central with Mhalo=2.e13, z=0.57
+      - CMASS galaxies obey an HOD, at z=0.57
+      """
+      
+      R = np.logspace(np.log10(0.001), np.log10(10.), 101, 10.)
+
+      # simple CMASS gas profile
+
+      # more sophisticated CMASS gas profile
 
 
 

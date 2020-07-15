@@ -18,9 +18,9 @@ import pn_3d
 reload(pn_3d)
 from pn_3d import *
 
-import weight
-reload(weight)
-from weight import *
+import projection_kernel
+reload(projection_kernel)
+from projection_kernel import *
 
 import pn_2d
 reload(pn_2d)

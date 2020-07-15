@@ -4,12 +4,14 @@ from headers import *
 
 class P2dAuto(object):
 
-   def __init__(self, U, P3dAuto, Weight, name="", fPnoise=lambda l: 0., fTnoise=lambda l: 0., doT=False, save=False, nProc=1):
+   def __init__(self, U, P3dAuto, Weight, name=None, fPnoise=lambda l: 0., fTnoise=lambda l: 0., doT=False, save=False, nProc=1):
       # copy classes
       self.U = U
       self.Pn = P3dAuto
       self.Weight = Weight
-      self.name = str(Weight) + name
+      self.name = str(Weight)#+"_"+str(P3dAuto)
+      if name is not None:
+         self.name += "_"+ name
       self.fPnoise = fPnoise
       self.fTnoise = fTnoise
       self.nProc = nProc
@@ -36,16 +38,19 @@ class P2dAuto(object):
          if (save==True):
             self.SaveT()
          self.LoadT()
-      
+ 
+   def __str__(self):
+      return self.name
       
    def SaveP(self):
       print "precomputing p2d "+self.name
       data = np.zeros((len(self.L), 4))
       data[:,0] = self.L.copy()
-      pool = Pool(ncpus=self.nProc)
-      data[:,1] = np.array(pool.map(self.fP_1h, self.L))
-      data[:,2] = np.array(pool.map(self.fP_2h, self.L))
-      data[:,3] = np.array(pool.map(self.fPnoise, self.L))
+#      pool = Pool(ncpus=self.nProc)
+      with sharedmem.MapReduce(np=self.nProc) as pool:
+         data[:,1] = np.array(pool.map(self.fP_1h, self.L))
+         data[:,2] = np.array(pool.map(self.fP_2h, self.L))
+         data[:,3] = np.array(pool.map(self.fPnoise, self.L))
       np.savetxt("./output/pn_2d/p2d_"+self.name+".txt", data)
 
    def LoadP(self):
@@ -58,25 +63,23 @@ class P2dAuto(object):
       self.Ptot = self.P1h + self.P2h + self.Pnoise
       #
       # interpolate power spectra
-      forP1h = UnivariateSpline(self.L,self.P1h,k=1,s=0)
-      self.fP1hinterp = lambda l: forP1h(l)*(l>=min(self.L))*(l<=max(self.L))
-      forP2h = UnivariateSpline(self.L,self.P2h,k=1,s=0)
-      self.fP2hinterp = lambda l: forP2h(l)*(l>=min(self.L))*(l<=max(self.L))
-      forP = UnivariateSpline(self.L,self.P,k=1,s=0)
-      self.fPinterp = lambda l: forP(l)*(l>=min(self.L))*(l<=max(self.L))
-      forPtot = UnivariateSpline(self.L,self.Ptot,k=1,s=0)
-      self.fPtotinterp = lambda l: forPtot(l)*(l>=min(self.L))*(l<=max(self.L))
-   
+      self.fP1hinterp = interp1d(self.L, self.P1h, kind='cubic', bounds_error=False, fill_value=0.)
+      self.fP2hinterp = interp1d(self.L, self.P2h, kind='cubic', bounds_error=False, fill_value=0.)
+      self.fPinterp = interp1d(self.L, self.P, kind='cubic', bounds_error=False, fill_value=0.)
+      self.fPtotinterp = interp1d(self.L, self.Ptot, kind='cubic', bounds_error=False, fill_value=0.)
+
+
    def SaveT(self):
       print "precomputing t2d "+self.name
       data = np.zeros((len(self.L), 6))
-      pool = Pool(ncpus=self.nProc)
-      data[:,0] = self.L.copy()
-      data[:,1] = np.array(pool.map(self.fT_1h, self.L))
-      data[:,2] = np.array(pool.map(self.fTnoise, self.L))
-      data[:,3] = np.array(pool.map(self.fT_2h, self.L))
-      data[:,4] = np.array(pool.map(self.fT_4h, self.L))
-      data[:,5] = np.array(pool.map(self.fT_ssv, self.L))
+#      pool = Pool(ncpus=self.nProc)
+      with sharedmem.MapReduce(np=self.nProc) as pool:
+         data[:,0] = self.L.copy()
+         data[:,1] = np.array(pool.map(self.fT_1h, self.L))
+         data[:,2] = np.array(pool.map(self.fTnoise, self.L))
+         data[:,3] = np.array(pool.map(self.fT_2h, self.L))
+         data[:,4] = np.array(pool.map(self.fT_4h, self.L))
+         data[:,5] = np.array(pool.map(self.fT_ssv, self.L))
       np.savetxt("./output/pn_2d/t2d_"+self.name+".txt", data)
    
    def LoadT(self):
@@ -91,18 +94,12 @@ class P2dAuto(object):
       self.Ttot = self.T + self.Tnoise
       #
       # interpolate trispectra
-      forT1h = UnivariateSpline(self.L,self.T1h,k=1,s=0)
-      self.fT1hinterp = lambda l: forT1h(l)*(l>=min(self.L))*(l<=max(self.L))
-      forT2h = UnivariateSpline(self.L,self.T2h,k=1,s=0)
-      self.fT2hinterp = lambda l: forT1h(l)*(l>=min(self.L))*(l<=max(self.L))
-      forT4h = UnivariateSpline(self.L,self.T2h,k=1,s=0)
-      self.fT4hinterp = lambda l: forT4h(l)*(l>=min(self.L))*(l<=max(self.L))
-      forTssv = UnivariateSpline(self.L,self.Tssv,k=1,s=0)
-      self.fTssvinterp = lambda l: forTssv(l)*(l>=min(self.L))*(l<=max(self.L))
-      forT = UnivariateSpline(self.L,self.T,k=1,s=0)
-      self.fTinterp = lambda l: forT(l)*(l>=min(self.L))*(l<=max(self.L))
-      forTtot = UnivariateSpline(self.L,self.Ttot,k=1,s=0)
-      self.fTtotinterp = lambda l: forTtot(l)*(l>=min(self.L))*(l<=max(self.L))
+      self.fT1hinterp = interp1d(self.L, self.T1h, kind='linear', bounds_error=False, fill_value=0.)
+      self.fT2hinterp = interp1d(self.L, self.T2h, kind='linear', bounds_error=False, fill_value=0.)
+      self.fT4hinterp = interp1d(self.L, self.T2h, kind='linear', bounds_error=False, fill_value=0.)
+      self.fTssvinterp = interp1d(self.L, self.Tssv, kind='linear', bounds_error=False, fill_value=0.)
+      self.fTinterp = interp1d(self.L, self.T, kind='linear', bounds_error=False, fill_value=0.)
+      self.fTtotinterp = interp1d(self.L, self.Ttot, kind='linear', bounds_error=False, fill_value=0.)
 
    ##################################################################################
    # power spectrum
@@ -111,9 +108,9 @@ class P2dAuto(object):
       '''dP2d/da, to be integrated wrt a
       '''
       z = 1./a-1.
-      chi = self.U.ComovDist(a, self.U.a_obs)
+      chi = self.U.bg.comoving_distance(1./a-1.)
       #
-      result = 3.e5/( self.U.Hubble(a) * a**2 )
+      result = 3.e5/( self.U.hubble(1./a-1.) * a**2 )
       result *= self.Weight.f(a)**2
       result /= chi**2
       result *= fP(l/chi, z)
@@ -167,9 +164,9 @@ class P2dAuto(object):
 
    def integrandT(self, a, fP, l):
       z = 1./a-1.
-      chi = self.U.ComovDist(a, self.U.a_obs)
+      chi = self.U.bg.comoving_distance(1./a-1.)
       #
-      result = 3.e5/( self.U.Hubble(a) * a**2 )
+      result = 3.e5/( self.U.hubble(1./a-1.) * a**2 )
       result *= self.Weight.f(a)**4
       result /= chi**6
       result *= fP(l/chi, z)
@@ -217,9 +214,9 @@ class P2dAuto(object):
 
    def integrandTNonDiag(self, a, fP, l1, l2):
       z = 1./a-1.
-      chi = self.U.ComovDist(a, self.U.a_obs)
+      chi = self.U.bg.comoving_distance(1./a-1.)
       #
-      result = 3.e5/( self.U.Hubble(a) * a**2 )
+      result = 3.e5/( self.U.hubble(1./a-1.) * a**2 )
       result *= self.Weight.f(a)**4
       result /= chi**6
       result *= fP(l1/chi, l2/chi, z)
@@ -306,17 +303,18 @@ class P2dAuto(object):
    def plotdPdz(self, l=1.e3):
       A = np.linspace(self.aMin, self.aMax, 201)
       Z = 1./A-1.
-      print Z
-      Chi = np.array(map(lambda a: self.U.ComovDist(a, 1.), A))
-      H = np.array(map(lambda a: self.U.Hubble(a), A))
+      Chi = np.array(map(lambda a: self.U.bg.comoving_distance(1./a-1.), A))
+      H = np.array(map(lambda a: self.U.hubble(1./a-1.), A))
       W = np.array(map(self.Weight.f, A))
       dChidA = 3.e5 / (H*A**2)
       dChidZ = 3.e5 / H
       
       # redshift contributions for P1h and P2h
-      f = lambda a: self.integrandP(a, self.Pn.fP_1h, l)
+#      f = lambda a: self.integrandP(a, self.Pn.fP_1h, l)
+      f = lambda a: self.integrandP(a, self.Pn.fP1hinterp, l)
       dP1h_da = np.array(map(f, A))
-      f = lambda a: self.integrandP(a, self.Pn.fP_2h, l)
+#      f = lambda a: self.integrandP(a, self.Pn.fP_2h, l)
+      f = lambda a: self.integrandP(a, self.Pn.fP2hinterp, l)
       dP2h_da = np.array(map(f, A))
       #
       dP1h_dz = dP1h_da * A**2
@@ -331,13 +329,13 @@ class P2dAuto(object):
       '''
       def f(a):
          z = 1./a-1.
-         chi = self.U.ComovDist(a, 1.)
+         chi = self.U.bg.comoving_distance(1./a-1.)
          return self.Pn.fP_1h(l/chi, z)
       P3d_1h = np.array(map(f, A))
       
       def f(a):
          z = 1./a-1.
-         chi = self.U.ComovDist(a, 1.)
+         chi = self.U.bg.comoving_distance(1./a-1.)
          return self.Pn.fP_2h(l/chi, z)
       P3d_2h = np.array(map(f, A))
       
@@ -396,8 +394,9 @@ class P2dAuto(object):
       ax.set_ylabel(r'$d C_{\ell='+str(int(l))+'} / dz$')
       #
       path = "./figures/pn2d/dp2d_dz"+self.name+".pdf"
-      #fig.savefig(path, bbox_inches='tight')
-   
+#      fig.savefig(path, bbox_inches='tight')
+#      fig.clf()
+
       '''
       fig=plt.figure(2)
       ax=fig.add_subplot(111)
@@ -430,8 +429,8 @@ class P2dAuto(object):
       zEdges = np.linspace(zMin-0.5*dZ, zMax+0.5*dZ, nZ+1)
 
       A = 1./(1.+Z)
-      Chi = np.array(map(lambda a: self.U.ComovDist(a, 1.), A))
-      H = np.array(map(lambda a: self.U.Hubble(a), A))
+      Chi = np.array(map(lambda a: self.U.bg.comoving_distance(1./a-1.), A))
+      H = np.array(map(lambda a: self.U.hubble(1./a-1.), A))
       W = np.array(map(self.Weight.f, A))
       dChidA = 3.e5 / (H*A**2)
       dChidZ = 3.e5 / H
@@ -616,15 +615,15 @@ class P2dAuto(object):
    def plotIntegrandT(self, l=5.e2):
       A = np.linspace(self.aMin, self.aMax, 101)
       Z = 1./A-1.
-      Chi = np.array(map(lambda a: self.U.ComovDist(a, 1.), A))
-      H = np.array(map(lambda a: self.U.Hubble(a), A))
+      Chi = np.array(map(lambda a: self.U.bg.comoving_distance(1./a-1.), A))
+      H = np.array(map(lambda a: self.U.hubble(1./a-1.), A))
       W = np.array(map(self.Weight.f, A))
       dChidA = 3.e5 / (H*A**2)
       dChidZ = 3.e5 / H
       
       def f(a):
          z = 1./a-1.
-         chi = self.U.ComovDist(a, 1.)
+         chi = self.U.bg.comoving_distance(1./a-1.)
          return self.Pn.fT1hinterp(l/chi, z)
       T3d_1h = np.array(map(f, A))
       
@@ -683,13 +682,15 @@ class P2dAuto(object):
 
 class P2dCross(P2dAuto):
    
-   def __init__(self, U, P3dCross, Weight1, Weight2, name="", fPnoise=lambda l: 0., fTnoise=lambda l: 0., doT=False, save=False, nProc=1):
+   def __init__(self, U, P3dCross, Weight1, Weight2, name=None, fPnoise=lambda l: 0., fTnoise=lambda l: 0., doT=False, save=False, nProc=1):
       # copy classes
       self.U = U
       self.Pn = P3dCross
       self.Weight1 = Weight1
       self.Weight2 = Weight2
-      self.name = str(self.Weight1) + str(self.Weight2) + name
+      self.name = str(self.Weight1) + str(self.Weight2)#+"_"+str(P3dCross)+"_"+ name
+      if name is not None:
+         self.name += "_"+ name
       self.fPnoise = fPnoise
       self.fTnoise = fTnoise
       self.nProc = nProc
@@ -717,14 +718,16 @@ class P2dCross(P2dAuto):
             self.SaveT()
          self.LoadT()
 
+   def __str__(self):
+      return self.name
 
    ##################################################################################
    
    def integrandP(self, a, fP, l):
       z = 1./a-1.
-      chi = self.U.ComovDist(a, self.U.a_obs)
+      chi = self.U.bg.comoving_distance(1./a-1.)
       #
-      result = 3.e5/( self.U.Hubble(a) * a**2 )
+      result = 3.e5/( self.U.hubble(1./a-1.) * a**2 )
       result *= self.Weight1.f(a) * self.Weight2.f(a)
       result /= chi**2
       result *= fP(l/chi, z)
@@ -732,17 +735,13 @@ class P2dCross(P2dAuto):
 
    def integrandT(self, a, fP, l):
       z = 1./a-1.
-      chi = self.U.ComovDist(a, self.U.a_obs)
+      chi = self.U.bg.comoving_distance(1./a-1.)
       #
-      result = 3.e5/( self.U.Hubble(a) * a**2 )
+      result = 3.e5/( self.U.hubble(1./a-1.) * a**2 )
       result *= self.Weight1.f(a)**2 * self.Weight2.f(a)**2
       result /= chi**6
       result *= fP(l/chi, z)
       return result
-
-
-
-
 
 
 

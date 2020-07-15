@@ -3,7 +3,9 @@ from headers import *
 
 class MassFunction(object):
 
-   def __init__(self, U, save=False):
+   def __init__(self, U, nProc=1, save=False):
+      self.U = U
+      self.nProc = nProc
    
       # required variables: path_MassFunc, path_B1, path_B2
       
@@ -18,9 +20,6 @@ class MassFunction(object):
       self.aMax = 1.
       self.Na = 101
       self.A = np.linspace(self.aMin, self.aMax, self.Na)
-   
-      # copy U and Proj
-      self.U = U
       
       # compute things if necessary
       if save==True:
@@ -42,16 +41,21 @@ class MassFunction(object):
       Massfunc = np.zeros((self.Nm, self.Na))
       B1 = np.zeros((self.Nm, self.Na))
       B2 = np.zeros((self.Nm, self.Na))
-      
-      for ia in range(self.Na):
-         z = 1./self.A[ia] - 1.
-         for im in range(self.Nm):
-            m = self.M[im]
-            # make sure not to get 0
-            Massfunc[im, ia] = max( self.massfunc(m, z), 1.e-300 )
-            B1[im, ia], B2[im, ia] = self.b(m, z)
-         print "- done "+str(ia+1)+" of "+str(self.Na)
-      
+
+      # Evaluate in parallel
+      with sharedmem.MapReduce(np=self.nProc) as pool:
+         for ia in range(self.Na):
+            z = 1./self.A[ia] - 1.
+            # compute mass function
+            f = lambda m: max(self.massfunc(m, z), 1.e-300)
+            Massfunc[:, ia] = np.array(pool.map(f, self.M))
+            # compute halo biases
+            f = lambda m: self.b(m, z)
+            result = np.array(pool.map(f, self.M))
+            B1[:, ia] = result[:,0]
+            B2[:, ia] = result[:,1]
+            print "- done "+str(ia+1)+" of "+str(self.Na)
+
       np.savetxt(self.path_Massfunc, Massfunc)
       np.savetxt(self.path_B1, B1)
       np.savetxt(self.path_B2, B2)
@@ -135,10 +139,45 @@ class MassFunction(object):
       plt.show()
 
 
+   def plotMassFunc(self):
+      """Useful for comparison with Springel et al 2005.
+      Mass function at different redshifts from my code.
+      """
+      Z = np.array([0., 1.5, 3.06, 5.72, 10.07])
+      M = np.logspace(np.log10(1.e10), np.log10(1.e16), 101, 10.) # Msun/h
+      
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         # interpolated function
+         f = lambda m: self.fmassfunc(m, 1./(1.+z)) * m**2 / self.U.rho_m(z)
+         # non-interpolated function
+         #f = lambda m: self.massfunc(m, z) * m**2 / self.U.rho_m(z)
+         y = np.array(map(f, M))
+         ax.loglog(M, y, 'r', label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=1)
+      ax.set_xlabel(r'M [$M_\odot/h$]')
+      ax.set_ylabel(r'$M_\odot^2 \rho^{-1} dn/dm$ [dimensionless]')
+      ax.set_xlim((1.e10, 1.e16))
+      ax.set_ylim((1.e-6, 1.e-1))
+
+      plt.show()
+
+
+##################################################################################
 ##################################################################################
 
-
 class MassFuncPS(MassFunction):
+
+   def __init__(self, U, nProc=1, save=False):
+      # paths for saving/loading data
+      self.path_Massfunc = "./output/massfunc/PS_Massfunc.txt"
+      self.path_B1 = "./output/massfunc/PS_B1.txt"
+      self.path_B2 = "./output/massfunc/PS_B2.txt"
+      #
+      super(MassFuncPS, self).__init__(U, nProc=nProc, save=save)
 
    def f(self, nu, z):
       """returns f(nu) for the Sheth-Tormen mass function
@@ -157,32 +196,40 @@ class MassFuncPS(MassFunction):
       """dn/dm
       """
       nu = self.U.fnu(m, z)
-      f = self.U.rho_z(z)/m**2
+      f = self.U.rho_m(z)/m**2
       f *= nu * self.f(nu, z)
       f *= self.U.fdlnnu_dlnm(m, z)
       return f
-   
-   def __init__(self, U, save=False):
-      # paths for saving/loading data
-      self.path_Massfunc = "./output/massfunc/PS_Massfunc.txt"
-      self.path_B1 = "./output/massfunc/PS_B1.txt"
-      self.path_B2 = "./output/massfunc/PS_B2.txt"
-      #
-      super(MassFuncPS, self).__init__(U, save=save)
-
 
 
 ##################################################################################
+##################################################################################
 
 class MassFuncST(MassFunction):
-   
+
+   def __init__(self, U, nProc=1, save=False):
+      # params for Sheth-Tormen
+      # different from Sheth & Tormen 1999, q = 0.707
+      self.p = .3
+      #self.q = .707 # from Takada & Jain 2002
+      self.q = .75  # from Takada & Jain 2003
+      # amplitude, function of p only, to have "int f(nu) dnu = 1"
+      self.A_p = 1./( 1. + special.gamma(0.5-self.p)/(2**self.p * np.sqrt(np.pi)) )
+
+      # paths for saving/loading data
+      self.path_Massfunc = "./output/massfunc/ST_Massfunc.txt"
+      self.path_B1 = "./output/massfunc/ST_B1.txt"
+      self.path_B2 = "./output/massfunc/ST_B2.txt"
+      #
+      super(MassFuncST, self).__init__(U, nProc=nProc, save=save)
+
    def f(self, nu, z):
       """returns f(nu) for the Sheth-Tormen mass function
       """
       f = self.A_p
       f *= 1 + (self.q*nu)**(-self.p)
       f *= np.sqrt( self.q*nu / (2.*np.pi) )
-      f *= exp( -0.5 * self.q*nu )
+      f *= np.exp( -0.5 * self.q*nu )
       f /= nu  # to get f(nu) and not nu*f(nu)
       return f
 
@@ -204,34 +251,20 @@ class MassFuncST(MassFunction):
       """dn/dm
       """
       nu = self.U.fnu(m, z)
-      f = self.U.rho_z(z)/m**2
+      f = self.U.rho_m(z)/m**2
       f *= nu * self.f(nu, z)
       f *= self.U.fdlnnu_dlnm(m, z)
       return f
 
-   def __init__(self, U, save=False):
-      # params for Sheth-Tormen
-      # different from Sheth & Tormen 1999, q = 0.707
-      self.p = .3
-      #self.q = .707 # from Takada & Jain 2002
-      self.q = .75  # from Takada & Jain 2003
-      # amplitude, function of p only, to have "int f(nu) dnu = 1"
-      self.A_p = 1./( 1. + special.gamma(0.5-self.p)/(2**self.p * np.sqrt(np.pi)) )
-
-      # paths for saving/loading data
-      self.path_Massfunc = "./output/massfunc/ST_Massfunc.txt"
-      self.path_B1 = "./output/massfunc/ST_B1.txt"
-      self.path_B2 = "./output/massfunc/ST_B2.txt"
-      #
-      super(MassFuncST, self).__init__(U, save=save)
 
 
+##################################################################################
 ##################################################################################
 
 
 class MassFuncTinker(MassFunction):
    
-   def __init__(self, U, save=False):
+   def __init__(self, U, nProc=1, save=False):
       # copy U and Proj
       self.U = U
       
@@ -253,7 +286,7 @@ class MassFuncTinker(MassFunction):
       self.path_B1 = "./output/massfunc/Tinker_B1.txt"
       self.path_B2 = "./output/massfunc/Tinker_B2.txt"
       #
-      super(MassFuncTinker, self).__init__(U, save=save)
+      super(MassFuncTinker, self).__init__(U, nProc=nProc, save=save)
 
 
    def f(self, sigma, z):
@@ -272,11 +305,11 @@ class MassFuncTinker(MassFunction):
    def Tinker_massfunc_m200d(self, m, z):
       """dn/dm200d; input m=m200d here
       """
-      r = (3.*m / (4.*np.pi*self.U.rho_z(z)))**(1./3.)
+      r = (3.*m / (4.*np.pi*self.U.rho_m(z)))**(1./3.)
       sigma = np.sqrt( self.U.Sigma2(r, z, W3d_sth) )
       #
       f = self.f(sigma, z)
-      f *= self.U.rho_z(z)/m**2
+      f *= self.U.rho_m(z)/m**2
       f *= abs(self.U.fdlnSigma_dlnM(m, z))
       return f
    
@@ -315,7 +348,7 @@ class MassFuncTinker(MassFunction):
    
    def b(self, m, z):
       # Tinker's convention: nu = dc/sigma
-      R = (3.*m / (4.*np.pi*self.U.rho_z(z)))**(1./3.)
+      R = (3.*m / (4.*np.pi*self.U.rho_m(z)))**(1./3.)
       dc = 1.686  # from Tinker et al 2010
       nu = dc / np.sqrt( self.U.Sigma2(R, z, W3d_sth) )
       # first order bias
@@ -362,7 +395,7 @@ class MassFuncTinker(MassFunction):
       #
       fig5 = plt.figure(5)
       ax = plt.subplot(111)
-      ax.loglog(M, M**2/self.U.rho_z(z) * Tinker_massfunc, 'g', label='my code')
+      ax.loglog(M, M**2/self.U.rho_m(z) * Tinker_massfunc, 'g', label='my code')
       ax.loglog(X, Y, 'r', label='Tinker et al 2008')
       ax.grid()
       ax.set_xlabel(r'$M_{200,d}$ [$M_{sun}$/h]')

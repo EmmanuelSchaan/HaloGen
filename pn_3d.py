@@ -5,7 +5,7 @@ from headers import *
 
 class P3dAuto(object):
    
-   def __init__(self, U, IHaloModel, Prof, fPnoise=lambda k,z: 0., fTnoise=lambda k,z: 0., name="", doT=False, Vs=1., save=False):
+   def __init__(self, U, IHaloModel, Prof, fPnoise=lambda k,z: 0., fTnoise=lambda k,z: 0., name="", doT=False, Vs=1., nProc=1, save=False):
       # copy classes
       self.U = U
       self.IHaloModel = IHaloModel
@@ -14,6 +14,7 @@ class P3dAuto(object):
       self.fTnoise = fTnoise
       self.Vs = Vs   # in (Mpc/h)^3
       self.name = str(self.Prof) + name
+      self.nProc = nProc
       
       # values of k to evaluate
       self.K = np.genfromtxt("./input/Kc.txt") # center of the bins for k
@@ -38,6 +39,8 @@ class P3dAuto(object):
             self.SaveT()
          self.LoadT()
 
+   def __str__(self):
+      return self.name
 
    def SaveP(self):
       nZ = len(self.Z)
@@ -51,18 +54,19 @@ class P3dAuto(object):
    
       # precompute the polyspectra
       print "precomputing p3d "+self.name
-      for iZ in range(nZ):
-         z = self.Z[iZ]
-         for iK in range(nK):
-            k = self.K[iK]
-            # power spectra
-            P1h[iK, iZ] = self.fP_1h(k, z)
-            P2h[iK, iZ] = self.fP_2h(k, z)
-            Pshot[iK, iZ] = self.fPnoise(k, z)
-            dP[iK, iZ] = self.fdP(k, z)
-            #print "done k "+str(iK)+" of "+str(nK)
-         print "done z "+str(iZ)+" of "+str(nZ)
-   
+      with sharedmem.MapReduce(np=self.nProc) as pool:
+         for iZ in range(nZ):
+            z = self.Z[iZ]
+            f = lambda k: self.fP_1h(k, z)
+            P1h[:, iZ] = np.array(pool.map(f, self.K))
+            f = lambda k: self.fP_2h(k, z)
+            P2h[:, iZ] = np.array(pool.map(f, self.K))
+            f = lambda k: self.fPnoise(k, z)
+            Pshot[:, iZ] = np.array(pool.map(f, self.K))
+            f = lambda k: self.fdP(k, z)
+            dP[:, iZ] = np.array(pool.map(f, self.K))
+            print "done z "+str(iZ)+" of "+str(nZ)
+
       # save power spectra
       path = "./output/pn_3d/p3d_"+self.name
       np.savetxt(path+"_z.txt", self.Z)
@@ -106,19 +110,20 @@ class P3dAuto(object):
       Tshot = np.zeros((nK, nZ))
       
       # precompute the polyspectra
-      print "precomputing t3d "+self.name
-      for iZ in range(nZ):
-         z = self.Z[iZ]
-         for iK in range(nK):
-            k = self.K[iK]
-            # equilateral trispectra
-            T1h[iK, iZ] = self.fT_1h(k, z)
-            T2h[iK, iZ] = self.fT_2h(k, z)
-            T4h[iK, iZ] = self.fT_4h(k, z)
-            Tshot[iK, iZ] = self.fTnoise(k, z)
-         #print "done k "+str(iK)+" of "+str(nK)
-         print "done z "+str(iZ)+" of "+str(nZ)
-      
+      print "precomputing t3d equilateral "+self.name
+      with sharedmem.MapReduce(np=self.nProc) as pool:
+         for iZ in range(nZ):
+            z = self.Z[iZ]
+            f = lambda k: self.fT_1h(k, z)
+            T1h[:, iZ] = np.array(pool.map(f, self.K))
+            f = lambda k: self.fT_2h(k, z)
+            T2h[:, iZ] = np.array(pool.map(f, self.K))
+            f = lambda k: self.fT_4h(k, z)
+            T4h[:, iZ] = np.array(pool.map(f, self.K))
+            f = lambda k: self.fTnoise(k, z)
+            Tshot[:, iZ] = np.array(pool.map(f, self.K))
+            print "done z "+str(iZ)+" of "+str(nZ)
+   
       # save trispectra
       path = "./output/pn_3d/t3d_"+self.name
       np.savetxt(path+"_z.txt", self.Z)
@@ -256,7 +261,7 @@ class P3dAuto(object):
    def fP_2h(self, k, z):
       Profiles = [[self.Prof, 1, k]]
       result = self.IHaloModel.f(1, Profiles, z)**2
-      result *= self.U.fPlin_z(k, z)
+      result *= self.U.fPlin(k, z)
       if not np.isfinite(result):
          result = 0.
       return result
@@ -288,8 +293,8 @@ class P3dAuto(object):
       I2 = self.IHaloModel.f(2, Profiles, z)
       
       result = 2*I1*I2
-      result += I1**2 * self.U.fdlnPdDelta(k,z)
-      result *= self.U.fPlin_z(k, z)
+      result += I1**2 * self.U.dlnPlindDelta(k,z)
+      result *= self.U.fPlin(k, z)
       return result
    
    def fdP(self, k, z):
@@ -309,7 +314,7 @@ class P3dAuto(object):
       Profiles = [[self.Prof, 1, k]]
       result = self.IHaloModel.f(1, Profiles, z)
       result *= self.IHaloModel.f(1, Profiles, z, mMin=mMin)
-      result *= self.U.fPlin_z(k, z)
+      result *= self.U.fPlin(k, z)
       result *= 2.
       return result
 
@@ -355,13 +360,13 @@ class P3dAuto(object):
       result13 = self.IHaloModel.f(1, Profiles, z)
       Profiles = [[self.Prof, 3, k]]
       result13 *= self.IHaloModel.f(1, Profiles, z)
-      result13 *= self.U.fPlin_z(k, z)
+      result13 *= self.U.fPlin(k, z)
       result13 *= 4. # permutations
       # term 2h 22
       Profiles = [[self.Prof, 2, k]]
       result22 = self.IHaloModel.f(1, Profiles, z)
       result22 **= 2.
-      result22 *= self.U.fPlin_z(k*np.sqrt(2.), z) # the sqrt(2.) is from the azimuthal average
+      result22 *= self.U.fPlin(k*np.sqrt(2.), z)  # the sqrt(2.) is from the azimuthal average
       result22 *= 2. # non-zero permutations
       # sum
       result = result13 + result22
@@ -384,7 +389,7 @@ class P3dAuto(object):
       result **= 4.
       # from Scoccimarro Zaldarriaga Hui 99:
       # T(k,-k,k,-k) azimuthally averaged in PT \simeq 232/441 * P(k)**3
-      result *= 232./441. * self.U.fPlin_z(k, z)**3
+      result *= 232./441. * self.U.fPlin(k, z)**3
       if not np.isfinite(result):
          result = 0.
       return result
@@ -412,7 +417,7 @@ class P3dAuto(object):
       """
       result = self.fdPinterp(k1, z)
       result *= self.fdPinterp(k2, z)
-      result *= self.U.fPlin_z(K, z)
+      result *= self.U.fPlin(k, z)
       if not np.isfinite(result):
          result = 0.
       return result
@@ -466,10 +471,10 @@ class P3dAuto(object):
    
 
 
-   def plotP(self, z=0.):
+   def plotP(self, z=0., p3d=None):
    
       # Plin
-      f = lambda k: self.U.fPlin_z(k,z)
+      f = lambda k: self.U.fPlin(k, z)
       Plin = np.array(map(f, self.K))
       # P1h
       f = lambda k: self.fP_1h(k, z)
@@ -482,25 +487,48 @@ class P3dAuto(object):
       Pnoise = np.array(map(f, self.K))
       # P1h+P2h
       P = P1h + P2h + Pnoise
+      # other power spectrum to be compared
+      if p3d is not None:
+         f = lambda k: p3d.fPinterp(k, z)
+         P3d = np.array(map(f, self.K))
+      
       
       fig = plt.figure(0)
       ax = plt.subplot(111)
       #
       ax.loglog(self.K, P, 'k', lw=4, label=r'$P_\text{tot}$')
+      #
+      if p3d is not None:
+         ax.loglog(self.K, P3d, 'k--', lw=2, label=str(p3d))
+      #
       ax.loglog(self.K, P2h, 'b-', lw=2, label=r'$P_\text{2h}$')
       #ax.loglog(self.K, self.Prof.bias(1./(1.+z))**2 * Plin, 'b--', lw=2, label=r'$b_\text{eff}^2 P_\text{lin}$')
       ax.loglog(self.K, Plin, 'k--', lw=2, label=r'$P_\text{lin}$')
       ax.loglog(self.K, P1h, 'r-', lw=2, label=r'$P_\text{1h}$')
       ax.loglog(self.K, Pnoise, 'g-', lw=2, label=r'$P_\text{noise}$')
-      
+
       #
       ax.grid()
       ax.legend(loc=3)
-      ax.set_xlabel(r'k [h/Mpc]')
+      ax.set_xlabel(r'$k$ [h/Mpc]')
       ax.set_ylabel(r'$P(k)$')
       #path = "./figures/pn3d/p_"+self.name+"z_"+str(z)+".pdf"
       #fig.savefig(path, bbox_inches='tight')
-   
+
+
+      if p3d is not None:
+         fig=plt.figure(1)
+         ax=fig.add_subplot(111)
+         #
+         ax.semilogx(self.K, P/P3d, 'r')
+         #
+         ax.axhline(0.9)
+         ax.axhline(1.)
+         ax.axhline(1.1)
+         #
+         ax.set_xlabel(r'$k$ [h/Mpc]')
+         ax.set_ylabel(r'ratio with '+str(p3d))
+
       plt.show()
 
 
@@ -592,7 +620,7 @@ class P3dAuto(object):
 
 class P3dCross(P3dAuto):
    
-   def __init__(self, U, IHaloModel, Prof1, Prof2, fPnoise=lambda k,z: 0., fTnoise=lambda k,z: 0., name="", doT=False, Vs=1., save=False):
+   def __init__(self, U, IHaloModel, Prof1, Prof2, fPnoise=lambda k,z: 0., fTnoise=lambda k,z: 0., name="", doT=False, Vs=1., nProc=1, save=False):
       # copy classes
       self.U = U
       self.IHaloModel = IHaloModel
@@ -602,6 +630,7 @@ class P3dCross(P3dAuto):
       self.fTnoise = fTnoise
       self.Vs = Vs   # in (Mpc/h)^3
       self.name = str(self.Prof1) + str(self.Prof2) + name
+      self.nProc = nProc
    
       # values of k to evaluate
       self.K = np.genfromtxt("./input/Kc.txt") # center of the bins for k
@@ -624,6 +653,8 @@ class P3dCross(P3dAuto):
             self.SaveT()
          self.LoadT()
 
+   def __str__(self):
+      return self.name
 
    def SaveT(self):
       nZ = len(self.Z)
@@ -671,7 +702,7 @@ class P3dCross(P3dAuto):
       result = self.IHaloModel.f(1, Profiles, z)
       Profiles = [[self.Prof2, 1, k]]
       result *= self.IHaloModel.f(1, Profiles, z)
-      result *= self.U.fPlin_z(k, z)
+      result *= self.U.fPlin(k, z)
       return result
    
    def fP(self, K, z):
@@ -696,8 +727,8 @@ class P3dCross(P3dAuto):
       I2_2 = self.IHaloModel.f(2, Profiles, z)
       
       result = I2_1*I1_2 + I1_1*I2_2
-      result += I1_1*I1_2 * self.U.fdlnPdDelta(k,z)
-      result *= self.U.fPlin_z(k, z)
+      result += I1_1*I1_2 * self.U.dlnPlindDelta(k,z)
+      result *= self.U.fPlin(k, z)
       return result
 
    def fdP(self, K, z):
@@ -773,7 +804,7 @@ class P3dCross(P3dAuto):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z)
 #      P2h *= self.Mij.f(1, 1, [k], z, nbias=1)
-#      P2h *= self.U.fPlin_z(k, z)
+#      P2h *= self.U.fPlin(k, z)
 #      P2h *= 2.
 #      return P2h
 #
@@ -790,7 +821,7 @@ class P3dCross(P3dAuto):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z, mMin=self.Mij.mMin)
 #      P2h *= self.Mij.f(1, 1, [k], z)
-#      P2h *= self.U.fPlin_z(k, z)
+#      P2h *= self.U.fPlin(k, z)
 #      P2h *= 2.
 #      return P2h
 #
@@ -864,7 +895,7 @@ class P3dCross(P3dAuto):
 #      if n==2:
 #         # linear
 #         if id=="linear":
-#            return self.U.fPlin_z(K[0], z)
+#            return self.U.fPlin(K[0], z)
 #         # non-linear
 #         if id=='':
 #            if ihalo==0:
@@ -953,7 +984,7 @@ class P3dCross(P3dAuto):
 #   def fP_2h(self, K, z):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z)**2
-#      P2h *= self.U.fPlin_z(k, z)
+#      P2h *= self.U.fPlin(k, z)
 #         #if k > 3. or k < 1.e-4: # WATCH OUT !!!
 #         #P2h = 0.
 #      return P2h
@@ -974,7 +1005,7 @@ class P3dCross(P3dAuto):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z)
 #      P2h *= self.Mij.f(1, 1, [k], z, nbias=1)
-#      P2h *= self.U.fPlin_z(k, z)
+#      P2h *= self.U.fPlin(k, z)
 #      P2h *= 2.
 #      return P2h
 #
@@ -991,7 +1022,7 @@ class P3dCross(P3dAuto):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z, mMin=self.Mij.mMin)
 #      P2h *= self.Mij.f(1, 1, [k], z)
-#      P2h *= self.U.fPlin_z(k, z)
+#      P2h *= self.U.fPlin(k, z)
 #      P2h *= 2.
 #      return P2h
 #   
@@ -1051,18 +1082,18 @@ class P3dCross(P3dAuto):
 #      k1=k2=k3= K[0]
 #      B2h = self.Mij.f(1, 1, [k1], z)
 #      B2h *= self.Mij.f(1, 2, [k2, k3], z)
-#      B2h *= self.U.fPlin_z(k1, z)
+#      B2h *= self.U.fPlin(k1, z)
 #      B2h *= 3.
 #      return B2h
 #   
 #   def fB_3h(self, K, z):
 #      k1=k2=k3= K[0]
 #      B3h_PT = 2. * self.F2([k1, k2, 2.*np.pi/3.])
-#      B3h_PT *= self.U.fPlin_z(k1, z) * self.U.fPlin_z(k2, z)
+#      B3h_PT *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
 #      B3h_PT *= self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z)
 #      B3h_PT *= 3.
 #      B3h_b2 = self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z)
-#      B3h_b2 *= self.U.fPlin_z(k1, z) * self.U.fPlin_z(k2, z)
+#      B3h_b2 *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
 #      B3h_b2 *= 3.
 #      B3h = B3h_PT + B3h_b2
 #      return B3h
@@ -1082,7 +1113,7 @@ class P3dCross(P3dAuto):
 #      k1=k2=k3= K[0]
 #      B2h = self.Mij.f(1, 1, [k1], z, nbias=1) * self.Mij.f(1, 2, [k2, k3], z)
 #      B2h += self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 2, [k2, k3], z, nbias=1)
-#      B2h *= self.U.fPlin_z(k1, z)
+#      B2h *= self.U.fPlin(k1, z)
 #      B2h *= 3.
 #      return B2h
 #   
@@ -1092,12 +1123,12 @@ class P3dCross(P3dAuto):
 #      B3h_PT +=  self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z, nbias=1) * self.Mij.f(1, 1, [k3], z)
 #      B3h_PT +=  self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z, nbias=1)
 #      B3h_PT *= 2. * self.F2([k1, k2, 2.*np.pi/3.])
-#      B3h_PT *= self.U.fPlin_z(k1, z) * self.U.fPlin_z(k2, z)
+#      B3h_PT *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
 #      B3h_PT *= 3.
 #      B3h_b2 = self.Mij.f(2, 1, [k1], z, nbias=1) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z)
 #      B3h_b2 += self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z, nbias=1) * self.Mij.f(1, 1, [k3], z)
 #      B3h_b2 += self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z, nbias=1)
-#      B3h_b2 *= self.U.fPlin_z(k1, z) * self.U.fPlin_z(k2, z)
+#      B3h_b2 *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
 #      B3h_b2 *= 3.
 #      B3h = B3h_PT + B3h_b2
 #      return B3h
@@ -1116,7 +1147,7 @@ class P3dCross(P3dAuto):
 #      k1=k2=k3= K[0]
 #      B2h = self.Mij.f(1, 1, [k1], z, mMin=self.Mij.mMin) * self.Mij.f(1, 2, [k2, k3], z)
 #      B2h += self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 2, [k2, k3], z, mMin=self.Mij.mMin)
-#      B2h *= self.U.fPlin_z(k1, z)
+#      B2h *= self.U.fPlin(k1, z)
 #      B2h *= 3.
 #      return B2h
 #   
@@ -1126,12 +1157,12 @@ class P3dCross(P3dAuto):
 #      B3h_PT +=  self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z, mMin=self.Mij.mMin) * self.Mij.f(1, 1, [k3], z)
 #      B3h_PT +=  self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z, mMin=self.Mij.mMin)
 #      B3h_PT *= 2. * self.F2([k1, k2, 2.*np.pi/3.])
-#      B3h_PT *= self.U.fPlin_z(k1, z) * self.U.fPlin_z(k2, z)
+#      B3h_PT *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
 #      B3h_PT *= 3.
 #      B3h_b2 = self.Mij.f(2, 1, [k1], z, mMin=self.Mij.mMin) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z)
 #      B3h_b2 += self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z, mMin=self.Mij.mMin) * self.Mij.f(1, 1, [k3], z)
 #      B3h_b2 += self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z, mMin=self.Mij.mMin)
-#      B3h_b2 *= self.U.fPlin_z(k1, z) * self.U.fPlin_z(k2, z)
+#      B3h_b2 *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
 #      B3h_b2 *= 3.
 #      B3h = B3h_PT + B3h_b2
 #      return B3h
@@ -1213,7 +1244,7 @@ class P3dCross(P3dAuto):
 #   # at z=0
 #   def SavePn3d(self, n, id='', nondiag=0):
 #      # redshift of observer
-#      z = 1./self.U.a_obs - 1.
+#      z = 0.  #1./self.U.a_obs - 1.
 #      K0 = np.ones(n)
 #      
 #      print "- computing "+self.Name(n, ihalo=0, id=id, nondiag=nondiag)
