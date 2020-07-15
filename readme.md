@@ -1,4 +1,4 @@
-# HaloGen
+# HaloGen (LIM branch)
 
 Modular halo model code for 3d power spectra, and the corresponding projected 2d power spectra in the Limber and flat sky approximations.
 Observables: matter density, galaxy lensing, CMB lensing, thermal Sunyaev-Zel'dovich (Hill & Pajer 2013), cosmic infrared background (Penin+12, 14), tracers with any dn/dz, b(z) and HOD.
