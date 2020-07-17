@@ -1,3 +1,10 @@
-./*.pyc
-./.*.swp
-./.DS_Store
+.DS_Store
+.DS_Store?
+
+# python compiled files
+*.pyc
+.*.swp
+
+# all output files
+output/
+figures/
