@@ -8,3 +8,4 @@
 # all output files
 output/
 figures/
+.ipynb_checkpoints/
