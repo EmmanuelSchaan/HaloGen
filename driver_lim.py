@@ -40,13 +40,16 @@ massFunc = MassFuncST(u, save=False)
 ##################################################################################
 
 sfr = Sfr(u, massFunc)
-#sfr.testSfrd()
+sfr.testSfrd()
 
 ##################################################################################
 
 profLIM = ProfLIM(u, sfr, lineName='halpha', trunc=4.)
 
-#profLIM.plotU()
+profLIM.plotU(z=1.)
+profLIM.plotNgal()
+profLIM.plotnGal()
+profLIM.plotMeanIntensity()
 
 ##################################################################################
 
@@ -56,9 +59,10 @@ iHaloModel = IHaloModel(u, massFunc)
 ##################################################################################
 
 
-p3d_lim = P3dAuto(u, iHaloModel, profLIM, fPnoise = lambda k,z: profLIM.Pshot(z), doT=False, save=False)
-#p3d_lim = P3dAuto(u, iHaloModel, profLIM, fPnoise = lambda k,z: 1./profLIM.nGal(z), doT=False, save=False)
+#p3d_lim = P3dAuto(u, iHaloModel, profLIM, fPnoise = lambda k,z: profLIM.Pshot(z), doT=False, save=False)
+p3d_lim = P3dAuto(u, iHaloModel, profLIM, fPnoise = lambda k,z: 1./profLIM.nGal(z), doT=False, save=False)
 #p3d_limlim = P3dCross(u, iHaloModel, profLIM, profLIM, doT=False, save=False)
 
-
+p3d_lim.plotP(z=1.)
+p3d_lim.plotBEff()
 

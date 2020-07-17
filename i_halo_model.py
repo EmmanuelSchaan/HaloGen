@@ -66,7 +66,7 @@ class IHaloModel():
       mMaxIntegral = np.min([ Profiles[j][0].mMax for j in range(len(Profiles)) ])
       mMaxIntegral = np.min([mMaxIntegral, self.MassFunc.mMax])
       # compute integral
-      integral = integrate.quad(integrand, np.log(mMinIntegral), np.log(mMaxIntegral), epsabs=0, epsrel=1.e-2)[0]
+      integral = integrate.quad(integrand, np.log(mMinIntegral), np.log(mMaxIntegral), epsabs=0, epsrel=1.e-3)[0]
 
       # correction factor?
       if i==1 and len(Profiles)==1 and Profiles[0][0].use_correction_factor==1:

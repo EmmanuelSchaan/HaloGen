@@ -32,7 +32,7 @@ class Profile(object):
          m = M[im]
          f = lambda k: func(k, m, z) #self.u(k, m, z)
          U = np.array(map(f, K))
-         ax.loglog(K, U, lw=2, label=r'$M=$'+str(m)+'$M_\odot/h$')
+         ax.loglog(K, U, lw=2, label=r'$M=$'+floatExpForm(m, round=2)+'$M_\odot/h$')
       #
       ax.legend(loc=3, framealpha=0.05)
       ax.set_xlim((min(K), max(K)))
@@ -1707,7 +1707,7 @@ class ProfLIM(Profile):
       # NFW profile setup
       self.LoadNonLinMass()
       self.trunc = trunc   # truncation radius, in units of rVir
-      self.use_correction_factor = False
+      self.use_correction_factor = True#False
       self.mMin = 0.
       self.mMax = np.inf
 
@@ -1716,10 +1716,10 @@ class ProfLIM(Profile):
       # read line parameters from EGG
       pathIn = './input/EGG_results/'
       # read redshift and mean number density of galaxies [(Mpc/h)^{-3}]
-      data = np.loadtxt(pathIn+'ngal.txt')
-      z = data[:,0]
+      d1 = np.loadtxt(pathIn+'ngal.txt')
+      z = d1[:,0]
       nZ = len(z)
-      self.nGal = interp1d(z, data[:,1], kind='linear', bounds_error=False, fill_value=0.)
+      self.nGal = interp1d(z, d1[:,1], kind='linear', bounds_error=False, fill_value=0.)
       # find the corresponding line number
       lineNames = np.loadtxt(pathIn+'line_names.txt', dtype='str')
       nLines = len(lineNames)
@@ -1728,17 +1728,16 @@ class ProfLIM(Profile):
       self.lambdaMicrons = np.loadtxt(pathIn+'line_lambda_microns.txt')[iLine] # [mu]
       self.nuHz = 3.e8 / self.lambdaMicrons * 1.e6 # [Hz]
       # read mean galaxy luminosity [Lsun]
-      data = np.loadtxt(pathIn+'mean_gal_lum.txt')
-      self.meanGalLum = interp1d(z, data[:,iLine], kind='linear', bounds_error=False, fill_value=0.)
+      d2 = np.loadtxt(pathIn+'mean_gal_lum.txt')
+      self.meanGalLum = interp1d(z, d2[:,iLine], kind='linear', bounds_error=False, fill_value=0.)
       # read total galaxy luminosity density # [Lsun / (Mpc/h)^3]
-      data = np.loadtxt(pathIn+'total_gal_lum_density.txt')
-      self.meanLumDensity = interp1d(z, data[:,iLine], kind='linear', bounds_error=False, fill_value=0.)
+      d3 = np.loadtxt(pathIn+'total_gal_lum_density.txt')
+      self.meanLumDensity = interp1d(z, d3[:,iLine], kind='linear', bounds_error=False, fill_value=0.)
 
       # read fractional covariance of galaxy line luminosities [dimless]
-      data = np.loadtxt(pathIn+'s2ij.txt')
-      data = data.reshape((nZ, nLines, nLines))
-      self.s2ij = interp1d(z, data, axis=0, kind='linear', bounds_error=False, fill_value=0.)      
-
+      d4 = np.loadtxt(pathIn+'s2ij.txt')
+      d4 = d4.reshape((nZ, nLines, nLines))
+      self.s2ij = interp1d(z, d4, axis=0, kind='linear', bounds_error=False, fill_value=0.)      
    
    def __str__(self):
       return "lim"+self.lineName
@@ -1807,10 +1806,13 @@ class ProfLIM(Profile):
       of mass m [Msun/h] at redshift z.
       Assumed propto SFR(m)
       '''
-      result = self.Sfr.sfr(m/self.U.bg.h, z)
-      result *= self.nGal(z)
-      result /= self.Sfr.sfrd(z)
-      return result
+      result = self.nGal(z)  # [(Mpc/h)^{-3}]
+      result *= self.Sfr.sfr(m, z)   # [Msun/yr]
+      result /= self.Sfr.sfrd(z) # [(Msun/yr) (Mpc/h)^{-3}]
+#!!!!! test
+#      result *= m / self.U.rho_m(z)
+      return result  # [dimless]
+
 
    def meanHaloLum(self, m, z):
       '''Mean luminosity of one halo [Lsun],
@@ -1820,24 +1822,32 @@ class ProfLIM(Profile):
 
    
    def u(self, k, m, z):
-      '''Effective profile for the halo model integrals
+      '''Effective profile for the halo model integrals [(Mpc/h)^3]
       '''
       result = self.nfw(k, m, z)
       result *= self.meanHaloLum(m, z)
       result /= self.meanLumDensity(z)
+#!!!! test
+#      result /= self.nGal(z) * self.meanGalLum(z)
       #result *= np.exp(- 0.5 * sigma**2 * k**2 * mu**2)
       if not np.isfinite(result):
          result = 0.
       return result
    
 
-   def meanIntensity(self, z):
+   def meanIntensity(self, z, Jy=False):
       '''Mean intensity in [Lsun / (Mpc/h)^2 / sr / Hz]
+      If Jy=True, convert to [Jy/sr]
       '''
-      result = 3.e5 / self.U.hubble(z)
-      result *= self.meanLumDensity(z)
-      result /= 4. * np.pi * self.nuHz
+      result = self.meanLumDensity(z)  # [Lsun / (Mpc/h)^3]
+      result *= 3.e5 / self.U.hubble(z)   # [Mpc/h]
+      result /= 4. * np.pi * self.nuHz # [/sr/Hz]
+      if Jy:
+         result *= 3.827e26   # [Lsun] to [W]
+         result /= (3.086e22 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [m^{-2}]
+         result /= 1.e-26  # [W/m^2/Hz/sr] to [Jy/sr]
       return result
+
 
    def nGalEff(self, z, lineName1=None, lineName2=None):
       '''Effective galaxy number density for shot noise
@@ -1863,3 +1873,58 @@ class ProfLIM(Profile):
       '''
       return 1. / self.nGalEff(z, lineName1, lineName2)
 
+
+
+   ####################################################
+
+   def plotNgal(self):
+      Z = np.linspace(0.,5.,6)
+      M = np.logspace(np.log10(1.e10), np.log10(1.e16), 101, 10.) # masses in h^-1 solarM
+
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         f = lambda m: self.Ngal(m, z)
+         Ngal = np.array(map(f, M))
+         ax.semilogx(M, Ngal, label=r'$z=$'+str(round(z,2)))
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'halo mass $M$  [$M_\odot$/h]')
+      ax.set_ylabel(r'$N_\text{gal}(M, z)$')
+
+      plt.show()
+
+
+   def plotnGal(self):
+      Z = np.linspace(0.71, 6.,101)
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      nGal = np.array(map(self.nGal, Z))
+      ax.semilogy(Z, nGal)
+      #
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\bar{n}_\text{gal}$ [(Mpc/h)$^{-3}$]')
+
+      plt.show()
+
+
+   def plotMeanIntensity(self):
+      Z = np.linspace(0.71, 6.,101)
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      f = lambda z: self.meanIntensity(z, Jy=True)
+      meanIntensity = np.array(map(self.meanIntensity, Z))
+      ax.semilogy(Z, meanIntensity)
+      #
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\bar{I}(z)$ [Jy/sr]')
+
+      plt.show()
+
+      

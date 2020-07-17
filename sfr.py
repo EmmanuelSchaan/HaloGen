@@ -36,10 +36,14 @@ class Sfr(object):
       ''' SFR [Msun/yr] as a function of halo mass [Msun] and redshift
       from Fonseca+16 (1607.05288v2), Eq 11.
       I inferred the units from Eq 9 and 11.
+      input halo mass m [Msun/h]
       '''
       # bounds for the fitting function
       if z<0. or z>5.:
          return 0.
+
+      # convert from [Msun/h] to [Msun]
+      m /= self.U.bg.h
 
       # Eq 11
       result = self.fM0(z)
@@ -74,23 +78,28 @@ class Sfr(object):
 
    def sfrdForInterp(self, z):
       '''SFR density:
-      \int dm dn/dm SFR(m) [Msun / yr / Mpc^3]
+      \int dm dn/dm SFR(m) [Msun/yr / (Mpc/h)^3]
       '''
       def integrand(lnm):
          '''the mass in integral is in [Msun/h]
          '''
          m = np.exp(lnm)
-         return m * self.MassFunc.fmassfunc(m, 1./(1.+z)) * self.sfr(m / self.U.bg.h, z)
+         #return m * self.MassFunc.fmassfunc(m, 1./(1.+z)) * self.sfr(m / self.U.bg.h, z)
+         return m * self.MassFunc.fmassfunc(m, 1./(1.+z)) * self.sfr(m, z)
       # [Msun /yr / (Mpc/h)^3]
       result = integrate.quad(integrand, np.log(self.MassFunc.mMin), np.log(self.MassFunc.mMax), epsabs=0., epsrel=1.e-3)[0]
       # [Msun /yr / Mpc^3]
-      result *= self.U.bg.h**3 
+      #result *= self.U.bg.h**3 
       return result
 
    
    def sfrdBehroozi13(self, z):
-     return 0.180 / (10.**(-0.997*(z-1.243)) + 10.**(0.241*(z-1.243))) 
-
+      # from Fonseca+16
+      # [Msun/yr/Mpc^3]
+      result = 0.180 / (10.**(-0.997*(z-1.243)) + 10.**(0.241*(z-1.243))) 
+      # convert from [Msun/yr/Mpc^3] to [Msun/yr/(Mpc/h)^3]
+      result /= self.U.bg.h**3
+      return result
 
    def testSfrd(self):
       fig=plt.figure(0)
@@ -108,7 +117,7 @@ class Sfr(object):
       #
       ax.legend(loc='lower center')
       ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'log$_10$(SFRD$(z)$/[M$_\odot$ / yr / Mpc$^3$])')
+      ax.set_ylabel(r'log$_{10}$(SFRD$(z)$/[M$_\odot$/yr / (Mpc/h)$^3$])')
       #
       #fig.savefig(pathFig + "sfrd.pdf", bbox_inches='tight')
       plt.show()

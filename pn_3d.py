@@ -574,7 +574,8 @@ class P3dAuto(object):
       ax.plot(Z, bEff, lw=2)
       #
       ax.set_xlabel(r'redshift $z$')
-      ax.set_ylabel(r'effective bias $P^\text{2h}(k=0) / P^\text{lin}(k=0)$')
+      ax.set_ylabel(r'$\sqrt{P^\text{2h}(k=0) / P^\text{lin}(k=0)}$')
+      ax.set_title(r'Effective bias')
       #
       #fig.savefig("./figures/pn3d/beff_"+self.name+".pdf", bbox_inches='tight')
 

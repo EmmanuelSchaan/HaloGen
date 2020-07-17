@@ -63,15 +63,21 @@ def i0(x):
 ##################################################################################
 # formatting numbers
 
-def intExpForm(input):
+def intExpForm(input, round=None):
    """
    clean scientific notation for file names
    removes trailing decimal point if not needed
    """
    a = '%e' % np.float(input)
    # mantissa: remove trailing zeros
+   mantissa = a.split('e')[0].rstrip('0')
+   # round if desired
+   if round is not None:
+      intPart, decPart = mantissa.split('.')
+      mantissa = intPart + '.' + decPart[:round]
+   # mantissa: remove trailing zeros
    # then remove dot if no decimal digits
-   mantissa = a.split('e')[0].rstrip('0').rstrip('.')
+   mantissa = mantissa.rstrip('0').rstrip('.')
    # exponent: remove + sign if there, and leading zeros
    exponent = np.int(a.split('e')[1])
    exponent = np.str(exponent)
@@ -82,13 +88,17 @@ def intExpForm(input):
 
 
 
-def floatExpForm(input):
+def floatExpForm(input, round=None):
    """same as intExpForm, except always leaves the decimal point
+   round: number of digits to keep after the dot
    """
    a = '%e' % np.float(input)
    # mantissa: remove trailing zeros
-   # then remove dot if no decimal digits
    mantissa = a.split('e')[0].rstrip('0')
+   # round if desired
+   if round is not None:
+      intPart, decPart = mantissa.split('.')
+      mantissa = intPart + '.' + decPart[:round]
    # exponent: remove + sign if there, and leading zeros
    exponent = np.int(a.split('e')[1])
    exponent = np.str(exponent)
@@ -96,7 +106,6 @@ def floatExpForm(input):
       return mantissa
    else:
       return mantissa + 'e' + exponent
-
 
 ##################################################################################
 # Matrix inversion for ill-conditioned matrices, with SVD
