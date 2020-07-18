@@ -1707,7 +1707,7 @@ class ProfLIM(Profile):
       # NFW profile setup
       self.LoadNonLinMass()
       self.trunc = trunc   # truncation radius, in units of rVir
-      self.use_correction_factor = True#False
+      self.use_correction_factor = False#False
       self.mMin = 0.
       self.mMax = np.inf
 
@@ -1726,7 +1726,7 @@ class ProfLIM(Profile):
       iLine = np.where(lineNames==self.lineName)[0][0]
       # find the line wavelength and frequency
       self.lambdaMicrons = np.loadtxt(pathIn+'line_lambda_microns.txt')[iLine] # [mu]
-      self.nuHz = 3.e8 / self.lambdaMicrons * 1.e6 # [Hz]
+      self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
       # read mean galaxy luminosity [Lsun]
       d2 = np.loadtxt(pathIn+'mean_gal_lum.txt')
       self.meanGalLum = interp1d(z, d2[:,iLine], kind='linear', bounds_error=False, fill_value=0.)
@@ -1835,17 +1835,19 @@ class ProfLIM(Profile):
       return result
    
 
-   def meanIntensity(self, z, Jy=False):
+   def meanIntensity(self, z, unit='SI'):
       '''Mean intensity in [Lsun / (Mpc/h)^2 / sr / Hz]
-      If Jy=True, convert to [Jy/sr]
       '''
       result = self.meanLumDensity(z)  # [Lsun / (Mpc/h)^3]
-      result *= 3.e5 / self.U.hubble(z)   # [Mpc/h]
-      result /= 4. * np.pi * self.nuHz # [/sr/Hz]
-      if Jy:
+      result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
+      result /= 4. * np.pi * self.nuHz # *[/sr/Hz]
+      if unit=='Jy/sr':
          result *= 3.827e26   # [Lsun] to [W]
          result /= (3.086e22 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [m^{-2}]
          result /= 1.e-26  # [W/m^2/Hz/sr] to [Jy/sr]
+      elif unit=='cgs':
+         result *= 3.839e33  # [Lsun] to [erg/s]
+         result /= (3.086e24 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [cm^{-2}]
       return result
 
 
@@ -1915,10 +1917,11 @@ class ProfLIM(Profile):
    def plotMeanIntensity(self):
       Z = np.linspace(0.71, 6.,101)
 
+      # reproduce Fig 3 in Gong Cooray Silva + 17
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
-      f = lambda z: self.meanIntensity(z, Jy=True)
+      f = lambda z: self.meanIntensity(z, unit='Jy/sr')
       meanIntensity = np.array(map(self.meanIntensity, Z))
       ax.semilogy(Z, meanIntensity)
       #
@@ -1927,4 +1930,16 @@ class ProfLIM(Profile):
 
       plt.show()
 
-      
+      # reproduce Fig 3 in Fonseca+16
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      f = lambda z: self.meanIntensity(z, unit='cgs')
+      meanIntensity = np.array(map(self.meanIntensity, Z))
+      ax.semilogy(Z, self.nuHz * meanIntensity)
+      #
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\nu \bar{I}(z)$ [erg/s/cm$^2$/sr]')
+
+      plt.show()
+
