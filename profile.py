@@ -1922,7 +1922,7 @@ class ProfLIM(Profile):
       ax=fig.add_subplot(111)
       #
       f = lambda z: self.meanIntensity(z, unit='Jy/sr')
-      meanIntensity = np.array(map(self.meanIntensity, Z))
+      meanIntensity = np.array(map(f, Z))
       ax.semilogy(Z, meanIntensity)
       #
       ax.set_xlabel(r'$z$')
@@ -1935,7 +1935,7 @@ class ProfLIM(Profile):
       ax=fig.add_subplot(111)
       #
       f = lambda z: self.meanIntensity(z, unit='cgs')
-      meanIntensity = np.array(map(self.meanIntensity, Z))
+      meanIntensity = np.array(map(f, Z))
       ax.semilogy(Z, self.nuHz * meanIntensity)
       #
       ax.set_xlabel(r'$z$')
