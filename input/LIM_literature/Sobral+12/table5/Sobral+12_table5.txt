@@ -1,0 +1,9 @@
+# Table 5 in Sobral+12, arXiv:1202.3436v2
+# they recommend fixing alpha=-1.6 at all redshifts
+# and this is actually how the L^star and phi^star were fit.
+# These fits are after correcting the 1mag of dust extinction on the Halpha luminosity
+# z, L^star_Halpha [erg/s], phi^star_Halpha [Mpc^-3], alpha_Halpha [dimless]
+0.40 41.95 -3.12 -1.75
+0.84 42.25 -2.47 -1.56
+1.47 42.56 -2.61 -1.62
+2.23 42.87 -2.78 -1.59

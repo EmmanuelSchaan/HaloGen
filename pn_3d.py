@@ -271,6 +271,13 @@ class P3dAuto(object):
       if not np.isfinite(result):
          result = 0.
       return result
+
+   def fPtot(self, K, z):
+      result = self.fP_1h(K, z) + self.fP_2h(K, z) + self.fPnoise(K, z)
+      if not np.isfinite(result):
+         result = 0.
+      return result
+
    
    # effective bias, such that P2h = beff^2 * Plin
    def bEff(self, k, z):

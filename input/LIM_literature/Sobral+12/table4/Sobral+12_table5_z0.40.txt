@@ -1,0 +1,24 @@
+# z = 0.40
+# table 4 in Sobral+12, arXiv:1202.3436v2
+# the luminosities have been corrected for [NII] contamination and dust extinction (A = 1 mag).
+# the volumes assume top hat photometric filter.
+# phi_corr has been corrected for incompleteness and the fact that the photometric filter profile is not a top hat, compared to phi_obs
+# log(LHa/(erg/s)), uncertainty on log(LHa/(erg/s)), # of sources, phi_obs [Mpc^-3], uncertainty on phi_obs [Mpc^-3], phi_corr [Mpc^-3], uncertainty on phi_corr [Mpc^-3], volume [10^4 Mpc^3]
+40.50    0.05    128    -1.84    0.04    -1.66    0.04    8.8
+40.60    0.05    147    -1.78    0.04    -1.70    0.04    8.8
+40.70    0.05    118    -1.87    0.04    -1.81    0.04    8.8
+40.80    0.05    86    -2.01    0.05    -1.93    0.05    8.8
+40.90    0.05    56    -2.20    0.06    -1.96    0.07    8.8
+41.00    0.05    54    -2.21    0.06    -2.03    0.07    8.8
+41.10    0.05    34    -2.41    0.08    -2.12    0.09    8.8
+41.20    0.05    36    -2.39    0.08    -2.27    0.08    8.8
+41.30    0.05    33    -2.43    0.08    -2.29    0.09    8.8
+41.40    0.05    25    -2.55    0.10    -2.42    0.10    8.8
+41.50    0.05    25    -2.55    0.10    -2.46    0.11    8.8
+41.60    0.05    17    -2.71    0.12    -2.57    0.13    8.8
+41.70    0.05    10    -2.94    0.17    -2.69    0.19    8.8
+41.80    0.05    11    -2.90    0.16    -2.73    0.17    8.8
+41.90    0.05    8    -3.04    0.19    -2.88    0.20    8.8
+42.00    0.05    4    -3.34    0.30    -3.03    0.35    8.8
+42.20    0.10    3    -3.45    0.36    -3.56    0.51    8.8
+42.50    0.15    2    -3.64    0.53    -3.71    0.71    8.8

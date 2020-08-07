@@ -1698,11 +1698,20 @@ class ProfHODAlam16GasBattaglia16(Profile):
 ##################################################################################
 
 
-class ProfLIM(Profile):
+class ProfLIMEGG(Profile):
 
-   def __init__(self, U, Sfr, lineName='halpha', trunc=4.):
-      super(ProfLIM, self).__init__(U)
+   def __init__(self, U, Sfr, lineName='halpha', trunc=4., unit='dI/I'):
+      '''Choice of unit for intensity:
+      unit=='dI/I' for delta I / I [dimless]
+      unit=='Lsun/(Mpc/h)^2/sr/Hz' for I
+      unit=='Jy/sr' for I
+      unit=='cgs' for I [erg/s/cm^2/sr/Hz]
+      '''
+      super(ProfLIMEGG, self).__init__(U)
       self.Sfr = Sfr
+
+      # choose to compute dI/I or I
+      self.unit = unit
 
       # NFW profile setup
       self.LoadNonLinMass()
@@ -1740,7 +1749,7 @@ class ProfLIM(Profile):
       self.s2ij = interp1d(z, d4, axis=0, kind='linear', bounds_error=False, fill_value=0.)      
    
    def __str__(self):
-      return "lim"+self.lineName
+      return "limegg"+self.lineName
    
    def LoadNonLinMass(self):
       """precompute the nonlinear mass at z=0.
@@ -1821,26 +1830,44 @@ class ProfLIM(Profile):
       return self.meanGalLum(z) * self.Ngal(m, z)
 
    
-   def u(self, k, m, z):
-      '''Effective profile for the halo model integrals [(Mpc/h)^3]
+   def u(self, k, m, z, unit=None):
+      '''Effective profile for the halo model integrals
+      Unit is [(Mpc/h)^3], multiplied by the intensity unit:
+      unit=='dI/I' for delta I / I
+      unit=='Lsun/(Mpc/h)^2/sr/Hz' for I
+      unit=='Jy/sr' for I
+      unit=='cgs' for I [erg/s/cm^2/sr/Hz]
       '''
+      if unit is None:
+         unit = self.unit
       result = self.nfw(k, m, z)
       result *= self.meanHaloLum(m, z)
       result /= self.meanLumDensity(z)
-#!!!! test
-#      result /= self.nGal(z) * self.meanGalLum(z)
+      result *= self.meanIntensity(z, unit=unit)
       #result *= np.exp(- 0.5 * sigma**2 * k**2 * mu**2)
       if not np.isfinite(result):
          result = 0.
       return result
    
 
-   def meanIntensity(self, z, unit='SI'):
-      '''Mean intensity in [Lsun / (Mpc/h)^2 / sr / Hz]
+   def meanIntensity(self, z, unit=None):
+      '''Mean intensity in 
+      unit=='dI/I' for delta I / I [dimless]
+      unit=='Lsun/(Mpc/h)^2/sr/Hz' for I
+      unit=='Jy/sr' for I
+      unit=='cgs' for I [erg/s/cm^2/sr/Hz]
       '''
+      if unit is None:
+         unit = self.unit
+
+      if unit=='dI/I':
+         return 1.
+
       result = self.meanLumDensity(z)  # [Lsun / (Mpc/h)^3]
       result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
       result /= 4. * np.pi * self.nuHz # *[/sr/Hz]
+      if unit=='Lsun/(Mpc/h)^2/sr/Hz':
+         return result
       if unit=='Jy/sr':
          result *= 3.827e26   # [Lsun] to [W]
          result /= (3.086e22 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [m^{-2}]
@@ -1870,10 +1897,564 @@ class ProfLIM(Profile):
 
       return self.nGal(z) / (1. + s2)
 
-   def Pshot(self, z, lineName1=None, lineName2=None):
-      '''shot noise power spectrum [(Mpc/h)^3]
+   def Pshot(self, z, lineName1=None, lineName2=None, unit=None):
+      '''shot noise power spectrum in [(Mpc/h)^3] multiplied
+      by the square of the intensity unit
       '''
-      return 1. / self.nGalEff(z, lineName1, lineName2)
+      if unit is None:
+         unit = self.unit
+      if lineName1 is None:
+         lineName1 = self.lineName
+      if lineName2 is None:
+         lineName2 = self.lineName
+
+      result = 1. / self.nGalEff(z, lineName1, lineName2)
+
+      if unit=='dI/I':
+         return result
+      else:
+#!!!! manuwaring: this is super super slow. Fix it
+         if lineName1==self.lineName:
+            p1 = self
+         else:
+            p1 = ProfLIM(self.U, self.Sfr, lineName=lineName1, trunc=self.trunc, unit=unit)
+         if lineName2==self.lineName:
+            p2 = self
+         else:
+            p2 = ProfLIM(self.U, self.Sfr, lineName=lineName2, trunc=self.trunc, unit=unit)
+         result *= p1.meanIntensity(z, unit=unit)
+         result *= p2.meanIntensity(z, unit=unit)
+         return result
+      
+
+
+   ####################################################
+
+   def plotNgal(self):
+      Z = np.linspace(0.,5.,6)
+      M = np.logspace(np.log10(1.e10), np.log10(1.e16), 101, 10.) # masses in h^-1 solarM
+
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         f = lambda m: self.Ngal(m, z)
+         Ngal = np.array(map(f, M))
+         ax.semilogx(M, Ngal, label=r'$z=$'+str(round(z,2)))
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'halo mass $M$  [$M_\odot$/h]')
+      ax.set_ylabel(r'$N_\text{gal}(M, z)$')
+
+      plt.show()
+
+
+   def plotnGal(self):
+      Z = np.linspace(0.71, 6.,101)
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      nGal = np.array(map(self.nGal, Z))
+      ax.semilogy(Z, nGal)
+      #
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\bar{n}_\text{gal}$ [(Mpc/h)$^{-3}$]')
+
+      plt.show()
+
+
+   def plotMeanIntensity(self):
+      Z = np.linspace(0.71, 6.,101)
+
+      # reproduce Fig 3 in Gong Cooray Silva + 17
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      # compare to Gong+17
+      if self.lineName=='halpha':
+         # center values
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_center.csv"
+         data = np.genfromtxt(path, delimiter=', ')
+         plt.plot(data[:,0], data[:,1], 'b', label=r'Hopkins Beacom 06')
+         # error band
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_low.csv"
+         low = np.genfromtxt(path, delimiter=', ')
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_high.csv"
+         high = np.genfromtxt(path, delimiter=', ')
+         plt.fill(np.append(low[:,0], high[::-1,0]), np.append(low[:,1], high[::-1,1]), facecolor='b', alpha=0.5)
+      #
+      # results from my calculation (EGG)
+      f = lambda z: self.meanIntensity(z, unit='Jy/sr')
+      meanIntensity = np.array(map(f, Z))
+      ax.semilogy(Z, meanIntensity, 'k', label=r'This work')
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\bar{I}(z)$ [Jy/sr]')
+
+      plt.show()
+
+      '''
+      # reproduce Fig 3 in Fonseca+16
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      f = lambda z: self.meanIntensity(z, unit='cgs')
+      meanIntensity = np.array(map(f, Z))
+      ax.semilogy(Z, self.nuHz * meanIntensity)
+      #
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\nu \bar{I}(z)$ [erg/s/cm$^2$/sr]')
+
+      plt.show()
+      '''
+
+
+
+   def plotP3dGong17(self, fp3d, lineName=None):
+      '''Compares power spectrum to Gong+17 fig5.
+      Power spectrum function should be in [(Jy/sr)^3(Mpc/h)^3]
+      '''
+      if lineName is None:
+         lineName = self.lineName
+      
+      zNames = np.array(['1.0', '1.4', '1.8', '2.2', '2.7', '3.3', '4.0', '4.8'])
+      Z = zNames.astype(float)
+      nZ = len(Z)
+      colors = plt.cm.cool(np.arange(nZ)/(nZ-1.))
+
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for iZ in range(nZ):
+         zName = zNames[iZ]
+         z = Z[iZ]
+
+         # read Gong+17 fig 5 power spectrum
+         path = "./input/LIM_literature/Gong+17/fig5/Gong+17_fig5_"+lineName+"_z_"+zName+".csv"
+         data = np.genfromtxt(path)
+         k = data[:,0]  # h/Mpc
+         p = data[:,1]  # k^3 P(k) / (2pi^2) [(Jy/sr)^2]
+         #ax.loglog(k, p, c=colors[iZ], ls='-', label=zName)
+         p /= k**3 / (2. * np.pi**2) # convert to [(Jy/sr)^2 (Mpc/h)^3]
+#         ax.loglog(k, p, c=colors[iZ], ls='-', label=zName)
+
+         # convert to [(Mpc/h)^3]
+         # by dividing out the factor of intensity squared 
+         # from Gong+17 fig3, model by Hopkins Beacom 06
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_center.csv"
+         data = np.genfromtxt(path, delimiter=', ')
+         fMeanIntensityGong17 = interp1d(data[:,0], data[:,1], kind='linear', bounds_error=False, fill_value=0.)
+         p /= fMeanIntensityGong17(z)**2
+         
+
+
+         # my calculation
+         f = lambda k: fp3d(k, z)
+         myp = np.array(map(f, k))
+         #ax.loglog(k, myp, c=colors[iZ], ls='--', label=zName)
+         ax.loglog(k, myp/p, c=colors[iZ], ls='--', label=zName)
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$k$ [h/Mpc]')
+      ax.set_ylabel(r'$P(k, z)$ [(Jy/sr)$^2$(Mpc/h)$^3$]')
+
+      plt.show()
+
+
+
+
+##################################################################################
+##################################################################################
+
+
+class ProfLIMSobral12(Profile):
+   '''Halpha luminosity functions from Sobral+12 arXiv:1202.3436v2
+   '''
+
+   def __init__(self, U, Sfr, trunc=4., unit='dI/I'):
+      '''Choice of unit for intensity:
+      unit=='dI/I' for delta I / I [dimless]
+      unit=='Lsun/(Mpc/h)^2/sr/Hz' for I
+      unit=='Jy/sr' for I
+      unit=='cgs' for I [erg/s/cm^2/sr/Hz]
+      '''
+      super(ProfLIMSobral12, self).__init__(U)
+      self.Sfr = Sfr
+
+      # choose to compute dI/I or I
+      self.unit = unit
+
+      # NFW profile setup
+      self.LoadNonLinMass()
+      self.trunc = trunc   # truncation radius, in units of rVir
+      self.use_correction_factor = False#False
+      self.mMin = 0.
+      self.mMax = np.inf
+
+      # Line setup: read from EGG
+      self.lineName = 'halpha'
+
+
+      
+      # Measured luminosity functions
+      # table 4
+      self.Z = [0.4, 0.84, 1.47, 2.23]
+      zString = ['0.40', '0.84', '1.47', '2.23']
+      self.nZ = len(self.Z)
+      pathIn = './input/LIM_literature/Sobral+12/table4/'
+      # intrinsic luminosities [erg/s], ie corrected to undo dust extinction
+      self.LInt = {}
+      self.dLInt = {}
+      self.dLog10LInt = {}
+
+      # "observed" luminosity [erg/s], ie affected by dust extinction
+      self.LObs = {} 
+      self.dLObs = {}
+      self.dLog10LObs = {}
+
+      # luminosity functions and uncertainties [(Mpc/h)^-3 (erg/s)^-1]
+      self.PhiInt = {}
+      self.PhiIntHigh = {}
+      self.PhiIntLow = {}
+      #
+      self.PhiObs = {}
+      self.PhiObsHigh = {}
+      self.PhiObsLow = {}
+
+      # interpolated LFs [(Mpc/h)^-3 (erg/s)^-1]
+      self.PhiObsMeas = {}
+      self.sPhiObsMeas = {}
+
+      for iZ in range(self.nZ):
+         z = self.Z[iZ]
+         path = pathIn + 'Sobral+12_table5_z'+zString[iZ]+'.txt'
+         data = np.genfromtxt(path)
+         # intrinsic luminosities
+         self.LInt[iZ] = 10.**data[:,0]   # [erg/s]
+         self.dLInt[iZ] = 10.**(data[:,0] + data[:,1]) - 10.**(data[:,0] - data[:,1])   # [erg/s]
+         self.dLog10LInt[iZ] = 2. * data[:,1]  # log10(L/(erg/s))
+         # observed luminosities
+         self.LObs[iZ] = self.LInt[iZ]  / (100.**(1./5.))  # adding 1 magnitude of dust extinction [erg/s]
+         self.dLObs[iZ] = self.dLInt[iZ] / (100.**(1./5.))
+         self.dLog10LObs[iZ] = self.dLog10LInt[iZ]  # unchanged by multiplicative dust extinction
+         # intrinsic LF 
+         self.PhiInt[iZ] = 10.**data[:,5] / self.U.bg.h**3 / self.LInt[iZ] / np.log(10.)
+         self.PhiIntHigh[iZ] = self.PhiInt[iZ] * 10.**data[:,6]
+         self.PhiIntLow[iZ] = self.PhiInt[iZ] / 10.**data[:,6]
+
+         # observed LF
+         self.PhiObs[iZ] = 10.**data[:,5] / self.U.bg.h**3 / self.LObs[iZ] / np.log(10.)
+         self.PhiObsHigh[iZ] = self.PhiObs[iZ] * 10.**data[:,6]
+         self.PhiObsLow[iZ] = self.PhiObs[iZ] / 10.**data[:,6]
+
+         # interpolate
+         self.PhiObsMeas[iZ] = interp1d(self.LObs[iZ], self.PhiObs[iZ], kind='linear', bounds_error=False, fill_value=0.)
+         #self.sPhiObsMeas[iZ] = interp1d(self.LObs[iZ], self.sPhiObs[iZ], kind='linear', bounds_error=False, fill_value=0.)
+      
+
+      # Schechter fits to the luminosity functions
+      # table 5
+      path = './input/LIM_literature/Sobral+12/table5/Sobral+12_table5.txt'
+      data = np.genfromtxt(path)
+      z = data[:,0]
+      LStar = 10.**data[:,1]  # L^star_Halpha [erg/s]
+      PhiStar = 10.**data[:,2] / self.U.bg.h**3  # [(Mpc/h)^-3]
+      # for alpha, they recommend using -1.6, rather than the best fit
+      Alpha = data[:,3] # [dimless]
+      #Alpha = -1.6 * np.ones_like(z) # [dimless]
+      # interpolate the Schechter fits (Eq 2)
+      self.lStar = interp1d(z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+      self.phiStar = interp1d(z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+      self.alpha = interp1d(z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+      #
+      self.phiInt = lambda z,l: self.phiStar(z) * (l/self.lStar(z))**self.alpha(z) * np.exp(-l/self.lStar(z)) / self.lStar(z) # [(Mpc/h)^-3 (erg/s)^-1]
+      self.phiObs = lambda z,l: 100.**(1./5.) * self.phiInt(z, l * 100.**(1./5.))
+
+      '''
+      self.nGal(z)
+      self.lambdaMicrons
+      self.nuHz
+      self.meanGalLum(z)
+      self.meanLumDensity(z)
+      self.s2ij(z)
+      '''
+
+
+
+   def plotLF(self):
+      '''Reproduces fig 8 in Sobral+12.
+      '''
+
+      L = np.logspace(np.log10(1.e40), np.log10(1.e44), 501, 10.)
+
+      
+      # Intrinsic LF,
+      # ie corrected for the dust attenuation
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      colors = ['gray', 'g', 'r', 'b']
+      for iZ in range(self.nZ):
+         z = self.Z[iZ]
+         factor = self.LInt[iZ] * np.log(10.) * self.U.bg.h**3
+         #
+         # measured LF
+         yerr = np.vstack(((self.PhiInt[iZ]-self.PhiIntLow[iZ])*factor, (self.PhiIntHigh[iZ]-self.PhiInt[iZ])*factor))
+         ax.errorbar(self.LInt[iZ], self.PhiInt[iZ]*factor, yerr=yerr, fmt='o', c=colors[iZ], label=r'$z=$'+str(z))
+         #
+         # error band
+         ax.fill_between(self.LInt[iZ], self.PhiIntLow[iZ]*factor, self.PhiIntHigh[iZ]*factor, edgecolor='',facecolor=colors[iZ], alpha=0.3)
+         #
+         # Schechter fit
+         ax.plot(L, self.phiInt(z, L) * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ])
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((10.**(40.5), 10.**(44)))
+      ax.set_ylim((10.**(-5.5), 10.**(-0.5)))
+      ax.set_xlabel(r'$L_{H_\alpha}$ [erg/s]')
+      ax.set_ylabel(r'$\text{log}_{10} \left( \Phi \times \text{Mpc}^3 \right)$')
+      ax.set_title(r'Intrinsic luminosity function')
+      #
+      path = './figures/profile/Sobral12/'+'lf_intrinsic_sobral12_fig8.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+      
+
+
+      # "Observed" LF,
+      # ie affected by dust attenuation
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      colors = ['gray', 'g', 'r', 'b']
+      for iZ in range(self.nZ):
+         z = self.Z[iZ]
+         factor = self.LObs[iZ] * np.log(10.) * self.U.bg.h**3
+         #
+         # measured LF
+         yerr = np.vstack(((self.PhiObs[iZ]-self.PhiObsLow[iZ])*factor, (self.PhiObsHigh[iZ]-self.PhiObs[iZ])*factor))
+         ax.errorbar(self.LObs[iZ], self.PhiObs[iZ]*factor, yerr=yerr, fmt='o', c=colors[iZ], label=r'$z=$'+str(z))
+         #
+         # error band
+         ax.fill_between(self.LObs[iZ], self.PhiObsLow[iZ]*factor, self.PhiObsHigh[iZ]*factor, edgecolor='',facecolor=colors[iZ], alpha=0.3)
+         #
+         # Schechter fit
+         ax.plot(L, self.phiObs(z, L) * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ])
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((10.**(40.5), 10.**(44)))
+      ax.set_ylim((10.**(-5.5), 10.**(-0.5)))
+      ax.set_xlabel(r'$L_{H_\alpha}$ [erg/s]')
+      ax.set_ylabel(r'$\text{log}_{10} \left( \Phi \times \text{Mpc}^3 \right)$')
+      ax.set_title(r'"Observed" luminosity function')
+      #
+      path = './figures/profile/Sobral12/'+'lf_observed.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   def __str__(self):
+      return "limsobral12"+self.lineName
+
+   def LoadNonLinMass(self):
+      """precompute the nonlinear mass at z=0.
+      """
+      print "Loading non-lin mass at z=0"
+      z = 0.
+      self.m_nonlin = self.U.nonLinMass(z)
+
+
+   def rS_rhoS_c(self, m, z):
+      """comoving scale radius for NFW profile
+      in Mpc/h
+      """
+      Rvir = self.U.frvir(m, z)
+      # concentration parameter
+      #c = 10./(1.+z) * (m / self.m_nonlin)**(-0.2)   # from Takada & Jain 2002
+      c = 9./(1.+z) * (m / self.m_nonlin)**(-0.13) # Takada & Jain 2003
+      # scale radius
+      RS = Rvir / c  # in Mpc/h
+      # normalize the mass within rVir to be mVir
+      rhoS = m / (4.*np.pi*RS**3)
+      rhoS /= np.log(1.+c) - c/(1.+c)  # (Msun/h) / (Mpc/h)^3
+      return RS, rhoS, c
+
+
+   def totalMass(self, trunc=None):
+      """total mass within truncation radius
+      trunc in units of rVir
+      mass in Msun/h
+      if trunc=infinity, the mass is infinite
+      """
+      if trunc is None:
+         trunc = self.trunc
+      rVir = self.U.frvir(m, z)
+      rS, rhoS, c = self.rS_rhoS_c(m, z)
+      # truncation radius over scale radius
+      xMax = trunc * rVir/rS
+      result = 4./3. * np.pi * rS**3 * rhoS
+      result = xMax - np.log(1 + xMax)
+      return result
+
+
+   def nfw(self, k, m, z):
+      """Fourier transform of NFW density profile,
+      normalized such that u(k=0, m, z) = 1
+      ie rhoNFW(k,m,z) = m * nfw(k,m,z)
+      truncation radius is taken to be infinite (unphysical)
+      k in h Mpc^-1
+      m in h^-1 solarM
+      """
+      RS, rhoS, c = self.rS_rhoS_c(m, z)
+      #
+      result = np.sin(k * RS) * (  Si((1+c) * k * RS) - Si(k * RS)  )
+      result += - np.sin(c * k * RS) / ((1+c) * k * RS)
+      result += np.cos(k * RS) * (  Ci((1+c) * k * RS) - Ci(k * RS)  )
+      result /= (np.log(1+c) - c/(1+c))
+      return result
+
+
+
+   def Ngal(self, m, z):
+      '''Mean number of galaxies in one halo [dimless]
+      of mass m [Msun/h] at redshift z.
+      Assumed propto SFR(m)
+      '''
+      result = self.nGal(z)  # [(Mpc/h)^{-3}]
+      result *= self.Sfr.sfr(m, z)   # [Msun/yr]
+      result /= self.Sfr.sfrd(z) # [(Msun/yr) (Mpc/h)^{-3}]
+#!!!!! test
+#      result *= m / self.U.rho_m(z)
+      return result  # [dimless]
+
+
+   def meanHaloLum(self, m, z):
+      '''Mean luminosity of one halo [Lsun],
+      of mass m [Msun/h] at redshift z.
+      '''
+      return self.meanGalLum(z) * self.Ngal(m, z)
+
+
+   def u(self, k, m, z, unit=None):
+      '''Effective profile for the halo model integrals
+      Unit is [(Mpc/h)^3], multiplied by the intensity unit:
+      unit=='dI/I' for delta I / I
+      unit=='Lsun/(Mpc/h)^2/sr/Hz' for I
+      unit=='Jy/sr' for I
+      unit=='cgs' for I [erg/s/cm^2/sr/Hz]
+      '''
+      if unit is None:
+         unit = self.unit
+      result = self.nfw(k, m, z)
+      result *= self.meanHaloLum(m, z)
+      result /= self.meanLumDensity(z)
+      result *= self.meanIntensity(z, unit=unit)
+      #result *= np.exp(- 0.5 * sigma**2 * k**2 * mu**2)
+      if not np.isfinite(result):
+         result = 0.
+      return result
+
+
+   def meanIntensity(self, z, unit=None):
+      '''Mean intensity in
+      unit=='dI/I' for delta I / I [dimless]
+      unit=='Lsun/(Mpc/h)^2/sr/Hz' for I
+      unit=='Jy/sr' for I
+      unit=='cgs' for I [erg/s/cm^2/sr/Hz]
+      '''
+      if unit is None:
+         unit = self.unit
+
+      if unit=='dI/I':
+         return 1.
+
+      result = self.meanLumDensity(z)  # [Lsun / (Mpc/h)^3]
+      result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
+      result /= 4. * np.pi * self.nuHz # *[/sr/Hz]
+      if unit=='Lsun/(Mpc/h)^2/sr/Hz':
+         return result
+      if unit=='Jy/sr':
+         result *= 3.827e26   # [Lsun] to [W]
+         result /= (3.086e22 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [m^{-2}]
+         result /= 1.e-26  # [W/m^2/Hz/sr] to [Jy/sr]
+      elif unit=='cgs':
+         result *= 3.839e33  # [Lsun] to [erg/s]
+         result /= (3.086e24 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [cm^{-2}]
+      return result
+
+
+   def nGalEff(self, z, lineName1=None, lineName2=None):
+      '''Effective galaxy number density for shot noise
+      [(Mpc/h)^{-3}]
+      '''
+      if lineName1 is None:
+         lineName1 = self.lineName
+      if lineName2 is None:
+         lineName2 = self.lineName
+      # find the corresponding line numbers
+      pathIn = './input/EGG_results/'
+      lineNames = np.loadtxt(pathIn+'line_names.txt', dtype='str')
+      iLine1 = np.where(lineNames==lineName1)[0][0]
+      iLine2 = np.where(lineNames==lineName2)[0][0]
+      # get the interpolated fractional covariance
+      # of galaxy line luminosities [dimless]
+      s2 = self.s2ij(z)[iLine1, iLine2]
+
+      return self.nGal(z) / (1. + s2)
+
+   def Pshot(self, z, lineName1=None, lineName2=None, unit=None):
+      '''shot noise power spectrum in [(Mpc/h)^3] multiplied
+      by the square of the intensity unit
+      '''
+      if unit is None:
+         unit = self.unit
+      if lineName1 is None:
+         lineName1 = self.lineName
+      if lineName2 is None:
+         lineName2 = self.lineName
+
+      result = 1. / self.nGalEff(z, lineName1, lineName2)
+
+      if unit=='dI/I':
+         return result
+      else:
+#!!!! manuwaring: this is super super slow. Fix it
+         if lineName1==self.lineName:
+            p1 = self
+         else:
+            p1 = ProfLIM(self.U, self.Sfr, lineName=lineName1, trunc=self.trunc, unit=unit)
+         if lineName2==self.lineName:
+            p2 = self
+         else:
+            p2 = ProfLIM(self.U, self.Sfr, lineName=lineName2, trunc=self.trunc, unit=unit)
+         result *= p1.meanIntensity(z, unit=unit)
+         result *= p2.meanIntensity(z, unit=unit)
+         return result
 
 
 
@@ -1921,15 +2502,31 @@ class ProfLIM(Profile):
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
+      # compare to Gong+17
+      if self.lineName=='halpha':
+         # center values
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_center.csv"
+         data = np.genfromtxt(path, delimiter=', ')
+         plt.plot(data[:,0], data[:,1], 'b', label=r'Hopkins Beacom 06')
+         # error band
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_low.csv"
+         low = np.genfromtxt(path, delimiter=', ')
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_high.csv"
+         high = np.genfromtxt(path, delimiter=', ')
+         plt.fill(np.append(low[:,0], high[::-1,0]), np.append(low[:,1], high[::-1,1]), facecolor='b', alpha=0.5)
+      #
+      # results from my calculation (EGG)
       f = lambda z: self.meanIntensity(z, unit='Jy/sr')
       meanIntensity = np.array(map(f, Z))
-      ax.semilogy(Z, meanIntensity)
+      ax.semilogy(Z, meanIntensity, 'k', label=r'This work')
       #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{I}(z)$ [Jy/sr]')
 
       plt.show()
 
+      '''
       # reproduce Fig 3 in Fonseca+16
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
@@ -1942,4 +2539,59 @@ class ProfLIM(Profile):
       ax.set_ylabel(r'$\nu \bar{I}(z)$ [erg/s/cm$^2$/sr]')
 
       plt.show()
+      '''
+
+
+
+   def plotP3dGong17(self, fp3d, lineName=None):
+      '''Compares power spectrum to Gong+17 fig5.
+      Power spectrum function should be in [(Jy/sr)^3(Mpc/h)^3]
+      '''
+      if lineName is None:
+         lineName = self.lineName
+
+      zNames = np.array(['1.0', '1.4', '1.8', '2.2', '2.7', '3.3', '4.0', '4.8'])
+      Z = zNames.astype(float)
+      nZ = len(Z)
+      colors = plt.cm.cool(np.arange(nZ)/(nZ-1.))
+
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for iZ in range(nZ):
+         zName = zNames[iZ]
+         z = Z[iZ]
+
+         # read Gong+17 fig 5 power spectrum
+         path = "./input/LIM_literature/Gong+17/fig5/Gong+17_fig5_"+lineName+"_z_"+zName+".csv"
+         data = np.genfromtxt(path)
+         k = data[:,0]  # h/Mpc
+         p = data[:,1]  # k^3 P(k) / (2pi^2) [(Jy/sr)^2]
+         #ax.loglog(k, p, c=colors[iZ], ls='-', label=zName)
+         p /= k**3 / (2. * np.pi**2) # convert to [(Jy/sr)^2 (Mpc/h)^3]
+#         ax.loglog(k, p, c=colors[iZ], ls='-', label=zName)
+
+         # convert to [(Mpc/h)^3]
+         # by dividing out the factor of intensity squared
+         # from Gong+17 fig3, model by Hopkins Beacom 06
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_center.csv"
+         data = np.genfromtxt(path, delimiter=', ')
+         fMeanIntensityGong17 = interp1d(data[:,0], data[:,1], kind='linear', bounds_error=False, fill_value=0.)
+         p /= fMeanIntensityGong17(z)**2
+
+
+
+         # my calculation
+         f = lambda k: fp3d(k, z)
+         myp = np.array(map(f, k))
+         #ax.loglog(k, myp, c=colors[iZ], ls='--', label=zName)
+         ax.loglog(k, myp/p, c=colors[iZ], ls='--', label=zName)
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$k$ [h/Mpc]')
+      ax.set_ylabel(r'$P(k, z)$ [(Jy/sr)$^2$(Mpc/h)$^3$]')
+
+      plt.show()
+
 
