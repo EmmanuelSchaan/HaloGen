@@ -2095,11 +2095,12 @@ class ProfLIMSobral12(Profile):
       self.mMin = 0.
       self.mMax = np.inf
 
-      # Line setup: read from EGG
+      # Line properties
       self.lineName = 'halpha'
-
-
+      self.lambdaMicrons = 656.28e-3   # [mu]
+      self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
       
+
       # Measured luminosity functions
       # table 4
       self.Z = [0.4, 0.84, 1.47, 2.23]
@@ -2126,8 +2127,9 @@ class ProfLIMSobral12(Profile):
       self.PhiObsLow = {}
 
       # interpolated LFs [(Mpc/h)^-3 (erg/s)^-1]
-      self.PhiObsMeas = {}
-      self.sPhiObsMeas = {}
+      self.fPhiObsMeas = {}
+      self.fPhiObsHighMeas = {}
+      self.fPhiObsLowMeas = {}
 
       for iZ in range(self.nZ):
          z = self.Z[iZ]
@@ -2152,36 +2154,269 @@ class ProfLIMSobral12(Profile):
          self.PhiObsLow[iZ] = self.PhiObs[iZ] / 10.**data[:,6]
 
          # interpolate
-         self.PhiObsMeas[iZ] = interp1d(self.LObs[iZ], self.PhiObs[iZ], kind='linear', bounds_error=False, fill_value=0.)
-         #self.sPhiObsMeas[iZ] = interp1d(self.LObs[iZ], self.sPhiObs[iZ], kind='linear', bounds_error=False, fill_value=0.)
+         self.fPhiObsMeas[iZ] = interp1d(self.LObs[iZ], self.PhiObs[iZ], kind='linear', bounds_error=False, fill_value=0.)
+         self.fPhiObsHighMeas[iZ] = interp1d(self.LObs[iZ], self.PhiObsHigh[iZ], kind='linear', bounds_error=False, fill_value=0.)
+         self.fPhiObsLowMeas[iZ] = interp1d(self.LObs[iZ], self.PhiObsLow[iZ], kind='linear', bounds_error=False, fill_value=0.)
       
 
-      # Schechter fits to the luminosity functions
+      # Schechter fits to the intrinsic luminosity functions
       # table 5
       path = './input/LIM_literature/Sobral+12/table5/Sobral+12_table5.txt'
       data = np.genfromtxt(path)
       z = data[:,0]
+      #
       LStar = 10.**data[:,1]  # L^star_Halpha [erg/s]
-      PhiStar = 10.**data[:,2] / self.U.bg.h**3  # [(Mpc/h)^-3]
+      LStarHigh = 10.**(data[:,1]+data[:,2])  # L^star_Halpha [erg/s]
+      LStarLow = 10.**(data[:,1]+data[:,3])  # L^star_Halpha [erg/s]
+      #
+      PhiStar = 10.**data[:,4] / self.U.bg.h**3  # [(Mpc/h)^-3]
+      PhiStarHigh = 10.**(data[:,4]+data[:,5]) / self.U.bg.h**3  # [(Mpc/h)^-3]
+      PhiStarLow = 10.**(data[:,4]+data[:,6]) / self.U.bg.h**3  # [(Mpc/h)^-3]
+      #
       # for alpha, they recommend using -1.6, rather than the best fit
-      Alpha = data[:,3] # [dimless]
       #Alpha = -1.6 * np.ones_like(z) # [dimless]
+      Alpha = data[:,7] # [dimless]
+      AlphaHigh = data[:,7]+data[:,8] # [dimless]
+      AlphaLow = data[:,7]+data[:,9] # [dimless]
+      
+
       # interpolate the Schechter fits (Eq 2)
       self.lStar = interp1d(z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+      self.lStarHigh = interp1d(z, LStarHigh, kind='linear', bounds_error=False, fill_value=0.)
+      self.lStarLow = interp1d(z, LStarLow, kind='linear', bounds_error=False, fill_value=0.)
+      #
       self.phiStar = interp1d(z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+      self.phiStarHigh = interp1d(z, PhiStarHigh, kind='linear', bounds_error=False, fill_value=0.)
+      self.phiStarLow = interp1d(z, PhiStarLow, kind='linear', bounds_error=False, fill_value=0.)
+      #
       self.alpha = interp1d(z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+      self.alphaHigh = interp1d(z, AlphaHigh, kind='linear', bounds_error=False, fill_value=0.)
+      self.alphaLow = interp1d(z, AlphaLow, kind='linear', bounds_error=False, fill_value=0.)
       #
       self.phiInt = lambda z,l: self.phiStar(z) * (l/self.lStar(z))**self.alpha(z) * np.exp(-l/self.lStar(z)) / self.lStar(z) # [(Mpc/h)^-3 (erg/s)^-1]
       self.phiObs = lambda z,l: 100.**(1./5.) * self.phiInt(z, l * 100.**(1./5.))
 
       '''
       self.nGal(z)
-      self.lambdaMicrons
-      self.nuHz
       self.meanGalLum(z)
       self.meanLumDensity(z)
       self.s2ij(z)
       '''
+
+   def phi(self, z, l, obs=True, lStar=None, phiStar=None, alpha=None):
+      '''output in [(Mpc/h)^-3 (erg/s)^-1]
+      luminosity in [erg/s]
+      obs = True for dust extincted luminosities
+      obs = False for intrinsic luminosities
+      '''
+      if obs:
+         lStarCorr = 100.**(1./5.)
+      else:
+         lStarCorr = 1.
+
+      if lStar is None:
+         lStar = self.lStar(z) / lStarCorr
+      elif lStar is 'high':
+         lStar = self.lStarHigh(z) / lStarCorr
+      elif lStar is 'low':
+         lStar = self.lStarLow(z) / lStarCorr
+
+
+      if phiStar is None:
+         phiStar = self.phiStar(z)
+      elif phiStar is 'high':
+         phiStar = self.phiStarHigh(z)
+      elif phiStar is 'low':
+         phiStar = self.phiStarLow(z)
+
+      if alpha is None:
+         alpha = self.alpha(z)
+      elif alpha is 'high':
+         alpha = self.alphaHigh(z)
+      elif alpha is 'low':
+         alpha = self.alphaLow(z)
+
+      result = phiStar * (l/lStar)**alpha * np.exp(-l/lStar) / lStar
+
+      return result
+
+
+
+   def nGal(self, z, lStar=None, phiStar=None, alpha=None):
+      ''' [(Mpc/h)^-3]
+      '''
+      def integrand(lnl):
+         l = np.exp(lnl)
+         result = self.phi(z, l, obs=False, lStar=lStar, phiStar=phiStar, alpha=alpha)
+         result *= l
+         return result
+      result = integrate.quad(integrand, np.log(1.e30), np.log(1.e44), epsabs=0., epsrel=1.e-3)[0]
+      return result
+
+
+   def meanLumDensity(self, z, lStar=None, phiStar=None, alpha=None):
+      '''[Lsun / (Mpc/h)^3]
+      '''
+      def integrand(lnl):
+         l = np.exp(lnl)
+         result = self.phi(z, l, obs=False, lStar=lStar, phiStar=phiStar, alpha=alpha)
+         result *= l**2
+         return result
+      result = integrate.quad(integrand, np.log(1.e30), np.log(1.e44), epsabs=0., epsrel=1.e-3)[0]
+      # convert from [erg/s] to [Lsun]
+      result /= 3.839333
+      return result
+      
+
+   def meanGalLum(self, z, lStar=None, phiStar=None, alpha=None):
+      '''[Lsun]
+      '''
+      result = self.meanLumDensity(z, lStar=lStar, phiStar=phiStar, alpha=alpha)
+      result /= self.nGal(z, lStar=lStar, phiStar=phiStar, alpha=alpha)
+      return result
+
+
+   def s2ij(self, z, lStar=None, phiStar=None, alpha=None):
+      '''var(L_Ha) / mean(L_Ha)^2 [dimless]
+      '''
+      def integrand(lnl):
+         l = np.exp(lnl)
+         result = self.phi(z, l, obs=False, lStar=lStar, phiStar=phiStar, alpha=alpha)
+         result *= l**3
+         return result
+      result = integrate.quad(integrand, np.log(1.e30), np.log(1.e44), epsabs=0., epsrel=1.e-3)[0]
+      result /= self.nGal(z, lStar=lStar, phiStar=phiStar, alpha=alpha)
+      result /= self.meanGalLum(z, lStar=lStar, phiStar=phiStar, alpha=alpha)**2
+      result -= 1.
+      return result
+   
+
+
+
+   def nGalEff(self, z, lStar=None, phiStar=None, alpha=None):
+      '''Effective galaxy number density for shot noise
+      [(Mpc/h)^{-3}]
+      '''
+      nGal = self.nGal(z, lStar=lStar, phiStar=phiStar, alpha=alpha)
+      s2 = self.s2ij(z, lStar=lStar, phiStar=phiStar, alpha=alpha)
+      return nGal / (1. + s2)
+
+
+   def meanIntensity(self, z, unit=None):
+      '''Mean intensity in
+      unit=='dI/I' for delta I / I [dimless]
+      unit=='Lsun/(Mpc/h)^2/sr/Hz' for I
+      unit=='Jy/sr' for I
+      unit=='cgs' for I [erg/s/cm^2/sr/Hz]
+      '''
+      if unit is None:
+         unit = self.unit
+
+      if unit=='dI/I':
+         return 1.
+
+      result = self.meanLumDensity(z)  # [Lsun / (Mpc/h)^3]
+      result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
+      result /= 4. * np.pi * self.nuHz # *[/sr/Hz]
+      if unit=='Lsun/(Mpc/h)^2/sr/Hz':
+         return result
+      if unit=='Jy/sr':
+         result *= 3.827e26   # [Lsun] to [W]
+         result /= (3.086e22 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [m^{-2}]
+         result /= 1.e-26  # [W/m^2/Hz/sr] to [Jy/sr]
+      elif unit=='cgs':
+         result *= 3.839e33  # [Lsun] to [erg/s]
+         result /= (3.086e24 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [cm^{-2}]
+      return result
+
+
+   def Pshot(self, z, unit=None, lStar=None, phiStar=None, alpha=None):
+      '''shot noise power spectrum in [(Mpc/h)^3] multiplied
+      by the square of the intensity unit
+      '''
+      if unit is None:
+         unit = self.unit
+
+      result = 1. / self.nGalEff(z, lStar=lStar, phiStar=phiStar, alpha=alpha)
+
+      if unit=='dI/I':
+         return result
+      else:
+         result *= self.meanIntensity(z, unit=unit)
+         result *= self.meanIntensity(z, unit=unit)
+         return result
+
+
+   def plotShotNoiseUncertainty(self):
+      '''Vary the Schechter fit parameters to get an idea of the uncertainty 
+      on the shot noise power spectrum
+      '''
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      colors = ['gray', 'g', 'r', 'b']
+      for iZ in range(self.nZ):
+         z = self.Z[iZ]
+
+         #ax.axhline(self.Pshot(z, lStar=None, phiStar=None, alpha=None), c=colors[iZ], label=r'$z=$'+str(z))
+         #ax.axhline(self.Pshot(z, lStar='high', phiStar=None, alpha=None), c=colors[iZ])
+         #ax.axhline(self.Pshot(z, lStar='low', phiStar=None, alpha=None), c=colors[iZ])
+         #ax.axhline(self.Pshot(z, lStar=None, phiStar='high', alpha=None), c=colors[iZ])
+         #ax.axhline(self.Pshot(z, lStar=None, phiStar='low', alpha=None), c=colors[iZ])
+         #ax.axhline(self.Pshot(z, lStar=None, phiStar=None, alpha='high'), c=colors[iZ])
+         #ax.axhline(self.Pshot(z, lStar=None, phiStar=None, alpha='low'), c=colors[iZ])
+
+
+         y = [self.Pshot(z, lStar=None, phiStar=None, alpha=None),
+              self.Pshot(z, lStar='high', phiStar=None, alpha=None),
+              self.Pshot(z, lStar='low', phiStar=None, alpha=None),
+              self.Pshot(z, lStar=None, phiStar='high', alpha=None),
+              self.Pshot(z, lStar=None, phiStar='low', alpha=None),
+              self.Pshot(z, lStar=None, phiStar=None, alpha='high'),
+              self.Pshot(z, lStar=None, phiStar=None, alpha='low')]
+         ax.axhline(y[0], xmin=1.*iZ/self.nZ, xmax=(iZ+1.)/self.nZ, color=colors[iZ], label=r'$z=$'+str(z) )
+         ax.axhspan(np.min(y), np.max(y), xmin=1.*iZ/self.nZ, xmax=(iZ+1.)/self.nZ, color=colors[iZ], alpha=0.3)
+      #
+      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+      ax.axes.xaxis.set_visible(False)
+      #ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_ylabel(r'$P_\text{shot}$ [(Mpc/h)$^3$]')
+      #ax.set_xlabel(r'$k$ [h/Mpc]')
+      #
+      path = './figures/profile/Sobral12/'+'shot_noise_uncertainty.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2224,10 +2459,10 @@ class ProfLIMSobral12(Profile):
       path = './figures/profile/Sobral12/'+'lf_intrinsic_sobral12_fig8.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
-      #plt.show()
+      plt.show()
       
 
-
+      
       # "Observed" LF,
       # ie affected by dust attenuation
       fig=plt.figure(0)
@@ -2247,20 +2482,35 @@ class ProfLIMSobral12(Profile):
          #
          # Schechter fit
          ax.plot(L, self.phiObs(z, L) * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ])
+         #
+         # my high and low curves
+         #y = self.phiObs(z, L) + self.fPhiObsHighMeas[iZ](L) - self.fPhiObsMeas[iZ](L)
+         #ax.plot(L, y * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ], ls='--')
+         #y = self.phiObs(z, L) + self.fPhiObsLowMeas[iZ](L) - self.fPhiObsMeas[iZ](L)
+         #ax.plot(L, y * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ], ls='--')
+         #
+         # varying the Schechter fits within 1 sigma
+         ax.plot(L, self.phi(z, L, obs=True, lStar='high') * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ], ls='--')
+         ax.plot(L, self.phi(z, L, obs=True, lStar='low') * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ], ls='--')
+         ax.plot(L, self.phi(z, L, obs=True, phiStar='high') * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ], ls='--')
+         ax.plot(L, self.phi(z, L, obs=True, phiStar='low') * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ], ls='--')
+         ax.plot(L, self.phi(z, L, obs=True, alpha='high') * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ], ls='--')
+         ax.plot(L, self.phi(z, L, obs=True, alpha='low') * L * np.log(10.) * self.U.bg.h**3, c=colors[iZ], ls='--')
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xscale('log', nonposx='clip')
       ax.set_yscale('log', nonposy='clip')
       ax.set_xlim((10.**(40.5), 10.**(44)))
-      ax.set_ylim((10.**(-5.5), 10.**(-0.5)))
+      ax.set_ylim((1.e-7, 1.))
       ax.set_xlabel(r'$L_{H_\alpha}$ [erg/s]')
       ax.set_ylabel(r'$\text{log}_{10} \left( \Phi \times \text{Mpc}^3 \right)$')
-      ax.set_title(r'"Observed" luminosity function')
+      ax.set_title(r'``Observed" luminosity function')
       #
       path = './figures/profile/Sobral12/'+'lf_observed.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
-      #plt.show()
+      plt.show()
+      
       
 
 
@@ -2379,82 +2629,6 @@ class ProfLIMSobral12(Profile):
          result = 0.
       return result
 
-
-   def meanIntensity(self, z, unit=None):
-      '''Mean intensity in
-      unit=='dI/I' for delta I / I [dimless]
-      unit=='Lsun/(Mpc/h)^2/sr/Hz' for I
-      unit=='Jy/sr' for I
-      unit=='cgs' for I [erg/s/cm^2/sr/Hz]
-      '''
-      if unit is None:
-         unit = self.unit
-
-      if unit=='dI/I':
-         return 1.
-
-      result = self.meanLumDensity(z)  # [Lsun / (Mpc/h)^3]
-      result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
-      result /= 4. * np.pi * self.nuHz # *[/sr/Hz]
-      if unit=='Lsun/(Mpc/h)^2/sr/Hz':
-         return result
-      if unit=='Jy/sr':
-         result *= 3.827e26   # [Lsun] to [W]
-         result /= (3.086e22 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [m^{-2}]
-         result /= 1.e-26  # [W/m^2/Hz/sr] to [Jy/sr]
-      elif unit=='cgs':
-         result *= 3.839e33  # [Lsun] to [erg/s]
-         result /= (3.086e24 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [cm^{-2}]
-      return result
-
-
-   def nGalEff(self, z, lineName1=None, lineName2=None):
-      '''Effective galaxy number density for shot noise
-      [(Mpc/h)^{-3}]
-      '''
-      if lineName1 is None:
-         lineName1 = self.lineName
-      if lineName2 is None:
-         lineName2 = self.lineName
-      # find the corresponding line numbers
-      pathIn = './input/EGG_results/'
-      lineNames = np.loadtxt(pathIn+'line_names.txt', dtype='str')
-      iLine1 = np.where(lineNames==lineName1)[0][0]
-      iLine2 = np.where(lineNames==lineName2)[0][0]
-      # get the interpolated fractional covariance
-      # of galaxy line luminosities [dimless]
-      s2 = self.s2ij(z)[iLine1, iLine2]
-
-      return self.nGal(z) / (1. + s2)
-
-   def Pshot(self, z, lineName1=None, lineName2=None, unit=None):
-      '''shot noise power spectrum in [(Mpc/h)^3] multiplied
-      by the square of the intensity unit
-      '''
-      if unit is None:
-         unit = self.unit
-      if lineName1 is None:
-         lineName1 = self.lineName
-      if lineName2 is None:
-         lineName2 = self.lineName
-
-      result = 1. / self.nGalEff(z, lineName1, lineName2)
-
-      if unit=='dI/I':
-         return result
-      else:
-#!!!! manuwaring: this is super super slow. Fix it
-         if lineName1==self.lineName:
-            p1 = self
-         else:
-            p1 = ProfLIM(self.U, self.Sfr, lineName=lineName1, trunc=self.trunc, unit=unit)
-         if lineName2==self.lineName:
-            p2 = self
-         else:
-            p2 = ProfLIM(self.U, self.Sfr, lineName=lineName2, trunc=self.trunc, unit=unit)
-         result *= p1.meanIntensity(z, unit=unit)
-         result *= p2.meanIntensity(z, unit=unit)
-         return result
 
 
 

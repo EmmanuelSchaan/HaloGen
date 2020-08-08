@@ -3,7 +3,13 @@
 # and this is actually how the L^star and phi^star were fit.
 # These fits are after correcting the 1mag of dust extinction on the Halpha luminosity
 # z, L^star_Halpha [erg/s], phi^star_Halpha [Mpc^-3], alpha_Halpha [dimless]
-0.40 41.95 -3.12 -1.75
-0.84 42.25 -2.47 -1.56
-1.47 42.56 -2.61 -1.62
-2.23 42.87 -2.78 -1.59
+# 0.40 41.95 -3.12 -1.75
+# 0.84 42.25 -2.47 -1.56
+# 1.47 42.56 -2.61 -1.62
+# 2.23 42.87 -2.78 -1.59
+#
+# z, L^star_Halpha [erg/s], plus, minus, phi^star_Halpha [Mpc^-3], plus, minus, alpha_Halpha [dimless], plus, minus
+0.40 41.95 0.47 -0.12 -3.12 0.10 -0.34 -1.75 0.12 -0.08
+0.84 42.25 0.07 -0.05 -2.47 0.07 -0.08 -1.56 0.13 -0.14
+1.47 42.56 0.06 -0.05 -2.61 0.08 -0.09 -1.62 0.25 -0.29
+2.23 42.87 0.08 -0.06 -2.78 0.08 -0.09 -1.59 0.12 -0.13

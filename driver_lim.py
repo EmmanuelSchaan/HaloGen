@@ -59,12 +59,12 @@ profLIM = ProfLIMEGG(u, sfr, lineName='halpha', trunc=4., unit='dI/I')
 
 profLIM = ProfLIMSobral12(u, sfr, trunc=4., unit='dI/I')
 
-profLIM.plotLF()
-
+#profLIM.plotLF()
+#profLIM.plotShotNoiseUncertainty()
 
 
 ##################################################################################
-'''
+
 # halo model integrals
 iHaloModel = IHaloModel(u, massFunc)
 
@@ -85,9 +85,9 @@ p3d_lim = P3dAuto(u, iHaloModel, profLIM, fPnoise = lambda k,z: profLIM.Pshot(z)
 #p3d_lim = P3dAuto(u, iHaloModel, profLIM, fPnoise = lambda k,z: 1./profLIM.nGal(z), doT=False, save=False)
 #p3d_limlim = P3dCross(u, iHaloModel, profLIM, profLIM, doT=False, save=False)
 
-#p3d_lim.plotP(z=1.)
+p3d_lim.plotP(z=1.)
 #p3d_lim.plotBEff()
 
-profLIM.plotP3dGong17(p3d_lim.fPtot, lineName='halpha')
+#profLIM.plotP3dGong17(p3d_lim.fPtot, lineName='halpha')
 #profLIM.plotP3dGong17(p3d_lim.fPtotinterp, lineName='h_alpha')
-'''
+
