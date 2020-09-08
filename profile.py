@@ -1988,7 +1988,7 @@ class ProfLIMEGG(Profile):
       # results from my calculation (EGG)
       f = lambda z: self.meanIntensity(z, unit='Jy/sr')
       meanIntensity = np.array(map(f, Z))
-      ax.semilogy(Z, meanIntensity, 'k', label=r'This work')
+      ax.semilogy(Z, meanIntensity, 'k', label=r'from EGG')
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
@@ -2244,12 +2244,15 @@ class ProfLIMSobral12(Profile):
 
    def nGal(self, z, lStar=None, phiStar=None, alpha=None):
       ''' [(Mpc/h)^-3]
+      This integral of the LF formally diverges at low luminosities,
+      so it is highly cutoff dependent.
       '''
       def integrand(lnl):
          l = np.exp(lnl)
-         result = self.phi(z, l, obs=False, lStar=lStar, phiStar=phiStar, alpha=alpha)
+         result = self.phi(z, l, obs=True, lStar=lStar, phiStar=phiStar, alpha=alpha)
          result *= l
          return result
+      #result = integrate.quad(integrand, np.log(1.e30), np.log(1.e44), epsabs=0., epsrel=1.e-3)[0]
       result = integrate.quad(integrand, np.log(1.e30), np.log(1.e44), epsabs=0., epsrel=1.e-3)[0]
       return result
 
@@ -2259,12 +2262,12 @@ class ProfLIMSobral12(Profile):
       '''
       def integrand(lnl):
          l = np.exp(lnl)
-         result = self.phi(z, l, obs=False, lStar=lStar, phiStar=phiStar, alpha=alpha)
+         result = self.phi(z, l, obs=True, lStar=lStar, phiStar=phiStar, alpha=alpha)
          result *= l**2
          return result
       result = integrate.quad(integrand, np.log(1.e30), np.log(1.e44), epsabs=0., epsrel=1.e-3)[0]
       # convert from [erg/s] to [Lsun]
-      result /= 3.839333
+      result /= 3.839e33
       return result
       
 
@@ -2281,11 +2284,13 @@ class ProfLIMSobral12(Profile):
       '''
       def integrand(lnl):
          l = np.exp(lnl)
-         result = self.phi(z, l, obs=False, lStar=lStar, phiStar=phiStar, alpha=alpha)
+         result = self.phi(z, l, obs=True, lStar=lStar, phiStar=phiStar, alpha=alpha)
          result *= l**3
          return result
       result = integrate.quad(integrand, np.log(1.e30), np.log(1.e44), epsabs=0., epsrel=1.e-3)[0]
       result /= self.nGal(z, lStar=lStar, phiStar=phiStar, alpha=alpha)
+      # convert from [(erg/s)^2] to [Lsun^2]
+      result /= 3.839e33**2
       result /= self.meanGalLum(z, lStar=lStar, phiStar=phiStar, alpha=alpha)**2
       result -= 1.
       return result
@@ -2347,7 +2352,7 @@ class ProfLIMSobral12(Profile):
          return result
 
 
-   def plotShotNoiseUncertainty(self):
+   def plotShotNoiseUncertainty(self, compareProfs=None):
       '''Vary the Schechter fit parameters to get an idea of the uncertainty 
       on the shot noise power spectrum
       '''
@@ -2358,28 +2363,34 @@ class ProfLIMSobral12(Profile):
       colors = ['gray', 'g', 'r', 'b']
       for iZ in range(self.nZ):
          z = self.Z[iZ]
+         y = [self.Pshot(z, lStar=None, phiStar=None, alpha=None, unit='dI/I'),
+              self.Pshot(z, lStar='high', phiStar=None, alpha=None, unit='dI/I'),
+              self.Pshot(z, lStar='low', phiStar=None, alpha=None, unit='dI/I'),
+              self.Pshot(z, lStar=None, phiStar='high', alpha=None, unit='dI/I'),
+              self.Pshot(z, lStar=None, phiStar='low', alpha=None, unit='dI/I'),
+              self.Pshot(z, lStar=None, phiStar=None, alpha='high', unit='dI/I'),
+              self.Pshot(z, lStar=None, phiStar=None, alpha='low', unit='dI/I')]
+         #ax.axhline(y[0], xmin=1.*iZ/self.nZ, xmax=(iZ+1.)/self.nZ, color=colors[iZ], label=r'$z=$'+str(z) )
+         #ax.axhspan(np.min(y), np.max(y), xmin=1.*iZ/self.nZ, xmax=(iZ+1.)/self.nZ, color=colors[iZ], alpha=0.3)
+         
+         ax.errorbar([z], [y[0]], yerr=[0.5*(np.max(y) - np.min(y))], c='b', fmt='o-')
+      ax.errorbar([], [], c='b', label=r'Sobral+12')
 
-         #ax.axhline(self.Pshot(z, lStar=None, phiStar=None, alpha=None), c=colors[iZ], label=r'$z=$'+str(z))
-         #ax.axhline(self.Pshot(z, lStar='high', phiStar=None, alpha=None), c=colors[iZ])
-         #ax.axhline(self.Pshot(z, lStar='low', phiStar=None, alpha=None), c=colors[iZ])
-         #ax.axhline(self.Pshot(z, lStar=None, phiStar='high', alpha=None), c=colors[iZ])
-         #ax.axhline(self.Pshot(z, lStar=None, phiStar='low', alpha=None), c=colors[iZ])
-         #ax.axhline(self.Pshot(z, lStar=None, phiStar=None, alpha='high'), c=colors[iZ])
-         #ax.axhline(self.Pshot(z, lStar=None, phiStar=None, alpha='low'), c=colors[iZ])
 
 
-         y = [self.Pshot(z, lStar=None, phiStar=None, alpha=None),
-              self.Pshot(z, lStar='high', phiStar=None, alpha=None),
-              self.Pshot(z, lStar='low', phiStar=None, alpha=None),
-              self.Pshot(z, lStar=None, phiStar='high', alpha=None),
-              self.Pshot(z, lStar=None, phiStar='low', alpha=None),
-              self.Pshot(z, lStar=None, phiStar=None, alpha='high'),
-              self.Pshot(z, lStar=None, phiStar=None, alpha='low')]
-         ax.axhline(y[0], xmin=1.*iZ/self.nZ, xmax=(iZ+1.)/self.nZ, color=colors[iZ], label=r'$z=$'+str(z) )
-         ax.axhspan(np.min(y), np.max(y), xmin=1.*iZ/self.nZ, xmax=(iZ+1.)/self.nZ, color=colors[iZ], alpha=0.3)
+      #
+      for prof in compareProfs:
+         if hasattr(prof, 'Z'):
+            Z = prof.Z
+         else:
+            Z = np.linspace(0.71, 6.,101)
+         f = lambda z: prof.Pshot(z, unit='dI/I')
+         pShot = np.array(map(f, Z))
+         plt.plot(Z, pShot, label=str(prof))
+         
       #
       ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
-      ax.axes.xaxis.set_visible(False)
+      #ax.axes.xaxis.set_visible(False)
       #ax.set_xscale('log', nonposx='clip')
       ax.set_yscale('log', nonposy='clip')
       ax.set_ylabel(r'$P_\text{shot}$ [(Mpc/h)$^3$]')
@@ -2654,23 +2665,34 @@ class ProfLIMSobral12(Profile):
       plt.show()
 
 
-   def plotnGal(self):
-      Z = np.linspace(0.71, 6.,101)
-
+   def plotnGal(self, profs=None):
+      if profs is None:
+         profs = [self]
+      
+      print("nGal is highly cutoff dependent (formally divergent at low luminosity)")
+      print("so its value is meaningless")
+      
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
-      nGal = np.array(map(self.nGal, Z))
-      ax.semilogy(Z, nGal)
+      for prof in profs:
+         if hasattr(prof, 'Z'):
+            Z = prof.Z
+         else:
+            Z = np.linspace(0.71, 6.,101)
+         nGal = np.array(map(prof.nGal, Z))
+         ax.semilogy(Z, nGal, label=str(prof))
       #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{n}_\text{gal}$ [(Mpc/h)$^{-3}$]')
 
       plt.show()
 
 
-   def plotMeanIntensity(self):
-      Z = np.linspace(0.71, 6.,101)
+   def plotMeanIntensity(self, profs=None):
+      if profs is None:
+         profs = [self]
 
       # reproduce Fig 3 in Gong Cooray Silva + 17
       fig=plt.figure(0)
@@ -2689,10 +2711,14 @@ class ProfLIMSobral12(Profile):
          high = np.genfromtxt(path, delimiter=', ')
          plt.fill(np.append(low[:,0], high[::-1,0]), np.append(low[:,1], high[::-1,1]), facecolor='b', alpha=0.5)
       #
-      # results from my calculation (EGG)
-      f = lambda z: self.meanIntensity(z, unit='Jy/sr')
-      meanIntensity = np.array(map(f, Z))
-      ax.semilogy(Z, meanIntensity, 'k', label=r'This work')
+      for prof in profs:
+         f = lambda z: prof.meanIntensity(z, unit='Jy/sr')
+         if hasattr(prof, 'Z'):
+            Z = prof.Z
+         else:
+            Z = np.linspace(0.71, 6.,101)
+         meanIntensity = np.array(map(f, Z))
+         ax.semilogy(Z, meanIntensity, label=str(prof))
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
@@ -2714,6 +2740,7 @@ class ProfLIMSobral12(Profile):
 
       plt.show()
       '''
+
 
 
 
