@@ -54,28 +54,6 @@ class Sfr(object):
       return result
 
 
-#   def sfr(self, m, z):
-#      ''' SFR [Msun/h/yr] as a function of halo mass [Msun/h] and redshift
-#      from Fonseca+16 (1607.05288v2), Eq 11.
-#      I inferred the units from Eq 9 and 11.
-#      '''
-#      # bounds for the fitting function
-#      if z<0. or z>5.:
-#         return 0.
-#      m *= self.U.bg.h  # convert from [Msun] to [Msun/h]
-#
-#      # Eq 11
-#      result = self.fM0(z)
-#      result *= (m/self.Ma)**self.fa(z)
-#      result *= (1.+m/self.fMb(z))**self.fb(z)
-#      result *= (1.+m/self.fMc(z))**self.fc(z)
-#
-#      # convert from [Msun/yr] to [Msun/h/yr]
-#      result *= self.U.bg.h
-#
-#      return result
-
-
    def sfrdForInterp(self, z):
       '''SFR density:
       \int dm dn/dm SFR(m) [Msun/yr / (Mpc/h)^3]

@@ -21,7 +21,7 @@ class P3dAuto(object):
       self.Ke = np.genfromtxt("./input/K.txt") # edges of the bins for k
       self.dK = np.genfromtxt("./input/dK.txt") # widths of the bins for k
       # redshifts to evaluate
-      self.Z = np.linspace(0., 10., 101)
+      self.Z = np.linspace(0., 10., 11)
    
       # create folder if needed
       directory = "./output/pn_3d/"
