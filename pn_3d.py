@@ -10,7 +10,9 @@ class P3dAuto(object):
       self.U = U
       self.IHaloModel = IHaloModel
       self.Prof = Prof
-      self.fPnoise = fPnoise
+      
+      self.fPnoise = lambda k,z: self.Prof.Pshot(z)
+      #self.fPnoise = fPnoise
       self.fTnoise = fTnoise
       self.Vs = Vs   # in (Mpc/h)^3
       self.name = str(self.Prof) + name

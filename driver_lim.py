@@ -51,95 +51,96 @@ sfr = Sfr(u, massFunc)
 ##################################################################################
 # Luminosity functions
 
+# SPHEREx lines
+#lineNames = np.array(['halpha', 'hbeta', 'o3_5007', 'lyalpha'])
 
-# Sobral+12 Ha
-lfSobral12 = LFSobral12(u)
-lfHaColbert13 = LFHaColbert13(u)
-lfOiiiColbert13 = LFOiiiColbert13(u)
-lfHaCochrane17 = LFHaCochrane17(u)
-# OIII: Mehta+15
-lfMehta15 = LFMehta15(u)
-
-#lfSobral12.plotnGal()
-#lfSobral12.plotMeanIntensity()
-#lfSobral12.plotLf()
-#lfSobral12.plotnGalEff()
-#lfSobral12.plotShotNoise()
-#lfSobral12.plotS2()
-
-#lfHaColbert13.plotnGal()
-#lfHaColbert13.plotMeanIntensity()
-#lfHaColbert13.plotLf()
-#lfHaColbert13.plotnGalEff()
-#lfHaColbert13.plotShotNoise()
-#lfHaColbert13.plotS2()
-
-#lfOiiiColbert13.plotnGal()
-#lfOiiiColbert13.plotMeanIntensity()
-#lfOiiiColbert13.plotLf()
-#lfOiiiColbert13.plotnGalEff()
-#lfOiiiColbert13.plotShotNoise()
-#lfOiiiColbert13.plotS2()
-
-#lfHaCochrane17.plotnGal()
-#lfHaCochrane17.plotMeanIntensity()
-#lfHaCochrane17.plotLf()
-#lfHaCochrane17.plotnGalEff()
-#lfHaCochrane17.plotShotNoise()
-#lfHaCochrane17.plotS2()
-
-#print lfMehta15.computeCorrCoeffHaOIII()
-#lfMehta15.plotBivariateLf()
-
-# to be fixed
-##profLIMSobral12.plotShotNoiseUncertainty(compareProfs=[profLIMEGG])
-
-##################################################################################
-# EGG: many lines
-
-# All lines available
+# EGG: available lines
 #lineNames = np.array(['c2_157', 'n2_205', 'c1_609', 'co10', 'co21', 'co32', 'co43',
 #           'co54', 'co65', 'co76', 'halpha', 'hbeta', 'hgamma', 'hdelta',
 #           'n2_6583', 'n2_6548', 'o3_5007', 'o3_4959', 'o2_3727',
 #           'lyalpha'])
 
-# SPHEREx lines
-#lineNames = np.array(['halpha', 'hbeta', 'o3_5007', 'lyalpha'])
 
 
-lfHaEgg = LFEGG(u, lineName='halpha')
-lfOiii5007Egg = LFEGG(u, lineName='o3_5007')
-lfOiii4959Egg = LFEGG(u, lineName='o3_4959')
+#import pandas as pd
+#df = pd.DataFrame(columns=['lineName', 'ref', 'lf', 'profLimLf', 'p3d'])
+#df = df.append({'lineName': 'halpha', 'ref': 'Sobral12', 'lf': LFHaSobral12(u)}, ignore_index=True)
 
-#lfHaEgg.plotnGal()
-#lfHaEgg.plotMeanIntensity()
-#lfHaEgg.plotnGalEff()
-#lfHaEgg.plotShotNoise()
-#lfHaEgg.plotS2()
 
+lfHa = {}
+lfHa['Sobral12'] = LFHaSobral12(u)
+lfHa['Colbert13'] = LFHaColbert13(u)
+lfHa['Cochrane17'] = LFHaCochrane17(u)
+lfHa['Egg'] = LFEGG(u, lineName='halpha')
+
+lfOiii = {}
+lfOiii['Colbert13'] = LFOiiiColbert13(u)
+lfOiii['Mehta15'] = LFOiiiMehta15(u)
+lfOiii['5007Egg'] = LFEGG(u, lineName='o3_5007')
+lfOiii['4959Egg'] = LFEGG(u, lineName='o3_4959')
+
+
+# lf = lfHaSobral12
+#lf.plotnGal()
+#lf.plotMeanIntensity()
+#lf.plotLf()
+#lf.plotnGalEff()
+#lf.plotShotNoise()
+#lf.plotS2()
+
+#print lfOiiiMehta15.computeCorrCoeffHaOIII()
+#lfOiiiMehta15.plotBivariateLf()
+
+
+##################################################################################
+# Plot: luminosity functions
+'''
+for key in lfHa.keys():
+   try: lfHa[key].plotLf()
+   except: pass
+
+for key in lfOiii.keys():
+   try: lfOiii[key].plotLf()
+   except: pass
+'''
+
+
+##################################################################################
+# Plot: mean intensity
+
+'''
+lfHa['Sobral12'].plotMeanIntensity(lfs=[lfHa[key] for key in lfHa.keys()])
+
+lfOiii['Colbert13'].plotMeanIntensity(lfs=[lfOiii[key] for key in lfOiii.keys()])
+
+'''
 
 
 ##################################################################################
 ##################################################################################
 # LIM from LF
 
-# Sobral+12 Ha
-profLIMLFSobral12 = ProfLIMLF(u, sfr, lfSobral12, trunc=4.)
-# Mehta+15 [OIII]
-profLIMLFMehta15 = ProfLIMLF(u, sfr, lfMehta15, trunc=4.)
-profLIMLFHaColbert13 = ProfLIMLF(u, sfr, lfHaColbert13, trunc=4.)
-profLIMLFOiiiColbert13 = ProfLIMLF(u, sfr, lfOiiiColbert13, trunc=4.)
-profLIMLFHaCochrane17 = ProfLIMLF(u, sfr, lfHaCochrane17, trunc=4.)
+profLimLfHa = {}
+for key in lfHa.keys():
+   profLimLfHa[key] = ProfLIMLF(u, sfr, lfHa[key], trunc=4.)
+
+profLimLfOiii = {}
+for key in lfOiii.keys():
+   profLimLfOiii[key] = ProfLIMLF(u, sfr, lfOiii[key], trunc=4.)
 
 
-# EGG
-profLimLfHaEgg = ProfLIMLF(u, sfr, lfHaEgg, trunc=4.)
-profLimLfOiii5007Egg = ProfLIMLF(u, sfr, lfOiii5007Egg, trunc=4.)
-profLimLfOiii4959Egg = ProfLIMLF(u, sfr, lfOiii4959Egg, trunc=4.)
 
-##profLimLfHaEgg.plotP3dGong17(p3d_limegg.fPtotinterp, lineName='halpha')
-#profLIMLFSobral12.plotNgal()
-
+#profLIMLFHaSobral12 = ProfLIMLF(u, sfr, lfHaSobral12, trunc=4.)
+#profLIMLFOiiiMehta15 = ProfLIMLF(u, sfr, lfOiiiMehta15, trunc=4.)
+#profLIMLFHaColbert13 = ProfLIMLF(u, sfr, lfHaColbert13, trunc=4.)
+#profLIMLFOiiiColbert13 = ProfLIMLF(u, sfr, lfOiiiColbert13, trunc=4.)
+#profLIMLFHaCochrane17 = ProfLIMLF(u, sfr, lfHaCochrane17, trunc=4.)
+#
+#
+## EGG
+#profLimLfHaEgg = ProfLIMLF(u, sfr, lfHaEgg, trunc=4.)
+#profLimLfOiii5007Egg = ProfLIMLF(u, sfr, lfOiii5007Egg, trunc=4.)
+#profLimLfOiii4959Egg = ProfLIMLF(u, sfr, lfOiii4959Egg, trunc=4.)
 
 
 ##################################################################################
@@ -148,25 +149,18 @@ profLimLfOiii4959Egg = ProfLIMLF(u, sfr, lfOiii4959Egg, trunc=4.)
 # halo model integrals
 iHaloModel = IHaloModel(u, massFunc)
 
+
 ##################################################################################
 ##################################################################################
 # Power spectrum
 
+p3dHa = {}
+for key in lfHa.keys():
+   p3dHa[key] = P3dAuto(u, iHaloModel, profLimLfHa[key], doT=False, save=False)
 
-# Sobral+12 Ha
-p3d_limsobral12 = P3dAuto(u, iHaloModel, profLIMLFSobral12, fPnoise = lambda k,z: profLIMLFSobral12.Pshot(z), doT=False, save=True)
-# Mehta+15 OIII
-p3d_limmehta15 = P3dAuto(u, iHaloModel, profLIMLFMehta15, fPnoise = lambda k,z: profLIMLFMehta15.Pshot(z), doT=False, save=True)
-p3d_limhacolbert13 = P3dAuto(u, iHaloModel, profLIMLFHaColbert13, fPnoise = lambda k,z: profLIMLFHaColbert13.Pshot(z), doT=False, save=True)
-p3d_limoiiicolbert13 = P3dAuto(u, iHaloModel, profLIMLFOiiiColbert13, fPnoise = lambda k,z: profLIMLFOiiiColbert13.Pshot(z), doT=False, save=True)
-p3d_limhacochrane17 = P3dAuto(u, iHaloModel, profLIMLFHaCochrane17, fPnoise = lambda k,z: profLIMLFHaCochrane17.Pshot(z), doT=False, save=True)
-
-
-# EGG
-p3d_limhaegg = P3dAuto(u, iHaloModel, profLimLfHaEgg, fPnoise = lambda k,z: profLimLfHaEgg.Pshot(z), doT=False, save=True)
-p3d_limoiii5007egg = P3dAuto(u, iHaloModel, profLimLfOiii5007Egg, fPnoise = lambda k,z: profLimLfOiii5007Egg.Pshot(z), doT=False, save=True)
-p3d_limoiii4959egg = P3dAuto(u, iHaloModel, profLimLfOiii4959Egg, fPnoise = lambda k,z: profLimLfOiii4959Egg.Pshot(z), doT=False, save=True)
-
+p3dOiii = {}
+for key in lfOiii.keys():
+   p3dOiii[key] = P3dAuto(u, iHaloModel, profLimLfOiii[key], doT=False, save=False)
 
 
 ##p3d_limhaegg.plotP(z=1.)
@@ -175,7 +169,56 @@ p3d_limoiii4959egg = P3dAuto(u, iHaloModel, profLimLfOiii4959Egg, fPnoise = lamb
 #p3d_limoiii5007egg.plotP(z=1.)
 #p3d_limoiii4959egg.plotP(z=1.)
 
+##profLimLfHaEgg.plotP3dGong17(p3d_limegg.fPtotinterp, lineName='halpha')
 
 
+
+
+##################################################################################
+# Plot: power spectrum
+
+for key in lfHa.keys():
+
+   fig=plt.figure(0)
+   ax=fig.add_subplot(111)
+   #
+   for z in lfHa[key].Z:    
+      f = lambda k: p3dHa[key].fPtotinterp(k, z)
+      p = np.array(map(f, p3dHa[key].K))
+      p *= lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+      ax.loglog(p3dHa[key].K, p, label=r'$z=$'+str(round(z, 2)))
+   #
+   ax.legend(loc=1)
+   ax.set_xlabel(r'$k$ [$h$/Mpc]')
+   ax.set_ylabel(r'$P(k,z)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
+   ax.set_title(lfHa[key].name.replace("_", ""))
+   #
+   path = './figures/pn_3d/p3d_'+lfHa[key].name+'.pdf'
+   fig.savefig(path, bbox_inches='tight')
+   fig.clf()
+   #plt.show()
+
+
+for key in lfOiii.keys():
+
+   fig=plt.figure(0)
+   ax=fig.add_subplot(111)
+   #
+   for z in lfOiii[key].Z:
+      #f = lambda k: p3dOiii[key].fPtotinterp(k, z)
+      f = lambda k: p3dOiii[key].fPtot(k, z)
+      p = np.array(map(f, p3dOiii[key].K))
+      p *= lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
+      ax.loglog(p3dOiii[key].K, p, label=r'$z=$'+str(round(z,2)))
+   #
+   ax.legend(loc=1)
+   ax.set_xlabel(r'$k$ [$h$/Mpc]')
+   ax.set_ylabel(r'$P(k,z)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
+   ax.set_title(lfOiii[key].name.replace("_", " "))
+   #
+   path = './figures/pn_3d/p3d_'+lfOiii[key].name+'.pdf'
+   fig.savefig(path, bbox_inches='tight')
+   fig.clf()
+   #plt.show()
 
 

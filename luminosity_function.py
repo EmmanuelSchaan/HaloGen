@@ -127,8 +127,8 @@ class LF(object):
          result /= (3.086e24 / self.U.bg.h)**2  # [(Mpc/h)^{-2}] to [cm^{-2}]
          return result
 
-   def convertShotNoiseUnit(unit):
-      pass
+   def convertPowerSpectrumUnit(self, unit):
+      return self.convertIntensityUnit(unit)**2
 
 
    ##################################################################################
@@ -162,7 +162,11 @@ class LF(object):
       ax.set_xlabel(r'$L$ [erg/s]')
       ax.set_ylabel(r'$\text{log}_{10} \left( \Phi \times \text{Mpc}^3 \right)$')
       #
-      plt.show()
+      path = './figures/lf/lf_'+self.name+'.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+      #plt.close()
       
       
 
@@ -222,13 +226,18 @@ class LF(object):
          else:
             Z = np.linspace(0.71, 6.,101)
          meanIntensity = np.array(map(f, Z))
-         ax.semilogy(Z, meanIntensity, label=str(lf))
+         ax.semilogy(Z, meanIntensity, label=str(lf.__str__().replace('_', ' ')))
       #
-      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{I}(z)$ [Jy/sr]')
-
-      plt.show()
+      ax.set_xlim((0., 5.))
+      #
+      path = './figures/lf/mean_intensity_'+self.name+'.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+      #plt.close()
 
       '''
       # reproduce Fig 3 in Fonseca+16
@@ -325,7 +334,7 @@ class LF(object):
 ##################################################################################
 
 
-class LFSobral12(LF):
+class LFHaSobral12(LF):
    '''Halpha luminosity function from Sobral+12 arXiv:1202.3436v2
    '''
 
@@ -390,7 +399,7 @@ class LFSobral12(LF):
       self.phi = self.phiObs 
 
 
-      super(LFSobral12, self).__init__(U)
+      super(LFHaSobral12, self).__init__(U)
 
       self.loadMeasuredLF()
 
@@ -585,10 +594,12 @@ class LFSobral12(LF):
          ax.set_ylabel(r'$\text{log}_{10} \left( \Phi \times \text{Mpc}^3 \right)$')
          ax.set_title(r'Intrinsic luminosity function')
          #
-         path = './figures/profile/Sobral12/'+'lf_intrinsic_sobral12_fig8.pdf'
-         #fig.savefig(path, bbox_inches='tight')
-         #fig.clf()
-         plt.show()
+         #path = './figures/profile/Sobral12/'+'lf_intrinsic_sobral12_fig8.pdf'
+         path = './figures/lf/lf_halpha_intrinsic_sobral12_fig8.pdf'
+         fig.savefig(path, bbox_inches='tight')
+         fig.clf()
+         #plt.show()
+         #plt.close()
 
 
 
@@ -636,10 +647,12 @@ class LFSobral12(LF):
       ax.set_ylabel(r'$\text{log}_{10} \left( \Phi \times \text{Mpc}^3 \right)$')
       ax.set_title(r'``Observed" luminosity function')
       #
-      path = './figures/profile/Sobral12/'+'lf_observed.pdf'
-      #fig.savefig(path, bbox_inches='tight')
-      #fig.clf()
-      plt.show()
+      #path = './figures/profile/Sobral12/'+'lf_observed.pdf'
+      path = './figures/lf/lf_halpha_sobral12.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+      #plt.close()
 
 
 
@@ -741,8 +754,8 @@ class LFHaCochrane17(LF):
 ##################################################################################
 
 
-class LFMehta15(LF):
-   '''Halpha luminosity function from Mehta+15 arXiv:1505.07843v2
+class LFOiiiMehta15(LF):
+   '''[OIII] luminosity function from Mehta+15 arXiv:1505.07843v2
    This is really the total luminosity in the [OIII] doublet
    4959A and 5007A.
    '''
@@ -789,7 +802,7 @@ class LFMehta15(LF):
       # Observed LF, where the luminosities experience dust extinction
       self.phi = lambda z,l: self.phiStar(z) * (l/self.lStar(z))**self.alpha(z) * np.exp(-l/self.lStar(z)) / self.lStar(z) # [(Mpc/h)^-3 / Lsun]
 
-      super(LFMehta15, self).__init__(U)
+      super(LFOiiiMehta15, self).__init__(U)
 
 
 
