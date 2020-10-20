@@ -226,12 +226,13 @@ class LF(object):
          else:
             Z = np.linspace(0.71, 6.,101)
          meanIntensity = np.array(map(f, Z))
-         ax.semilogy(Z, meanIntensity, label=str(lf.__str__().replace('_', ' ')))
+         ax.plot(Z, meanIntensity, label=str(lf.__str__().replace('_', ' ')))
       #
-      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{I}(z)$ [Jy/sr]')
       ax.set_xlim((0., 5.))
+      ax.set_ylim((0., 40.))
       #
       path = './figures/lf/mean_intensity_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')

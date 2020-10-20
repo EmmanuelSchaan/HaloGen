@@ -43,9 +43,18 @@ massFunc = MassFuncST(u, save=False)
 
 ##################################################################################
 
-sfr = Sfr(u, massFunc)
-#sfr.testSfrd()
+#sfr = SfrFonseca16(u, massFunc)
+#sfr = SfrMoster13(u, massFunc)
 
+sfr = SfrMoster13Speagle14(u, massFunc, scatter=True, nProc=3, save=False)
+
+#sfr.plotSfr()
+#sfr.plotSfrd()
+#sfr.plotnHEff()
+#sfr.plotNHEffSpherex()
+#sfr.plotBEff()
+sfr.plotdbEff2dlnm()
+sfr.plotdP1hdlnm()
 
 ##################################################################################
 ##################################################################################
@@ -112,8 +121,8 @@ for key in lfOiii.keys():
 lfHa['Sobral12'].plotMeanIntensity(lfs=[lfHa[key] for key in lfHa.keys()])
 
 lfOiii['Colbert13'].plotMeanIntensity(lfs=[lfOiii[key] for key in lfOiii.keys()])
-
 '''
+
 
 
 ##################################################################################
@@ -156,11 +165,11 @@ iHaloModel = IHaloModel(u, massFunc)
 
 p3dHa = {}
 for key in lfHa.keys():
-   p3dHa[key] = P3dAuto(u, iHaloModel, profLimLfHa[key], doT=False, save=False)
+   p3dHa[key] = P3dAuto(u, iHaloModel, profLimLfHa[key], doT=False, save=True)
 
 p3dOiii = {}
 for key in lfOiii.keys():
-   p3dOiii[key] = P3dAuto(u, iHaloModel, profLimLfOiii[key], doT=False, save=False)
+   p3dOiii[key] = P3dAuto(u, iHaloModel, profLimLfOiii[key], doT=False, save=True)
 
 
 ##p3d_limhaegg.plotP(z=1.)
@@ -177,6 +186,7 @@ for key in lfOiii.keys():
 ##################################################################################
 # Plot: power spectrum
 
+
 for key in lfHa.keys():
 
    fig=plt.figure(0)
@@ -184,11 +194,21 @@ for key in lfHa.keys():
    #
    for z in lfHa[key].Z:    
       f = lambda k: p3dHa[key].fPtotinterp(k, z)
-      p = np.array(map(f, p3dHa[key].K))
-      p *= lfHa[key].convertPowerSpectrumUnit('Jy/sr')
-      ax.loglog(p3dHa[key].K, p, label=r'$z=$'+str(round(z, 2)))
+      pTot = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+      f = lambda k: p3dHa[key].fP1hinterp(k, z)
+      p1h = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+      #f = lambda k: p3dHa[key].fP2hinterp(k, z)
+      #p2h = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+      #print p2h
+      f = lambda k: p3dHa[key].fPnoise(k, z)
+      pShot = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+      #
+      plot=ax.loglog(p3dHa[key].K, pTot, label=r'$z=$'+str(round(z, 2)))
+      ax.loglog(p3dHa[key].K, p1h, ls='--', c=plot[0].get_color(), lw=1)
+      #ax.loglog(p3dHa[key].K, p2h, ls='-', c=plot[0].get_color())
+      ax.loglog(p3dHa[key].K, pShot, ls=':', c=plot[0].get_color(), lw=1)
    #
-   ax.legend(loc=1)
+   ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
    ax.set_xlabel(r'$k$ [$h$/Mpc]')
    ax.set_ylabel(r'$P(k,z)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
    ax.set_title(lfHa[key].name.replace("_", ""))
@@ -199,26 +219,35 @@ for key in lfHa.keys():
    #plt.show()
 
 
+
 for key in lfOiii.keys():
 
    fig=plt.figure(0)
    ax=fig.add_subplot(111)
    #
-   for z in lfOiii[key].Z:
-      #f = lambda k: p3dOiii[key].fPtotinterp(k, z)
-      f = lambda k: p3dOiii[key].fPtot(k, z)
-      p = np.array(map(f, p3dOiii[key].K))
-      p *= lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
-      ax.loglog(p3dOiii[key].K, p, label=r'$z=$'+str(round(z,2)))
+   for z in lfOiii[key].Z:    
+      f = lambda k: p3dOiii[key].fPtotinterp(k, z)
+      pTot = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
+      f = lambda k: p3dOiii[key].fP1hinterp(k, z)
+      p1h = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
+      #f = lambda k: p3dOiii[key].fP2hinterp(k, z)
+      #p2h = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
+      #print p2h
+      f = lambda k: p3dOiii[key].fPnoise(k, z)
+      pShot = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
+      #
+      plot=ax.loglog(p3dOiii[key].K, pTot, label=r'$z=$'+str(round(z, 2)))
+      ax.loglog(p3dOiii[key].K, p1h, ls='--', c=plot[0].get_color(), lw=1)
+      #ax.loglog(p3dOiii[key].K, p2h, ls='-', c=plot[0].get_color())
+      ax.loglog(p3dOiii[key].K, pShot, ls=':', c=plot[0].get_color(), lw=1)
    #
-   ax.legend(loc=1)
+   ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
    ax.set_xlabel(r'$k$ [$h$/Mpc]')
    ax.set_ylabel(r'$P(k,z)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
-   ax.set_title(lfOiii[key].name.replace("_", " "))
+   ax.set_title(lfOiii[key].name.replace("_", ""))
    #
    path = './figures/pn_3d/p3d_'+lfOiii[key].name+'.pdf'
    fig.savefig(path, bbox_inches='tight')
    fig.clf()
    #plt.show()
-
 
