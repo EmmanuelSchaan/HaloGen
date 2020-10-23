@@ -14,6 +14,7 @@ class LF(object):
 
       # required attributes
       #self.name
+      #self.nameLatex
       #self.lineName
       #self.lambdaMicrons = 656.28e-3   # [mu]
       #self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
@@ -134,8 +135,7 @@ class LF(object):
    ##################################################################################
 
    def plotLf(self, lfs=None):
-      '''Reproduces fig 8 in Sobral+12.
-      '''
+      
       if lfs is None:
          lfs = [self]
 
@@ -147,18 +147,21 @@ class LF(object):
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
-      for iZ in range(self.nZ):
-         z = self.Z[iZ]
-         #
-         # Schechter fit
-         y = self.phi(z, L_Lsun) * L_Lsun * np.log(10.) * self.U.bg.h**3
-         ax.plot(L_cgs, y, label=r'$z=$'+str(floatExpForm(z, round=2)))
+      for lf in lfs:
+         for iZ in range(self.nZ):
+            z = self.Z[iZ]
+            #
+            # Schechter fit
+            if hasattr(lf, 'phi'):
+               y = lf.phi(z, L_Lsun) * L_Lsun * np.log(10.) * self.U.bg.h**3
+               #ax.plot(L_cgs, y, label=r'$z=$'+str(round(z,2))+' '+str(lf).replace('_', ' '))
+               ax.plot(L_cgs, y, label=r'$z=$'+str(round(z,2))+' '+lf.nameLatex)
       #
-      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1, handlelength=0.2)
       ax.set_xscale('log', nonposx='clip')
       ax.set_yscale('log', nonposy='clip')
-      ax.set_xlim((10.**(40.5), 10.**(44)))
-      ax.set_ylim((1.e-7, 1.))
+      ax.set_xlim((10.**(40.), 10.**(44)))
+      ax.set_ylim((1.e-8, 1.))
       ax.set_xlabel(r'$L$ [erg/s]')
       ax.set_ylabel(r'$\text{log}_{10} \left( \Phi \times \text{Mpc}^3 \right)$')
       #
@@ -187,7 +190,8 @@ class LF(object):
          else:
             Z = np.linspace(0.71, 6.,101)
          nGal = np.array(map(lf.nGal, Z))
-         ax.semilogy(Z, nGal, label=str(lf))
+         #ax.semilogy(Z, nGal, label=str(lf).replace('_', ' '))
+         ax.semilogy(Z, nGal, label=lf.nameLatex)
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
@@ -226,7 +230,8 @@ class LF(object):
          else:
             Z = np.linspace(0.71, 6.,101)
          meanIntensity = np.array(map(f, Z))
-         ax.plot(Z, meanIntensity, label=str(lf.__str__().replace('_', ' ')))
+         #ax.plot(Z, meanIntensity, label=str(lf).replace('_', ' '))
+         ax.plot(Z, meanIntensity, label=lf.nameLatex)
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
@@ -269,13 +274,19 @@ class LF(object):
          else:
             Z = np.linspace(0.71, 6.,101)
          nGalEff = np.array(map(lf.nGalEff, Z))
-         ax.semilogy(Z, nGalEff, label=str(lf))
+         #ax.semilogy(Z, nGalEff, label=str(lf).replace('_', ' '))
+         ax.semilogy(Z, nGalEff, label=lf.nameLatex)
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{n}_\text{gal eff}$ [(Mpc/h)$^{-3}$]')
+      #
+      path = './figures/lf/ngaleff_'+self.name+'.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
 
-      plt.show()
+
 
 
    def plotShotNoise(self, lfs=None):
@@ -295,7 +306,8 @@ class LF(object):
             Z = np.linspace(0.71, 6.,101)
          f = lambda z: 1. / lf.nGalEff(z) # shot noise power of dI/I
          pShot = np.array(map(f, Z))
-         plt.plot(Z, pShot, label=str(lf))
+         #plt.plot(Z, pShot, label=str(lf))
+         plt.plot(Z, pShot, label=lf.nameLatex)
          
       #
       ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
@@ -320,7 +332,8 @@ class LF(object):
          else:
             Z = np.linspace(0.71, 6.,101)
          s2 = np.array(map(lf.s2, Z))
-         ax.semilogy(Z, s2, label=str(lf))
+         #ax.semilogy(Z, s2, label=str(lf))
+         ax.semilogy(Z, s2, label=lf.nameLatex)
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
@@ -342,6 +355,7 @@ class LFHaSobral12(LF):
    def __init__(self, U):
       # required attributes
       self.name = 'sobral12halpha'
+      self.nameLatex = r'S12 H$\alpha$'
       self.lineName = 'halpha'
       self.lambdaMicrons = 656.28e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
@@ -668,6 +682,7 @@ class LFHaCochrane17(LF):
    def __init__(self, U):
       # required attributes
       self.name = 'cochrane17halpha'
+      self.nameLatex = r'C17 H$\alpha$'
       self.lineName = 'halpha'
       self.lambdaMicrons = 656.28e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
@@ -764,6 +779,7 @@ class LFOiiiMehta15(LF):
    def __init__(self, U):
       # required attributes
       self.name = 'mehta15oiii'
+      self.nameLatex = r'M15 O{\sc iii}'
       self.lineName = 'oiii'
       self.lambdaMicrons = 495.9e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
@@ -1006,6 +1022,7 @@ class LFHaColbert13(LF):
    def __init__(self, U):
       # required attributes
       self.name = 'colbert13halpha'
+      self.nameLatex = r'C13 H$\alpha$'
       self.lineName = 'halpha'
       self.lambdaMicrons = 656.28e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
@@ -1063,6 +1080,7 @@ class LFOiiiColbert13(LF):
    def __init__(self, U):
       # required attributes
       self.name = 'colbert13oiii'
+      self.nameLatex = r'C13 O{\sc iii}'
       self.lineName = 'oiii'
       self.lambdaMicrons = 495.9e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
@@ -1133,6 +1151,7 @@ class LFEGG(LF):
       # required attributes
       self.lineName = lineName
       self.name = 'egg' + self.lineName
+      self.nameLatex = ('EGG ' + self.lineName).replace('_', ' ')
 
       # Luminosity bounds 
       # Arbitrary here, copied from Sobral+12

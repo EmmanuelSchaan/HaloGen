@@ -25,9 +25,9 @@ class Sfr(object):
          '''the mass in integral is in [Msun/h]
          '''
          m = np.exp(lnm)
-         result =  m * self.MassFunc.fmassfunc(m, 1./(1.+z)) * self.sfr(m, z)**alpha
+         result =  m * self.MassFunc.massfunc(m, 1./(1.+z)) * self.sfr(m, z)**alpha
          if bias:
-            result *= self.MassFunc.fb1(m, 1./(1.+z))
+            result *= self.MassFunc.b1(m, 1./(1.+z))
          return result
 
       # [Msun /yr / (Mpc/h)^3]
@@ -88,10 +88,12 @@ class Sfr(object):
       for a in A:
          f = lambda z: self.nHEff(z, alpha1=a, alpha2=a)
          n = np.array(map(f, self.Z))
-         ax.plot(self.Z, n, label=r'$\alpha_i=\alpha_j=$'+str(round(a, 1)))
+         ax.plot(self.Z, n, label=r'$\alpha=$'+str(round(a, 1)))
       #
       ax.set_yscale('log', nonposy='clip')
-      ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      ax.set_xlim((0., 7.))
+      ax.set_ylim((5.e-4, 1.e-1))
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{n}^h_\text{eff}$ [(Mpc/$h$)$^{-3}$]')
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
@@ -109,11 +111,13 @@ class Sfr(object):
       for a in A:
          f = lambda z: self.nHEff(z, alpha1=a, alpha2=a)
          n = np.array(map(f, self.Z))
-         ax.plot(self.Z, 1./n, label=r'$\alpha_i=\alpha_j=$'+str(round(a, 1)))
+         ax.plot(self.Z, 1./n, label=r'$\alpha=$'+str(round(a, 1)))
       #
       ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
       ax.set_yscale('log', nonposy='clip')
-      ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      ax.set_xlim((0., 7.))
+      ax.set_ylim((10., 2.e3))
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$P^\text{1h}$ [(Mpc/$h$)$^3$]')
       #
@@ -137,7 +141,7 @@ class Sfr(object):
       thetaPix = 6.2 * np.pi/(180.*3600.)
       # hence the voxel comoving volume
       vVoxSpherex = (self.U.bg.comoving_distance(self.Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
-      print "vVoxSpherex=", vVoxSpherex, "(Mpc/h)^3"
+      #print "vVoxSpherex=", vVoxSpherex, "(Mpc/h)^3"
 
 
       fig=plt.figure(0)
@@ -152,7 +156,8 @@ class Sfr(object):
          ax.plot(self.Z, n, label=r'$\alpha_i=\alpha_j=$'+str(round(a, 1)))
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
-      ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      ax.set_xlim((0., 7.))
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{N}^h_\text{eff}$ per SPHEREx voxel')
       #
@@ -185,7 +190,9 @@ class Sfr(object):
          b = np.array(map(f, self.Z))
          ax.plot(self.Z, b, label=r'$\alpha$='+str(round(a, 1)))
       #
-      ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      ax.set_xlim((0., 7.))
+      ax.set_ylim((0., 8.))
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$b^h_\text{eff}$')
       ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
@@ -201,8 +208,8 @@ class Sfr(object):
       This gives the contribution of each halo mass to 
       the 2halo power spectrum
       '''
-      result = 2. * m * self.MassFunc.fmassfunc(m, 1./(1.+z)) * self.sfr(m, z)**alpha
-      result *= self.MassFunc.fb1(m, 1./(1.+z))
+      result = 2. * m * self.MassFunc.massfunc(m, 1./(1.+z)) * self.sfr(m, z)**alpha
+      result *= self.MassFunc.b1(m, 1./(1.+z))
       result /= self.sfrdForInterp(z, alpha=alpha)
       result *= self.bEff(z, alpha=alpha)
       return result
@@ -226,7 +233,7 @@ class Sfr(object):
       ax.set_xscale('log', nonposx='clip')
       #ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
-      ax.set_ylabel(r'$\frac{d b^h_\text{eff}(z)}{d\text{ln} m}$', fontsize=14)
+      ax.set_ylabel(r'$d b^{h\, 2}_\text{eff}(z) / d\text{ln} m$', fontsize=14)
       #
       path = './figures/sfr/dbheff2dlnm_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -239,7 +246,7 @@ class Sfr(object):
    def dP1hdlnm(self, m, z, alpha1=1, alpha2=1):
       '''dP1h/dlnm [(Mpc/h)^3]
       '''
-      result = m * self.MassFunc.fmassfunc(m, 1./(1.+z)) * self.sfr(m, z)**(alpha1+alpha2)
+      result = m * self.MassFunc.massfunc(m, 1./(1.+z)) * self.sfr(m, z)**(alpha1+alpha2)
       result /= self.sfrdForInterp(z, alpha=alpha1) * self.sfrdForInterp(z, alpha=alpha2)
       return result
 
@@ -263,7 +270,7 @@ class Sfr(object):
       ax.set_xscale('log', nonposx='clip')
       #ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
-      ax.set_ylabel(r'$\frac{dP^\text{1h}(z)}{d\text{ln} m}$  [(Mpc/h)$^3$]', fontsize=14)
+      ax.set_ylabel(r'$dP^\text{1h}(z) / d\text{ln} m$  [(Mpc/h)$^3$]', fontsize=14)
       #
       path = './figures/sfr/dp1hdlnm_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -388,8 +395,8 @@ class SfrFonseca16(Sfr):
 #         '''the mass in integral is in [Msun/h]
 #         '''
 #         m = np.exp(lnm)
-#         #return m * self.MassFunc.fmassfunc(m, 1./(1.+z)) * self.sfr(m / self.U.bg.h, z)
-#         return m * self.MassFunc.fmassfunc(m, 1./(1.+0.)) * self.sfr(m, z)**alpha
+#         #return m * self.MassFunc.massfunc(m, 1./(1.+z)) * self.sfr(m / self.U.bg.h, z)
+#         return m * self.MassFunc.massfunc(m, 1./(1.+0.)) * self.sfr(m, z)**alpha
 #      # [Msun /yr / (Mpc/h)^3]
 #      result = integrate.quad(integrand, np.log(self.MassFunc.mMin), np.log(self.MassFunc.mMax), epsabs=0., epsrel=1.e-3)[0]
 #      # [Msun /yr / Mpc^3]
@@ -613,7 +620,7 @@ class SfrMoster13Speagle14(Sfr):
          '''the mass in integral is in [Msun/h]
          '''
          m = np.exp(lnm)
-         result = m * self.MassFunc.fmassfunc(m, 1./(1.+z)) 
+         result = m * self.MassFunc.massfunc(m, 1./(1.+z)) 
          result *= self.meanSfr(self.meanMStar(m, z), z)**alpha
          return result
       # [Msun /yr / (Mpc/h)^3]

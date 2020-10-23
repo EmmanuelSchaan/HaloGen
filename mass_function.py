@@ -20,7 +20,12 @@ class MassFunction(object):
       self.aMax = 1.
       self.Na = 101
       self.A = np.linspace(self.aMin, self.aMax, self.Na)
-      
+      #
+      self.Z = 1./self.A - 1.
+      self.zMin = np.min(self.Z)
+      self.zMax = np.max(self.Z)
+      self.Nz = len(self.Z)
+
       # compute things if necessary
       if save==True:
          self.Save()
@@ -29,10 +34,10 @@ class MassFunction(object):
    
    ##################################################################################
    
-   def massfunc(self, m, z):
+   def massfuncForInterp(self, m, z):
       pass
    
-   def b(m, z):
+   def bForInterp(m, z):
       pass
  
    def Save(self):
@@ -47,10 +52,10 @@ class MassFunction(object):
          for ia in range(self.Na):
             z = 1./self.A[ia] - 1.
             # compute mass function
-            f = lambda m: max(self.massfunc(m, z), 1.e-300)
+            f = lambda m: max(self.massfuncForInterp(m, z), 1.e-300)
             Massfunc[:, ia] = np.array(pool.map(f, self.M))
             # compute halo biases
-            f = lambda m: self.b(m, z)
+            f = lambda m: self.bForInterp(m, z)
             result = np.array(pool.map(f, self.M))
             B1[:, ia] = result[:,0]
             B2[:, ia] = result[:,1]
@@ -70,13 +75,14 @@ class MassFunction(object):
       
       # interpolate
       interp_massfunc = RectBivariateSpline(np.log(self.M), self.A, np.log(self.Massfunc), s=0)
-      self.fmassfunc = lambda m, a: (a>=self.aMin and a<=self.aMax) * np.exp( interp_massfunc(np.log(m), a)[0,0] )
+      #self.fmassfunc = lambda m, a: (a>=self.aMin and a<=self.aMax) * np.exp( interp_massfunc(np.log(m), a)[0,0] )
+      self.massfunc = lambda m, z: (z>=self.zMin and z<=self.zMax) * np.exp( interp_massfunc(np.log(m), 1./(1.+z))[0,0] )
       #
       interp_b1 = RectBivariateSpline(np.log(self.M), self.A, np.log(self.B1), s=0)
-      self.fb1 = lambda m, a: (a>=self.aMin and a<=self.aMax) * np.exp( interp_b1(np.log(m), a)[0,0] )
+      self.b1 = lambda m, z: (z>=self.zMin and z<=self.zMax) * np.exp( interp_b1(np.log(m), 1./(1.+z))[0,0] )
       #
       interp_b2 = RectBivariateSpline(np.log(self.M), self.A,  self.B2, s=0)
-      self.fb2 = lambda m, a: (a>=self.aMin and a<=self.aMax) * interp_b2(np.log(m), a)[0,0]
+      self.b2 = lambda m, z: (z>=self.zMin and z<=self.zMax) * interp_b2(np.log(m), 1./(1.+z))[0,0]
 
 
    def testInterp(self, z=0.):
@@ -88,13 +94,13 @@ class MassFunction(object):
       # interpolated values
       M = np.logspace(np.log10(self.mMin), np.log10(self.mMax), 5*self.Nm, 10.)
       #
-      f = lambda m: self.fmassfunc(m, a)
+      f = lambda m: self.massfunc(m, z)
       RecMassfunc = np.array(map(f, self.M))
       #
-      f = lambda m: self.fb1(m, a)
+      f = lambda m: self.b1(m, z)
       RecB1 = np.array(map(f, self.M))
       #
-      f = lambda m: self.fb2(m, a)
+      f = lambda m: self.b2(m, z)
       RecB2 = np.array(map(f, self.M))
       
       # mass function
@@ -151,7 +157,7 @@ class MassFunction(object):
       #
       for z in Z:
          # interpolated function
-         f = lambda m: self.fmassfunc(m, 1./(1.+z)) * m**2 / self.U.rho_m(z)
+         f = lambda m: self.massfunc(m, z) * m**2 / self.U.rho_m(z)
          # non-interpolated function
          #f = lambda m: self.massfunc(m, z) * m**2 / self.U.rho_m(z)
          y = np.array(map(f, M))
@@ -186,13 +192,13 @@ class MassFuncPS(MassFunction):
       f /= np.sqrt(2.*np.pi*nu)
       return f
    
-   def b(self, m, z):
+   def bForInterp(self, m, z):
       """only b1 implemented
       """
       nu = self.U.fnu(m, z)
-      return 1 + (nu-1) / self.U.deltaC_z(z), 0.
+      return 1 + (nu-1) / self.U.deltaC(z), 0.
    
-   def massfunc(self, m, z):
+   def massfuncForInterp(self, m, z):
       """dn/dm
       """
       nu = self.U.fnu(m, z)
@@ -233,11 +239,11 @@ class MassFuncST(MassFunction):
       f /= nu  # to get f(nu) and not nu*f(nu)
       return f
 
-   def b(self, m, z):
+   def bForInterp(self, m, z):
       """returns bias1 and bias2 for the Sheth-Tormen mass function
       """
       nu = self.U.fnu(m, z)
-      dc = self.U.deltaC_z(z)
+      dc = self.U.deltaC(z)
       #
       b1 = 1. + (self.q*nu - 1.)/dc
       b1 += 2.*self.p / ( dc * (1. + (self.q*nu)**self.p) )
@@ -247,7 +253,7 @@ class MassFuncST(MassFunction):
       
       return b1, b2
 
-   def massfunc(self, m, z):
+   def massfuncForInterp(self, m, z):
       """dn/dm
       """
       nu = self.U.fnu(m, z)
@@ -313,7 +319,7 @@ class MassFuncTinker(MassFunction):
       f *= abs(self.U.fdlnSigma_dlnM(m, z))
       return f
    
-   def massfunc(self, m, z):
+   def massfuncForInterp(self, m, z):
       """dn/dm, including the jacobian dm200_d/dm; m=m_vir here
       """
       m200d = self.U.massRadiusConversion(m, z, 200., 'm')[0]
@@ -346,7 +352,7 @@ class MassFuncTinker(MassFunction):
       return b1
    
    
-   def b(self, m, z):
+   def bForInterp(self, m, z):
       # Tinker's convention: nu = dc/sigma
       R = (3.*m / (4.*np.pi*self.U.rho_m(z)))**(1./3.)
       dc = 1.686  # from Tinker et al 2010

@@ -94,10 +94,10 @@ class P3dAuto(object):
       self.dP = np.genfromtxt(path+"_dPdd.txt")
       
       # interpolate them
-      self.fP1hinterp = interp2d(K, Z, self.P1h.transpose(), kind='linear', bounds_error=False, fill_value=0.)
-      self.fP2hinterp = interp2d(K, Z, self.P2h.transpose(), kind='linear', bounds_error=False, fill_value=0.)
+      self.p1hInterp = interp2d(K, Z, self.P1h.transpose(), kind='linear', bounds_error=False, fill_value=0.)
+      self.p2hInterp = interp2d(K, Z, self.P2h.transpose(), kind='linear', bounds_error=False, fill_value=0.)
       self.fPshotinterp = interp2d(K, Z, self.Pshot.transpose(), kind='linear', bounds_error=False, fill_value=0.)
-      self.fPinterp = interp2d(K, Z, self.P.transpose(), kind='linear', bounds_error=False, fill_value=0.)
+      self.pInterp = interp2d(K, Z, self.P.transpose(), kind='linear', bounds_error=False, fill_value=0.)
       self.fPtotinterp = interp2d(K, Z, self.Ptot.transpose(), kind='linear', bounds_error=False, fill_value=0.)
       self.fdPinterp = interp2d(K, Z, self.dP.transpose(), kind='linear', bounds_error=False, fill_value=0.)
 
@@ -200,7 +200,7 @@ class P3dAuto(object):
       self.LoadCovP(z=z)
       
       # compute power spectrum
-      f = lambda k: self.fPinterp(k, z)[0]  # reduce the dim 0 array to a float
+      f = lambda k: self.pInterp(k, z)[0]  # reduce the dim 0 array to a float
       P = np.array(map(f, self.K))
       
       # compute SNR2 as a function of kMax
@@ -232,7 +232,7 @@ class P3dAuto(object):
       self.LoadCovP(z=z)
       
       # compute power spectrum
-      f = lambda k: self.fPinterp(k, z)[0]  # reduce the dim 0 array to a float
+      f = lambda k: self.pInterp(k, z)[0]  # reduce the dim 0 array to a float
       P = np.array(map(f, self.K))
       
       fig=plt.figure(0)
@@ -254,60 +254,60 @@ class P3dAuto(object):
    ##################################################################################
    # Power spectrum
    
-   def fP_1h(self, k, z):
+   def fP_1h(self, k, z, mMin=None, mMax=None):
       Profiles = [[self.Prof, 2, k]]
-      result = self.IHaloModel.f(0, Profiles, z)
+      result = self.IHaloModel.f(0, Profiles, z, mMin=None, mMax=None)
       if not np.isfinite(result):
          result = 0.
       return result
 
-   def fP_2h(self, k, z):
+   def fP_2h(self, k, z, mMin=None, mMax=None):
       Profiles = [[self.Prof, 1, k]]
-      result = self.IHaloModel.f(1, Profiles, z)**2
-      result *= self.U.fPlin(k, z)
+      result = self.IHaloModel.f(1, Profiles, z, mMin=mMin, mMax=mMax)**2
+      result *= self.U.pLin(k, z)
       if not np.isfinite(result):
          result = 0.
       return result
 
-   def fP(self, K, z):
-      result = self.fP_1h(K, z) + self.fP_2h(K, z)
+   def fP(self, K, z, mMin=None, mMax=None):
+      result = self.fP_1h(K, z, mMin=mMin, mMax=mMax) + self.fP_2h(K, z, mMin=mMin, mMax=mMax)
       if not np.isfinite(result):
          result = 0.
       return result
 
-   def fPtot(self, K, z):
-      result = self.fP_1h(K, z) + self.fP_2h(K, z) + self.fPnoise(K, z)
+   def fPtot(self, K, z, mMin=None, mMax=None):
+      result = self.fP_1h(K, z, mMin=mMin, mMax=mMax) + self.fP_2h(K, z, mMin=mMin, mMax=mMax) + self.fPnoise(K, z, mMin=mMin, mMax=mMax)
       if not np.isfinite(result):
          result = 0.
       return result
 
    
    # effective bias, such that P2h = beff^2 * Plin
-   def bEff(self, k, z):
+   def bEff(self, k, z, mMin=None, mMax=None):
       Profiles = [[self.Prof, 1, k]]
-      result = self.IHaloModel.f(1, Profiles, z)
+      result = self.IHaloModel.f(1, Profiles, z, mMin=mMin, mMax=mMax)
       return result
    
    
    ##################################################################################
    # Power spectrum response: overdensity
    
-   def fdP_1h(self, k, z):
+   def fdPddelta_1h(self, k, z):
       Profiles = [[self.Prof, 2, k]]
       result = self.IHaloModel.f(1, Profiles, z)
       return result
    
-   def fdP_2h(self, k, z):
+   def fdPddelta_2h(self, k, z):
       Profiles = [[self.Prof, 1, k]]
       I1 = self.IHaloModel.f(1, Profiles, z)
       I2 = self.IHaloModel.f(2, Profiles, z)
       
       result = 2*I1*I2
       result += I1**2 * self.U.dlnPlindDelta(k,z)
-      result *= self.U.fPlin(k, z)
+      result *= self.U.pLin(k, z)
       return result
    
-   def fdP(self, k, z):
+   def fdPddelta(self, k, z):
       result = self.fdP_1h(k, z) + self.fdP_2h(k, z)
       return result
 
@@ -324,7 +324,7 @@ class P3dAuto(object):
       Profiles = [[self.Prof, 1, k]]
       result = self.IHaloModel.f(1, Profiles, z)
       result *= self.IHaloModel.f(1, Profiles, z, mMin=mMin)
-      result *= self.U.fPlin(k, z)
+      result *= self.U.pLin(k, z)
       result *= 2.
       return result
 
@@ -370,13 +370,13 @@ class P3dAuto(object):
       result13 = self.IHaloModel.f(1, Profiles, z)
       Profiles = [[self.Prof, 3, k]]
       result13 *= self.IHaloModel.f(1, Profiles, z)
-      result13 *= self.U.fPlin(k, z)
+      result13 *= self.U.pLin(k, z)
       result13 *= 4. # permutations
       # term 2h 22
       Profiles = [[self.Prof, 2, k]]
       result22 = self.IHaloModel.f(1, Profiles, z)
       result22 **= 2.
-      result22 *= self.U.fPlin(k*np.sqrt(2.), z)  # the sqrt(2.) is from the azimuthal average
+      result22 *= self.U.pLin(k*np.sqrt(2.), z)  # the sqrt(2.) is from the azimuthal average
       result22 *= 2. # non-zero permutations
       # sum
       result = result13 + result22
@@ -399,7 +399,7 @@ class P3dAuto(object):
       result **= 4.
       # from Scoccimarro Zaldarriaga Hui 99:
       # T(k,-k,k,-k) azimuthally averaged in PT \simeq 232/441 * P(k)**3
-      result *= 232./441. * self.U.fPlin(k, z)**3
+      result *= 232./441. * self.U.pLin(k, z)**3
       if not np.isfinite(result):
          result = 0.
       return result
@@ -427,7 +427,7 @@ class P3dAuto(object):
       """
       result = self.fdPinterp(k1, z)
       result *= self.fdPinterp(k2, z)
-      result *= self.U.fPlin(k, z)
+      result *= self.U.pLin(k, z)
       if not np.isfinite(result):
          result = 0.
       return result
@@ -468,7 +468,7 @@ class P3dAuto(object):
       Knew = np.logspace(np.log10(1.e-3), np.log10(1.e1), 201, 10.)
       for iZ in range(len(Z)):
          z = Z[iZ]
-         f = lambda k: self.fPinterp(k, z)
+         f = lambda k: self.pInterp(k, z)
          Pinterp = np.array(map(f, Knew))
          ax.plot(Knew, Pinterp, lw=0.5, c=plt.cm.jet(float(iZ)/nZ))
       #
@@ -480,11 +480,49 @@ class P3dAuto(object):
       plt.show()
    
 
+   def compareP(self, ps=None):
+      if ps is None:
+         ps = [self]
+
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for p in ps:
+         for z in p.Prof.Lf.Z:    
+            if z<=5:
+               f = lambda k: p.fPtotinterp(k, z)
+               pTot = np.array(map(f, p.K)) * p.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+#               f = lambda k: p3dHa[key].p1hInterp(k, z)
+#               p1h = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+#               #f = lambda k: p3dHa[key].p2hInterp(k, z)
+#               #p2h = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+#               #print p2h
+#               f = lambda k: p3dHa[key].fPnoise(k, z)
+#               pShot = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+               #
+               plot=ax.loglog(p.K, pTot, label=r'$z=$'+str(round(z, 2))+' '+p.Prof.Lf.nameLatex)
+#               ax.loglog(p3dHa[key].K, p1h, ls=(0, (10, 3)), c=plot[0].get_color(), lw=1)
+#               #ax.loglog(p3dHa[key].K, p2h, ls='-', c=plot[0].get_color())
+#               ax.loglog(p3dHa[key].K, pShot, ls=':', c=plot[0].get_color(), lw=1)
+
+
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$k$ [$h$/Mpc]')
+      ax.set_ylabel(r'$P(k,z)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
+      #ax.set_title(lfHa[key].nameLatex)
+      #
+      #path = './figures/pn_3d/p3d_'+lfHa[key].name+'.pdf'
+      #fig.savefig(path, bbox_inches='tight')
+      #fig.clf()
+      plt.show()
+
 
    def plotP(self, z=0., p3d=None):
    
       # Plin
-      f = lambda k: self.U.fPlin(k, z)
+      f = lambda k: self.U.pLin(k, z)
       Plin = np.array(map(f, self.K))
       # P1h
       f = lambda k: self.fP_1h(k, z)
@@ -499,7 +537,7 @@ class P3dAuto(object):
       P = P1h + P2h + Pnoise
       # other power spectrum to be compared
       if p3d is not None:
-         f = lambda k: p3d.fPinterp(k, z)
+         f = lambda k: p3d.pInterp(k, z)
          P3d = np.array(map(f, self.K))
       
       
@@ -713,7 +751,7 @@ class P3dCross(P3dAuto):
       result = self.IHaloModel.f(1, Profiles, z)
       Profiles = [[self.Prof2, 1, k]]
       result *= self.IHaloModel.f(1, Profiles, z)
-      result *= self.U.fPlin(k, z)
+      result *= self.U.pLin(k, z)
       return result
    
    def fP(self, K, z):
@@ -739,7 +777,7 @@ class P3dCross(P3dAuto):
       
       result = I2_1*I1_2 + I1_1*I2_2
       result += I1_1*I1_2 * self.U.dlnPlindDelta(k,z)
-      result *= self.U.fPlin(k, z)
+      result *= self.U.pLin(k, z)
       return result
 
    def fdP(self, K, z):
@@ -815,7 +853,7 @@ class P3dCross(P3dAuto):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z)
 #      P2h *= self.Mij.f(1, 1, [k], z, nbias=1)
-#      P2h *= self.U.fPlin(k, z)
+#      P2h *= self.U.pLin(k, z)
 #      P2h *= 2.
 #      return P2h
 #
@@ -832,7 +870,7 @@ class P3dCross(P3dAuto):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z, mMin=self.Mij.mMin)
 #      P2h *= self.Mij.f(1, 1, [k], z)
-#      P2h *= self.U.fPlin(k, z)
+#      P2h *= self.U.pLin(k, z)
 #      P2h *= 2.
 #      return P2h
 #
@@ -906,7 +944,7 @@ class P3dCross(P3dAuto):
 #      if n==2:
 #         # linear
 #         if id=="linear":
-#            return self.U.fPlin(K[0], z)
+#            return self.U.pLin(K[0], z)
 #         # non-linear
 #         if id=='':
 #            if ihalo==0:
@@ -995,7 +1033,7 @@ class P3dCross(P3dAuto):
 #   def fP_2h(self, K, z):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z)**2
-#      P2h *= self.U.fPlin(k, z)
+#      P2h *= self.U.pLin(k, z)
 #         #if k > 3. or k < 1.e-4: # WATCH OUT !!!
 #         #P2h = 0.
 #      return P2h
@@ -1016,7 +1054,7 @@ class P3dCross(P3dAuto):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z)
 #      P2h *= self.Mij.f(1, 1, [k], z, nbias=1)
-#      P2h *= self.U.fPlin(k, z)
+#      P2h *= self.U.pLin(k, z)
 #      P2h *= 2.
 #      return P2h
 #
@@ -1033,7 +1071,7 @@ class P3dCross(P3dAuto):
 #      k = K[0]
 #      P2h = self.Mij.f(1, 1, [k], z, mMin=self.Mij.mMin)
 #      P2h *= self.Mij.f(1, 1, [k], z)
-#      P2h *= self.U.fPlin(k, z)
+#      P2h *= self.U.pLin(k, z)
 #      P2h *= 2.
 #      return P2h
 #   
@@ -1093,18 +1131,18 @@ class P3dCross(P3dAuto):
 #      k1=k2=k3= K[0]
 #      B2h = self.Mij.f(1, 1, [k1], z)
 #      B2h *= self.Mij.f(1, 2, [k2, k3], z)
-#      B2h *= self.U.fPlin(k1, z)
+#      B2h *= self.U.pLin(k1, z)
 #      B2h *= 3.
 #      return B2h
 #   
 #   def fB_3h(self, K, z):
 #      k1=k2=k3= K[0]
 #      B3h_PT = 2. * self.F2([k1, k2, 2.*np.pi/3.])
-#      B3h_PT *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
+#      B3h_PT *= self.U.pLin(k1, z) * self.U.pLin(k2, z)
 #      B3h_PT *= self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z)
 #      B3h_PT *= 3.
 #      B3h_b2 = self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z)
-#      B3h_b2 *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
+#      B3h_b2 *= self.U.pLin(k1, z) * self.U.pLin(k2, z)
 #      B3h_b2 *= 3.
 #      B3h = B3h_PT + B3h_b2
 #      return B3h
@@ -1124,7 +1162,7 @@ class P3dCross(P3dAuto):
 #      k1=k2=k3= K[0]
 #      B2h = self.Mij.f(1, 1, [k1], z, nbias=1) * self.Mij.f(1, 2, [k2, k3], z)
 #      B2h += self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 2, [k2, k3], z, nbias=1)
-#      B2h *= self.U.fPlin(k1, z)
+#      B2h *= self.U.pLin(k1, z)
 #      B2h *= 3.
 #      return B2h
 #   
@@ -1134,12 +1172,12 @@ class P3dCross(P3dAuto):
 #      B3h_PT +=  self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z, nbias=1) * self.Mij.f(1, 1, [k3], z)
 #      B3h_PT +=  self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z, nbias=1)
 #      B3h_PT *= 2. * self.F2([k1, k2, 2.*np.pi/3.])
-#      B3h_PT *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
+#      B3h_PT *= self.U.pLin(k1, z) * self.U.pLin(k2, z)
 #      B3h_PT *= 3.
 #      B3h_b2 = self.Mij.f(2, 1, [k1], z, nbias=1) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z)
 #      B3h_b2 += self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z, nbias=1) * self.Mij.f(1, 1, [k3], z)
 #      B3h_b2 += self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z, nbias=1)
-#      B3h_b2 *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
+#      B3h_b2 *= self.U.pLin(k1, z) * self.U.pLin(k2, z)
 #      B3h_b2 *= 3.
 #      B3h = B3h_PT + B3h_b2
 #      return B3h
@@ -1158,7 +1196,7 @@ class P3dCross(P3dAuto):
 #      k1=k2=k3= K[0]
 #      B2h = self.Mij.f(1, 1, [k1], z, mMin=self.Mij.mMin) * self.Mij.f(1, 2, [k2, k3], z)
 #      B2h += self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 2, [k2, k3], z, mMin=self.Mij.mMin)
-#      B2h *= self.U.fPlin(k1, z)
+#      B2h *= self.U.pLin(k1, z)
 #      B2h *= 3.
 #      return B2h
 #   
@@ -1168,12 +1206,12 @@ class P3dCross(P3dAuto):
 #      B3h_PT +=  self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z, mMin=self.Mij.mMin) * self.Mij.f(1, 1, [k3], z)
 #      B3h_PT +=  self.Mij.f(1, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z, mMin=self.Mij.mMin)
 #      B3h_PT *= 2. * self.F2([k1, k2, 2.*np.pi/3.])
-#      B3h_PT *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
+#      B3h_PT *= self.U.pLin(k1, z) * self.U.pLin(k2, z)
 #      B3h_PT *= 3.
 #      B3h_b2 = self.Mij.f(2, 1, [k1], z, mMin=self.Mij.mMin) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z)
 #      B3h_b2 += self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z, mMin=self.Mij.mMin) * self.Mij.f(1, 1, [k3], z)
 #      B3h_b2 += self.Mij.f(2, 1, [k1], z) * self.Mij.f(1, 1, [k2], z) * self.Mij.f(1, 1, [k3], z, mMin=self.Mij.mMin)
-#      B3h_b2 *= self.U.fPlin(k1, z) * self.U.fPlin(k2, z)
+#      B3h_b2 *= self.U.pLin(k1, z) * self.U.pLin(k2, z)
 #      B3h_b2 *= 3.
 #      B3h = B3h_PT + B3h_b2
 #      return B3h

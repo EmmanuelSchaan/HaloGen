@@ -26,12 +26,18 @@ import pn_3d
 reload(pn_3d)
 from pn_3d import *
 
+import p3d_rsd
+reload(p3d_rsd)
+from p3d_rsd import *
+
 
 ##################################################################################
 
 # Basic functions and parameters, for background and fluctuations
 u = UnivPlanck15()
 
+#u.plotSigma2V1d()
+#u.plotSigma2DispFog()
 
 ##################################################################################
 
@@ -53,8 +59,8 @@ sfr = SfrMoster13Speagle14(u, massFunc, scatter=True, nProc=3, save=False)
 #sfr.plotnHEff()
 #sfr.plotNHEffSpherex()
 #sfr.plotBEff()
-sfr.plotdbEff2dlnm()
-sfr.plotdP1hdlnm()
+#sfr.plotdbEff2dlnm()
+#sfr.plotdP1hdlnm()
 
 ##################################################################################
 ##################################################################################
@@ -80,13 +86,13 @@ lfHa = {}
 lfHa['Sobral12'] = LFHaSobral12(u)
 lfHa['Colbert13'] = LFHaColbert13(u)
 lfHa['Cochrane17'] = LFHaCochrane17(u)
-lfHa['Egg'] = LFEGG(u, lineName='halpha')
+#lfHa['Egg'] = LFEGG(u, lineName='halpha')
 
 lfOiii = {}
 lfOiii['Colbert13'] = LFOiiiColbert13(u)
 lfOiii['Mehta15'] = LFOiiiMehta15(u)
-lfOiii['5007Egg'] = LFEGG(u, lineName='o3_5007')
-lfOiii['4959Egg'] = LFEGG(u, lineName='o3_4959')
+#lfOiii['5007Egg'] = LFEGG(u, lineName='o3_5007')
+#lfOiii['4959Egg'] = LFEGG(u, lineName='o3_4959')
 
 
 # lf = lfHaSobral12
@@ -103,16 +109,20 @@ lfOiii['4959Egg'] = LFEGG(u, lineName='o3_4959')
 
 ##################################################################################
 # Plot: luminosity functions
-'''
-for key in lfHa.keys():
-   try: lfHa[key].plotLf()
-   except: pass
 
-for key in lfOiii.keys():
-   try: lfOiii[key].plotLf()
-   except: pass
-'''
+#for key in lfHa.keys():
+#   try: lfHa[key].plotLf()
+#   except: pass
+#
+#for key in lfOiii.keys():
+#   try: lfOiii[key].plotLf()
+#   except: pass
 
+'''
+lfHa['Cochrane17'].plotLf(lfs=[lfHa[key] for key in lfHa.keys()])
+
+lfOiii['Colbert13'].plotLf(lfs=[lfOiii[key] for key in lfOiii.keys()])
+'''
 
 ##################################################################################
 # Plot: mean intensity
@@ -121,6 +131,15 @@ for key in lfOiii.keys():
 lfHa['Sobral12'].plotMeanIntensity(lfs=[lfHa[key] for key in lfHa.keys()])
 
 lfOiii['Colbert13'].plotMeanIntensity(lfs=[lfOiii[key] for key in lfOiii.keys()])
+'''
+
+##################################################################################
+# Plot: nGalEff
+
+'''
+lfHa['Sobral12'].plotnGalEff(lfs=[lfHa[key] for key in lfHa.keys()])
+
+lfOiii['Colbert13'].plotnGalEff(lfs=[lfOiii[key] for key in lfOiii.keys()])
 '''
 
 
@@ -165,11 +184,11 @@ iHaloModel = IHaloModel(u, massFunc)
 
 p3dHa = {}
 for key in lfHa.keys():
-   p3dHa[key] = P3dAuto(u, iHaloModel, profLimLfHa[key], doT=False, save=True)
+   p3dHa[key] = P3dAuto(u, iHaloModel, profLimLfHa[key], doT=False, save=False)
 
 p3dOiii = {}
 for key in lfOiii.keys():
-   p3dOiii[key] = P3dAuto(u, iHaloModel, profLimLfOiii[key], doT=False, save=True)
+   p3dOiii[key] = P3dAuto(u, iHaloModel, profLimLfOiii[key], doT=False, save=False)
 
 
 ##p3d_limhaegg.plotP(z=1.)
@@ -186,38 +205,38 @@ for key in lfOiii.keys():
 ##################################################################################
 # Plot: power spectrum
 
-
+'''
 for key in lfHa.keys():
 
    fig=plt.figure(0)
    ax=fig.add_subplot(111)
    #
    for z in lfHa[key].Z:    
-      f = lambda k: p3dHa[key].fPtotinterp(k, z)
-      pTot = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
-      f = lambda k: p3dHa[key].fP1hinterp(k, z)
-      p1h = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
-      #f = lambda k: p3dHa[key].fP2hinterp(k, z)
-      #p2h = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
-      #print p2h
-      f = lambda k: p3dHa[key].fPnoise(k, z)
-      pShot = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
-      #
-      plot=ax.loglog(p3dHa[key].K, pTot, label=r'$z=$'+str(round(z, 2)))
-      ax.loglog(p3dHa[key].K, p1h, ls='--', c=plot[0].get_color(), lw=1)
-      #ax.loglog(p3dHa[key].K, p2h, ls='-', c=plot[0].get_color())
-      ax.loglog(p3dHa[key].K, pShot, ls=':', c=plot[0].get_color(), lw=1)
+      if z<=5:
+         f = lambda k: p3dHa[key].fPtotinterp(k, z)
+         pTot = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+         f = lambda k: p3dHa[key].fP1hinterp(k, z)
+         p1h = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+         #f = lambda k: p3dHa[key].fP2hinterp(k, z)
+         #p2h = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+         #print p2h
+         f = lambda k: p3dHa[key].fPnoise(k, z)
+         pShot = np.array(map(f, p3dHa[key].K)) * lfHa[key].convertPowerSpectrumUnit('Jy/sr')
+         #
+         plot=ax.loglog(p3dHa[key].K, pTot, label=r'$z=$'+str(round(z, 2)))
+         ax.loglog(p3dHa[key].K, p1h, ls=(0, (10, 3)), c=plot[0].get_color(), lw=1)
+         #ax.loglog(p3dHa[key].K, p2h, ls='-', c=plot[0].get_color())
+         ax.loglog(p3dHa[key].K, pShot, ls=':', c=plot[0].get_color(), lw=1)
    #
    ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
    ax.set_xlabel(r'$k$ [$h$/Mpc]')
    ax.set_ylabel(r'$P(k,z)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
-   ax.set_title(lfHa[key].name.replace("_", ""))
+   ax.set_title(lfHa[key].nameLatex)
    #
    path = './figures/pn_3d/p3d_'+lfHa[key].name+'.pdf'
    fig.savefig(path, bbox_inches='tight')
    fig.clf()
    #plt.show()
-
 
 
 for key in lfOiii.keys():
@@ -226,28 +245,54 @@ for key in lfOiii.keys():
    ax=fig.add_subplot(111)
    #
    for z in lfOiii[key].Z:    
-      f = lambda k: p3dOiii[key].fPtotinterp(k, z)
-      pTot = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
-      f = lambda k: p3dOiii[key].fP1hinterp(k, z)
-      p1h = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
-      #f = lambda k: p3dOiii[key].fP2hinterp(k, z)
-      #p2h = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
-      #print p2h
-      f = lambda k: p3dOiii[key].fPnoise(k, z)
-      pShot = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
-      #
-      plot=ax.loglog(p3dOiii[key].K, pTot, label=r'$z=$'+str(round(z, 2)))
-      ax.loglog(p3dOiii[key].K, p1h, ls='--', c=plot[0].get_color(), lw=1)
-      #ax.loglog(p3dOiii[key].K, p2h, ls='-', c=plot[0].get_color())
-      ax.loglog(p3dOiii[key].K, pShot, ls=':', c=plot[0].get_color(), lw=1)
+      if z<=5:
+         f = lambda k: p3dOiii[key].fPtotinterp(k, z)
+         pTot = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
+         f = lambda k: p3dOiii[key].fP1hinterp(k, z)
+         p1h = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
+         #f = lambda k: p3dOiii[key].fP2hinterp(k, z)
+         #p2h = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
+         #print p2h
+         f = lambda k: p3dOiii[key].fPnoise(k, z)
+         pShot = np.array(map(f, p3dOiii[key].K)) * lfOiii[key].convertPowerSpectrumUnit('Jy/sr')
+         #
+         plot=ax.loglog(p3dOiii[key].K, pTot, label=r'$z=$'+str(round(z, 2)))
+         ax.loglog(p3dOiii[key].K, p1h, ls=(0, (10, 3)), c=plot[0].get_color(), lw=1)
+         #ax.loglog(p3dOiii[key].K, p2h, ls='-', c=plot[0].get_color())
+         ax.loglog(p3dOiii[key].K, pShot, ls=':', c=plot[0].get_color(), lw=1)
    #
    ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
    ax.set_xlabel(r'$k$ [$h$/Mpc]')
    ax.set_ylabel(r'$P(k,z)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
-   ax.set_title(lfOiii[key].name.replace("_", ""))
+   ax.set_title(lfOiii[key].nameLatex)
    #
    path = './figures/pn_3d/p3d_'+lfOiii[key].name+'.pdf'
    fig.savefig(path, bbox_inches='tight')
    fig.clf()
    #plt.show()
+'''
 
+##################################################################################
+# compare P3d
+
+'''
+p3dHa['Sobral12'].compareP(ps=[p3dHa[key] for key in p3dHa.keys()])
+
+p3dOiii['Colbert13'].compareP(ps=[p3dOiii[key] for key in p3dOiii.keys()])
+'''
+
+##################################################################################
+##################################################################################
+# RSD power spectrum
+
+
+pRsdHa = {}
+#for key in lfHa.keys():
+for key in ['Cochrane17']:
+   pRsdHa[key] = P3dRsdAuto(u, profLimLfHa[key], massFunc)
+
+key = 'Cochrane17'
+
+pRsdHa[key].plotPMuDpdce(lfHa[key].Z[0])
+
+p = pRsdHa[key]

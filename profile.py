@@ -115,7 +115,7 @@ class ProfNFW(Profile):
       """comoving scale radius for NFW profile
       in Mpc/h
       """
-      Rvir = self.U.frvir(m, z)
+      Rvir = self.U.rVir(m, z)
       # concentration parameter
       #c = 10./(1.+z) * (m / self.m_nonlin)**(-0.2)   # from Takada & Jain 2002
       c = 9./(1.+z) * (m / self.m_nonlin)**(-0.13) # Takada & Jain 2003
@@ -135,7 +135,7 @@ class ProfNFW(Profile):
       """
       if trunc is None:
          trunc = self.trunc
-      rVir = self.U.frvir(m, z)
+      rVir = self.U.rVir(m, z)
       rS, rhoS, c = self.rS_rhoS_c(m, z)
       # truncation radius over scale radius
       xMax = trunc * rVir/rS
@@ -220,7 +220,11 @@ class ProfNFW(Profile):
       k in h Mpc^-1, m in h^-1 solarM
       this is the quantity typically used in the halo model
       """
-      return self.nfw(k, m, z) * m / self.U.rho_m(z)
+      result = self.nfw(k, m, z) * m / self.U.rho_m(z)
+      # FOG
+      #sigma2 = self.U.sigma2DispFog(m, z)
+      #result *= np.exp(- 0.5 * sigma2 * k**2 * mu**2)
+      return result
    
 
    def phiOfR(self, r, m, z):
@@ -287,7 +291,7 @@ class ProfNFWPlusGaussian(Profile):
       """Gaussian density profile
       k in h Mpc^-1, m in h^-1 solarM
       """
-      Rvir = self.U.frvir(m, z)
+      Rvir = self.U.rVir(m, z)
       result = np.exp(-0.5 * Rvir**2 * k**2)
       return result
    
@@ -781,7 +785,7 @@ class ProfY(Profile):
 #      cNFW = self.cNFW0 * (m / (2.e12))**self.cNFWam * (1.+z)**self.cNFWaz
 #
 #      # physical virial radius and scale radius in h^-1 Mpc
-#      Rvir = ( 3.*m / (4*np.pi*self.U.rho_crit(z) * self.U.Deltacrit_z(z)) )**(1./3.)
+#      Rvir = ( 3.*m / (4*np.pi*self.U.rho_crit(z) * self.U.deltaCrit(z)) )**(1./3.)
 #      Rs = Rvir / cNFW
 #
 #      # NFW scale density (physical)
@@ -835,7 +839,7 @@ class ProfY(Profile):
       y3d_x = lambda x: factor * P200 * self.Pth_to_Pe * self.P_PDelta_x(x, M200, z)
       
       # bound for integral over x=r/r200c
-      Rvir = self.U.frvir(m, z)
+      Rvir = self.U.rVir(m, z)
       xmax = 4. * Rvir / R200
       
       # compute Fourier transform
@@ -1337,7 +1341,7 @@ class ProfGasBattaglia16(Profile):
       k in h Mpc^-1, m in h^-1 solarM
       """
       # truncation radius
-      rVir = self.U.frvir(m, z)
+      rVir = self.U.rVir(m, z)
       m200c, r200c = self.U.massRadiusConversion(m, z, value=200, ref="c")
       xTrunc = self.trunc * rVir / r200c
       # do Fourier transform
@@ -1358,7 +1362,7 @@ class ProfGasBattaglia16(Profile):
       output dimensionless
       """
       # truncation radius
-      rVir = self.U.frvir(m, z)
+      rVir = self.U.rVir(m, z)
       m200c, r200c = self.U.massRadiusConversion(m, z, value=200, ref="c")
       xTrunc = self.trunc * rVir / r200c
       # do Fourier transform
@@ -1736,7 +1740,7 @@ class ProfLIMLF(Profile):
       """comoving scale radius for NFW profile
       in Mpc/h
       """
-      Rvir = self.U.frvir(m, z)
+      Rvir = self.U.rVir(m, z)
       # concentration parameter
       #c = 10./(1.+z) * (m / self.m_nonlin)**(-0.2)   # from Takada & Jain 2002
       c = 9./(1.+z) * (m / self.m_nonlin)**(-0.13) # Takada & Jain 2003
@@ -1756,7 +1760,7 @@ class ProfLIMLF(Profile):
       """
       if trunc is None:
          trunc = self.trunc
-      rVir = self.U.frvir(m, z)
+      rVir = self.U.rVir(m, z)
       rS, rhoS, c = self.rS_rhoS_c(m, z)
       # truncation radius over scale radius
       xMax = trunc * rVir/rS
@@ -1806,9 +1810,8 @@ class ProfLIMLF(Profile):
       result *= self.Sfr.sfr(m, z)   # [Msun/yr]
       result /= self.Sfr.sfrd(z) # [(Msun/yr) (Mpc/h)^{-3}]
       return result
-
    
-   def u(self, k, m, z):
+   def u(self, k, m, z, mu=0.):
       '''Effective profile for the halo model integrals
       Unit is [(Mpc/h)^3], multiplied by the intensity unit [Lsun/(Mpc/h)^2/sr/Hz],
       i.e. [Lsun*(Mpc/h)/sr/Hz]
@@ -1817,11 +1820,29 @@ class ProfLIMLF(Profile):
       result *= self.meanHaloLum(m, z)
       result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
       result /= 4. * np.pi * self.Lf.nuHz # *[/sr/Hz]
-      #result *= np.exp(- 0.5 * sigma**2 * k**2 * mu**2)
+      # FOG
+      s2 = self.U.sigma2DispFog(m, z)
+      result *= np.exp(- 0.5 * s2 * k**2 * mu**2)
       if not np.isfinite(result):
          result = 0.
       return result
    
+   def uMat(self, k, m, z, mu=0.):
+      '''Effective profile for F,
+      ie matter mass density profile times mean Intensity
+      Unit is [(Mpc/h)^3], multiplied by the intensity unit [Lsun/(Mpc/h)^2/sr/Hz],
+      i.e. [Lsun*(Mpc/h)/sr/Hz]
+      '''
+      result = self.nfw(k, m, z) * m / self.U.rho_m(z)
+      result *= self.Lf.lumDensity(z)  # [Lsun (Mpc/h)^-3] 
+      result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
+      result /= 4. * np.pi * self.Lf.nuHz # *[/sr/Hz]
+      # FOG
+      sigma2 = self.U.sigma2DispFog(m, z)
+      result *= np.exp(- 0.5 * sigma2 * k**2 * mu**2)
+      if not np.isfinite(result):
+         result = 0.
+      return result
 
    ##################################################################################
    # Plots
@@ -2003,7 +2024,7 @@ class ProfLIMLF(Profile):
 #      """comoving scale radius for NFW profile
 #      in Mpc/h
 #      """
-#      Rvir = self.U.frvir(m, z)
+#      Rvir = self.U.rVir(m, z)
 #      # concentration parameter
 #      #c = 10./(1.+z) * (m / self.m_nonlin)**(-0.2)   # from Takada & Jain 2002
 #      c = 9./(1.+z) * (m / self.m_nonlin)**(-0.13) # Takada & Jain 2003
@@ -2023,7 +2044,7 @@ class ProfLIMLF(Profile):
 #      """
 #      if trunc is None:
 #         trunc = self.trunc
-#      rVir = self.U.frvir(m, z)
+#      rVir = self.U.rVir(m, z)
 #      rS, rhoS, c = self.rS_rhoS_c(m, z)
 #      # truncation radius over scale radius
 #      xMax = trunc * rVir/rS

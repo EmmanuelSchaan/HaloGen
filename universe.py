@@ -16,8 +16,8 @@ class Universe(object):
 
          self.params = {
                   'output': 'dTk vTk mPk',#'lCl tCl pCl mPk',
-#                  'l_max_scalars': 2000,
-#                  'lensing': 'yes',
+                  #'l_max_scalars': 2000,
+                  #'lensing': 'yes',
                   'A_s': 2.3e-9,
                   'n_s': 0.9624,
                   'h': 0.6711,
@@ -26,9 +26,9 @@ class Universe(object):
                   'Omega_cdm': 0.32,
                   'Omega_k': 0.,
                   'P_k_max_1/Mpc': 10.,
-#                  'N_ncdm': 3,
-#                  'm_ncdm': str(self.nuMasses[0])+','+str(self.nuMasses[1])+','+str(self.nuMasses[2]),
-#                  'deg_ncdm': '1, 1, 1',
+                  #'N_ncdm': 3,
+                  #'m_ncdm': str(self.nuMasses[0])+','+str(self.nuMasses[1])+','+str(self.nuMasses[2]),
+                  #'deg_ncdm': '1, 1, 1',
                   'non linear': 'halofit',
                   'z_max_pk': 100.
                   }
@@ -36,28 +36,11 @@ class Universe(object):
          self.params = params
       
       # run CLASS
-#      tStart = time()
       self.engine = CLASS.ClassEngine(self.params)
-#      tStop = time()
-#      print "-- class engine:", tStop-tStart, "sec"
-#      tStart = time()
       self.bg = CLASS.Background(self.engine)
-#      tStop = time()
-#      print "-- class background:", tStop-tStart, "sec"
-#      tStart = time()
       self.sp = CLASS.Spectra(self.engine)
-#      tStop = time()
-#      print "-- class spectra:", tStop-tStart, "sec"
-      tStart = time()
       self.th = CLASS.Thermo(self.engine)
-#      tStop = time()
-#      print "-- class thermo:", tStop-tStart, "sec"
-#      tStart = time()
       self.pm = CLASS.Primordial(self.engine)
-#      tStop = time()
-#      print "-- class primordial:", tStop-tStart, "sec"
-#      tStart = time()
-
 
       # wave vectors computed for power spectrum (h/Mpc)
       self.kMin = self.sp.P_k_min
@@ -65,12 +48,11 @@ class Universe(object):
       self.nK = 1001
       self.K = np.logspace(np.log10(self.kMin), np.log10(self.kMax), self.nK, 10.)
 
-
       # physical constants
       self.G = 6.67e-11   # Newton's constant in SI
-      self.c_kms = 299792458 / 1.e3 # light celerity in km/s
-      self.rhoCRIT = 2.7617e11 # critical density today, in (h^-1 solarM) (h^-1 Mpc)^-3
-
+      self.c_kms = 299792458. / 1.e3 # light celerity in km/s
+      self.mSun = 1.989e30 # [kg]
+      self.Mpc = 3.086e22 # [m]
       
       # convert from physical to comoving density
       # and to (h^-1 solarM) (h^-1 Mpc)^-3
@@ -96,6 +78,9 @@ class Universe(object):
    def __str__(self):
       return self.name
 
+
+   ##################################################################################
+
    def computeNuMasses(self, mSum, normal=True):
       '''mSum: sum of neutrino masses in eV
       normal=True for normal hierarchy
@@ -114,8 +99,9 @@ class Universe(object):
       return result
 
 
+   ##################################################################################
 
-   def fPlin(self, k, z):
+   def pLin(self, k, z):
       '''This is actually Plin.
       Used for my halo model code
       '''
@@ -124,7 +110,7 @@ class Universe(object):
       else:
          return self.sp.get_pklin(k, z)
 
-   def fP2hinterp(self, k, z):
+   def p2hInterp(self, k, z):
       '''This is actually Plin.
       Used for my halo model code
       '''
@@ -133,12 +119,12 @@ class Universe(object):
       else:
          return self.sp.get_pklin(k, z)
    
-   def fP1hinterp(self, k, z):
+   def p1hInterp(self, k, z):
       '''Used for my halo model code
       '''
       return 0.
    
-   def fPinterp(self, k, z):
+   def pInterp(self, k, z):
       '''This is actually Pnl.
       Used for my halo model code
       '''
@@ -153,7 +139,7 @@ class Universe(object):
    ##################################################################################
 
 
-   def deltaC_z(self, z):
+   def deltaC(self, z):
       """critical density for spherical collapse at redshift z
       from Henry 2000, from Nakamura & Suto 1997
       usual 3.*(12.*pi)**(2./3.) / 20. = 1.686 if OmM=1.
@@ -194,7 +180,7 @@ class Universe(object):
    '''
 
 
-   def Deltacrit_z(self, z):
+   def deltaCrit(self, z):
       """ratio of virialized density to critical density at collapse (dimless).
       from Bullock et al 2001, from Bryan & Norman 1998
       usual 18*pi**2 if OmM=1.
@@ -204,13 +190,95 @@ class Universe(object):
       return 18.*np.pi**2 + 82.*(f-1.) - 39.*(f-1.)**2
 
 
-   def frvir(self, m, z):
+   def rVir(self, m, z):
       """Comoving virial and scale radii (Mpc/h)
       input mass is mvir (Msun/h)
       """
-      Rvir = ( 3.*m / (4*np.pi*self.rho_crit(z)*self.Deltacrit_z(z)) )**(1./3.)  # in h^-1 Mpc
+      Rvir = ( 3.*m / (4*np.pi*self.rho_crit(z)*self.deltaCrit(z)) )**(1./3.)  # in h^-1 Mpc
       return Rvir
+
+   ##################################################################################
+
    
+   def sigma2V1d(self, m, z):
+      '''Variance of the 1d LOS random velocities
+      inside a singular isothermal sphere
+      with mass m and physical radius r_vir:
+      sigma_{v1d}^2 = G*m / (2 r_vir)  [(km/s)^2]
+      '''
+      rVir = self.rVir(m, z)  # comoving [Mpc/h]
+      rVir /= 1.+z   # physical [Mpc/h]
+      # 1d velocity dispersion [(km/s)^2]
+      # for a singular isothermal sphere
+      # with mass m and radius r_vir
+      result = self.G * (m * self.mSun / self.bg.h)
+      result /= 2. * (rVir * self.Mpc / self.bg.h)
+      result /= 1.e6 # convert [(m/s)^2] to [(km/s)^2]
+      return result
+
+   def plotSigma2V1d(self):
+      M = np.logspace(np.log10(1.e10), np.log10(1.e15), 101, 10.) # [Msun/h]
+      Z = np.array([0., 1., 2., 5.])
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         f = lambda m: np.sqrt(self.sigma2V1d(m, z))  # [km/s]
+         s = np.array(map(f, M))
+         ax.loglog(M, s, label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$M$ [$M_\odot/h$]')
+      ax.set_ylabel(r'$\sigma_{v\ \text{1d}}(M, z)$ [km/s]')
+      #
+      plt.show()
+
+
+
+   
+   def sigma2DispFog(self, m, z):
+      '''Variance of the spurious LOS displacements
+      due to the orbital motion inside halos,
+      causing the FOG effect.
+      Sigma_d^2 = sigma_{v 1d}^2 / (aH)^2 # [(Mpc/h)^2],
+      where sigma_{v1d}^2 = G*m / (2 r_vir)
+      for a singular isothermal sphere
+      with mass m and physical radius r_vir.
+      '''
+      #return 0.
+      rVir = self.rVir(m, z)  # comoving [Mpc/h]
+      rVir /= 1.+z   # physical [Mpc/h]
+      # 1d velocity dispersion [(km/s)^2]
+      # for a singular isothermal sphere
+      # with mass m and radius r_vir
+      result = self.G * (m * self.mSun / self.bg.h)
+      result /= 2. * (rVir * self.Mpc / self.bg.h)
+      result /= 1.e6 # convert [(m/s)^2] to [(km/s)^2]
+      #print np.sqrt(result), "km/s"
+      # convert sigma_{v 1d}^2 to sigma_d^2 [(Mpc/h)^2]
+      result *= (1.+z)**2
+      result /= self.hubble(z)**2
+      return result
+
+   def plotSigma2DispFog(self):
+      M = np.logspace(np.log10(1.e10), np.log10(1.e15), 101, 10.) # [Msun/h]
+      Z = np.array([0., 1., 2., 5.])
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         f = lambda m: 1. / np.sqrt(self.sigma2DispFog(m, z))  # [(h/Mpc)]
+         kCut = np.array(map(f, M))
+         ax.loglog(M, kCut, label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$M$ [$M_\odot/h$]')
+      ax.set_ylabel(r'$k_\text{FOG} = 1 / \sigma_d(M, z)$ [$h/$Mpc]')
+      #
+      plt.show()
+
    
    ##################################################################################
 
@@ -433,7 +501,7 @@ class Universe(object):
       mb = 1.e13
       # solve for sigma(m)^2 = deltaC**2
       R = lambda m: ( 3.* m / (4*np.pi*self.rho_m(z)) )**(1./3.)   # in h^-1 Mpc
-      f = lambda m: self.Sigma2(R(m), z, W3d_sth) - self.deltaC_z(z)**2
+      f = lambda m: self.Sigma2(R(m), z, W3d_sth) - self.deltaC(z)**2
       # find mass such that nu(m, z) = 1
       result = optimize.brentq(f , ma, mb)
       return result
@@ -489,7 +557,7 @@ class Universe(object):
       """
       r = (3.*m / (4.*np.pi*self.rho_m(z)))**(1./3.)
       s2 = self.Sigma2(r, z, W3d_sth)
-      nu = self.deltaC_z(z)**2 / s2
+      nu = self.deltaC(z)**2 / s2
       return nu
 
 
@@ -519,7 +587,7 @@ class Universe(object):
       # from Duffy et al 2008: different pivot mass
       cNFW = cNFW0 * (m/2.e12)**cNFWam * (1.+z)**cNFWaz
       # comoving virial radius and scale radius in h^-1 Mpc
-      Rvir = ( 3.*m / (4*np.pi*self.rho_crit(z) * self.Deltacrit_z(z)) )**(1./3.)
+      Rvir = ( 3.*m / (4*np.pi*self.rho_crit(z) * self.deltaCrit(z)) )**(1./3.)
       Rs = Rvir / cNFW
       # NFW scale density (comoving)
       rhoS = m / (4.*np.pi*Rs**3) / (np.log(1.+cNFW) - cNFW/(1.+cNFW))
@@ -656,8 +724,8 @@ class Universe(object):
          x = np.exp(par[0])  # such that |p| = x |k|
          mu = par[1] # such that mu = cos(theta_{k, p})
          #
-         result = self.fPlin(k*x, z)
-         result *= self.fPlin(k*np.sqrt(1.+x**2-2.*x*mu), z)
+         result = self.pLin(k*x, z)
+         result *= self.pLin(k*np.sqrt(1.+x**2-2.*x*mu), z)
          result *= (1.-2.*x*mu) * (1.-mu**2) / (1.+x**2-2.*x*mu)
          #
          result *= k / (2.*np.pi)**2
@@ -752,8 +820,8 @@ class Universe(object):
 ##         mu = pars[2]
 ##         x = K/k
 ##         # Put the density instead of velocity!!!
-##         result = self.fPlin_z(k, z) / k**2
-##         result *= self.fPlin_z(k*np.sqrt(1 - 2.*x*mu + x**2), z) / (k*np.sqrt(1 - 2.*x*mu + x**2))**2
+##         result = self.pLin_z(k, z) / k**2
+##         result *= self.pLin_z(k*np.sqrt(1 - 2.*x*mu + x**2), z) / (k*np.sqrt(1 - 2.*x*mu + x**2))**2
 ##
 ##         factor = ( self.bg.Omega0_m*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
 ##         factor *= ( self.Hubble(1./(1.+z))/(1.+z) )**2 # (a*H)**2
@@ -784,8 +852,8 @@ class Universe(object):
 #         mu = pars[2]
 ##         x = K/k
 #         # Put the density instead of velocity!!!
-#         result = self.fPlin_z(k, z) / k**2
-#         result *= self.fPlin_z(np.sqrt(k**2 - 2.*k*K*mu + K**2), z) / (k**2 - 2.*k*K*mu + K**2)
+#         result = self.pLin_z(k, z) / k**2
+#         result *= self.pLin_z(np.sqrt(k**2 - 2.*k*K*mu + K**2), z) / (k**2 - 2.*k*K*mu + K**2)
 #
 #         factor = ( self.bg.Omega0_m*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
 #         factor *= ( self.Hubble(1./(1.+z))/(1.+z) )**2 # (a*H)**2
