@@ -256,7 +256,7 @@ class P3dAuto(object):
    
    def fP_1h(self, k, z, mMin=None, mMax=None):
       Profiles = [[self.Prof, 2, k]]
-      result = self.IHaloModel.f(0, Profiles, z, mMin=None, mMax=None)
+      result = self.IHaloModel.f(0, Profiles, z, mMin=mMin, mMax=mMax)
       if not np.isfinite(result):
          result = 0.
       return result
@@ -578,6 +578,84 @@ class P3dAuto(object):
          ax.set_ylabel(r'ratio with '+str(p3d))
 
       plt.show()
+
+
+
+   def plotCumulMassContributionP(self, z=None):
+      if z is None:
+         z = self.Z[0]
+      M = np.logspace(np.log10(5.e10), np.log10(4.e14), 6, 10.) # [Msun/h]
+      K = np.logspace(np.log10(1.e-3), np.log10(40.), 101, 10.) # [h/Mpc]
+
+      # Compute the build up of the power spectrum,
+      # as the maximum mass increases
+      P = np.zeros((len(M)+1, len(K)))
+      for iM in range(len(M)):
+         m = M[iM]
+         f = lambda k: self.fP(k, z, mMin=None, mMax=m)
+         P[iM+1, :] = np.array(map(f, K))
+         print P[iM+1,:]
+
+      
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for iM in range(len(M))[::-1]:
+         m = M[iM]
+         #
+         #ax.fill_between(K, P[iM,:], P[iM+1,:], facecolor=plt.cm.rainbow(1.*iM/len(M)), edgecolor='', label=r'$M\leqslant$'+floatSciForm(m, round=1)+r' $M_\odot/h$')
+         ax.fill_between(K, P[iM,:], P[iM+1,:], facecolor=plt.cm.YlOrRd(1.*iM/(len(M)-1.)), edgecolor='', label=r'$M\leqslant$'+floatSciForm(m, round=1)+r' $M_\odot/h$')
+
+      #
+      ax.legend(loc=3, fontsize=12, labelspacing=0.1)
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(K), np.max(K)))
+      ax.set_xlabel(r'$k$ [$h$/Mpc]')
+      ax.set_ylabel(r'$P(k)$')
+
+      plt.show()
+
+
+
+   def plotMassContributionP(self, z=None):
+      if z is None:
+         z = self.Z[0]
+      M = np.logspace(np.log10(5.e10), np.log10(7.e13), 7, 10.) # [Msun/h]
+      K = np.logspace(np.log10(1.e-3), np.log10(40.), 101, 10.) # [h/Mpc]
+
+      # Compute the build up of the power spectrum,
+      # as the maximum mass increases
+      P = np.zeros((len(M)-1, len(K)))
+      for iM in range(len(M)-1):
+         f = lambda k: self.fP(k, z, mMin=M[iM], mMax=M[iM+1])
+         P[iM, :] = np.array(map(f, K))
+         print P[iM,:]
+
+      
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      # full power spectrum
+      f = lambda k: self.fP(k, z)
+      p = np.array(map(f, K))
+      ax.plot(K, p, 'k-', label=r'Total')
+      #
+      for iM in range(len(M)-1)[::-1]:
+         m = M[iM]
+         #
+         ax.plot(K, P[iM,:], ls='--', c=plt.cm.YlOrRd((iM+1.)/(len(M)-1.)), label=floatSciForm(M[iM], round=1)+r'$\geqslant M<$'+floatSciForm(M[iM+1], round=1)+r' $M_\odot/h$')
+      #
+      ax.legend(loc=3, fontsize=12, labelspacing=0.1)
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(K), np.max(K)))
+      ax.set_xlabel(r'$k$ [$h$/Mpc]')
+      ax.set_ylabel(r'$P(k)$')
+
+      plt.show()
+
+
 
 
    def plotdP(self, z=0.):

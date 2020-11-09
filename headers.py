@@ -64,6 +64,9 @@ rc('text.latex', preamble='\usepackage{amsmath}, \usepackage{amssymb}')
 #rc('font', size=20)
 rc('legend',**{'fontsize':'18'})
 
+# to add more tick marks on log plots
+from matplotlib.ticker import LogLocator
+
 # fonty stuffs
 #font.serif: CMU Serif
 #font.family: serif

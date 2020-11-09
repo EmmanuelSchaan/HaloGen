@@ -66,7 +66,7 @@ class LF(object):
       return self.name
 
 
-   def lumMoment(self, z, n):
+   def lumMoment(self, z, n, lMin=0., lMax=np.inf):
       ''' [Lsun^n (Mpc/h)^-3]
       This integral of the LF formally diverges at low luminosities,
       so it is highly cutoff dependent. Use with caution.
@@ -76,7 +76,10 @@ class LF(object):
          result = self.phi(z, l)
          result *= l**(n+1)
          return result
-      result = integrate.quad(integrand, np.log(self.lMin), np.log(self.lMax), epsabs=0., epsrel=1.e-3)[0]
+      # integration bounds
+      lMin = max(lMin, self.lMin)
+      lMax = min(lMax, self.lMax)
+      result = integrate.quad(integrand, np.log(lMin), np.log(lMax), epsabs=0., epsrel=1.e-3)[0]
       return result
 
 
@@ -87,6 +90,67 @@ class LF(object):
       result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
       result /= 4. * np.pi * self.nuHz # *[/sr/Hz]
       return result
+
+
+
+
+   def dlnLumMomentdlnL(self, z, l, n):
+      '''l is galaxy luminosity in Lsun
+      Result is dimensionless
+      '''
+      result = self.phi(z, l) * l**(n+1)
+      result /= self.lumMoment(z, n)
+      return result
+
+
+   def plotdlnMeanIntensitydlnL(self):
+      L_cgs = np.logspace(np.log10(1.e35), np.log10(1.e44), 101, 10.) # [erg/s]
+      L_Lsun = L_cgs / self.convertLumUnit('cgs')
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for iZ in range(len(self.Z)):
+         z = self.Z[iZ]
+         f = lambda l: self.dlnLumMomentdlnL(z, l, 1)
+         y = np.array(map(f, L_Lsun))
+         ax.plot(L_cgs, y, c=plt.cm.cool(iZ/(len(self.Z)-1.)), label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.2)
+      ax.set_xscale('log', nonposx='clip')
+      #ax.set_yscale('log', nonposy='clip')
+      ax.set_xlabel(r'$L$ [erg/s]')
+      ax.set_ylabel(r'$d \text{ln} I / d\text{ln} L$')
+      #
+      path = './figures/lf/dlnmeanintensitydlnl_'+self.name+'.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+   
+   def plotdlnPshotdlnL(self):
+      L_cgs = np.logspace(np.log10(1.e39), np.log10(1.e44), 101, 10.) # [erg/s]
+      L_Lsun = L_cgs / self.convertLumUnit('cgs')
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for iZ in range(len(self.Z)):
+         z = self.Z[iZ]
+         f = lambda l: self.dlnLumMomentdlnL(z, l, 2)
+         y = np.array(map(f, L_Lsun))
+         ax.plot(L_cgs, y, c=plt.cm.cool(iZ/(len(self.Z)-1.)), label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.2)
+      ax.set_xscale('log', nonposx='clip')
+      #ax.set_yscale('log', nonposy='clip')
+      ax.set_xlabel(r'$L$ [erg/s]')
+      ax.set_ylabel(r'$d \text{ln} P_\text{shot} / d\text{ln} L$')
+      #
+      path = './figures/lf/dlnpshotdlnl_'+self.name+'.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
 
 
    ##################################################################################
@@ -287,12 +351,48 @@ class LF(object):
       #plt.show()
 
 
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for lf in lfs:
+         if hasattr(lf, 'Z'):
+            Z = lf.Z
+         else:
+            Z = np.linspace(0.71, 6.,101)
+         # SPHEREx voxel size
+         # the spectral resolution power is R=40 for the lower z, and 150 for the high z
+         R = 40.
+         # hence the redshift size of the voxel
+         dz = (1. + Z) / R
+         # and the comoving depth of the voxel
+         dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+         # angular pixel size: 6.2 arcsec
+         thetaPix = 6.2 * np.pi/(180.*3600.)
+         # hence the voxel comoving volume
+         vVoxSpherex = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+         #print "vVoxSpherex=", vVoxSpherex, "(Mpc/h)^3"
+
+         # effective number of galaxies
+         n = np.array(map(lf.nGalEff, Z))
+         n *= vVoxSpherex
+         ax.plot(Z, n, label=lf.nameLatex)
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      ax.set_xlim((0., 7.))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\bar{N}^\text{gal eff}$ per SPHEREx voxel')
+      #
+      path = './figures/lf/galaxy_sparsity_spherex_'+self.name+'.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+
+
 
 
    def plotShotNoise(self, lfs=None):
-      '''Vary the Schechter fit parameters to get an idea of the uncertainty 
-      on the shot noise power spectrum
-      '''
       if lfs is None:
          lfs = [self]
 
@@ -304,17 +404,18 @@ class LF(object):
             Z = lf.Z
          else:
             Z = np.linspace(0.71, 6.,101)
-         f = lambda z: 1. / lf.nGalEff(z) # shot noise power of dI/I
-         pShot = np.array(map(f, Z))
-         #plt.plot(Z, pShot, label=str(lf))
+         #f = lambda z: 1. / lf.nGalEff(z) # shot noise power of dI/I
+         f = lambda z: lf.Pshot(z)
+         pShot = np.array(map(f, Z)) * self.convertPowerSpectrumUnit('Jy/sr')
          plt.plot(Z, pShot, label=lf.nameLatex)
          
       #
-      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
-      ax.set_yscale('log', nonposy='clip')
-      ax.set_ylabel(r'$P_\text{shot}$ [(Mpc/h)$^3$]')
+      ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
+      #ax.set_yscale('log', nonposy='clip')
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$P_\text{shot}$ [(Jy/sr)$^2$(Mpc/h)$^3$]')
       #
-      path = './figures/profile/Sobral12/'+'shot_noise_uncertainty.pdf'
+      path = './figures/lf/shot_noise_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       plt.show()
 
@@ -355,7 +456,7 @@ class LFHaSobral12(LF):
    def __init__(self, U):
       # required attributes
       self.name = 'sobral12halpha'
-      self.nameLatex = r'S12 H$\alpha$'
+      self.nameLatex = r'S13 H$\alpha$'
       self.lineName = 'halpha'
       self.lambdaMicrons = 656.28e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
@@ -423,7 +524,7 @@ class LFHaSobral12(LF):
    def loadMeasuredLF(self):
       # Measured luminosity functions
       # table 4
-      self.Z = [0.4, 0.84, 1.47, 2.23]
+      self.Z = np.array([0.4, 0.84, 1.47, 2.23])
       zString = ['0.40', '0.84', '1.47', '2.23']
       self.nZ = len(self.Z)
       pathIn = './input/LIM_literature/Sobral+12/table4/'

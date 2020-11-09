@@ -62,9 +62,15 @@ class IHaloModel():
 
       # integration bounds
       mMinIntegral = np.max([ Profiles[j][0].mMin for j in range(len(Profiles)) ])
-      mMinIntegral = np.max([mMinIntegral, mMin, self.MassFunc.mMin])
+      mMinIntegral = np.max([mMinIntegral, self.MassFunc.mMin])
+      if mMin is not None:
+         mMinIntegral = max(mMinIntegral, mMin)
+      #
       mMaxIntegral = np.min([ Profiles[j][0].mMax for j in range(len(Profiles)) ])
-      mMaxIntegral = np.min([mMaxIntegral, mMax, self.MassFunc.mMax])
+      mMaxIntegral = np.min([mMaxIntegral, self.MassFunc.mMax])
+      if mMax is not None:
+         mMaxIntegral = min(mMaxIntegral, mMax)
+
       # compute integral
       integral = integrate.quad(integrand, np.log(mMinIntegral), np.log(mMaxIntegral), epsabs=0, epsrel=1.e-3)[0]
 

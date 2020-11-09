@@ -184,9 +184,10 @@ class Universe(object):
       """ratio of virialized density to critical density at collapse (dimless).
       from Bullock et al 2001, from Bryan & Norman 1998
       usual 18*pi**2 if OmM=1.
-      Omega = rhocrit(z)/rho_matter(z).
+      Omega = rho_matter(z)/rhocrit(z).
       """
-      f = self.bg.Omega0_m * (1.+z)**3 / ( self.bg.Omega0_m * (1.+z)**3 + (1. - self.bg.Omega0_m) )
+      #f = self.bg.Omega0_m * (1.+z)**3 / ( self.bg.Omega0_m * (1.+z)**3 + (1. - self.bg.Omega0_m) )
+      f = self.bg.Omega_m(z)
       return 18.*np.pi**2 + 82.*(f-1.) - 39.*(f-1.)**2
 
 
@@ -200,20 +201,27 @@ class Universe(object):
    ##################################################################################
 
    
-   def sigma2V1d(self, m, z):
+   def sigma2V1d(self, m, z, ref='Evrard07'):
       '''Variance of the 1d LOS random velocities
       inside a singular isothermal sphere
       with mass m and physical radius r_vir:
       sigma_{v1d}^2 = G*m / (2 r_vir)  [(km/s)^2]
       '''
-      rVir = self.rVir(m, z)  # comoving [Mpc/h]
-      rVir /= 1.+z   # physical [Mpc/h]
-      # 1d velocity dispersion [(km/s)^2]
-      # for a singular isothermal sphere
-      # with mass m and radius r_vir
-      result = self.G * (m * self.mSun / self.bg.h)
-      result /= 2. * (rVir * self.Mpc / self.bg.h)
-      result /= 1.e6 # convert [(m/s)^2] to [(km/s)^2]
+      if ref=='Evrard07':
+         # From Eq6 and Table 5 of Evrard+07
+         result = self.hubble(z) * self.bg.h / 100.
+         result *= m / (1.e15 * self.bg.h)
+         result = 982. * result**0.355 # [km/s]
+         result = result**2   # [(km/s)]
+      elif ref=='White01':
+         rVir = self.rVir(m, z)  # comoving [Mpc/h]
+         rVir /= 1.+z   # physical [Mpc/h]
+         # 1d velocity dispersion [(km/s)^2]
+         # for a singular isothermal sphere
+         # with mass m and radius r_vir
+         result = self.G * (m * self.mSun / self.bg.h)
+         result /= 2. * (rVir * self.Mpc / self.bg.h)
+         result /= 1.e6 # convert [(m/s)^2] to [(km/s)^2]
       return result
 
    def plotSigma2V1d(self):
@@ -224,9 +232,15 @@ class Universe(object):
       ax=fig.add_subplot(111)
       #
       for z in Z:
-         f = lambda m: np.sqrt(self.sigma2V1d(m, z))  # [km/s]
+         # White+01 version
+         f = lambda m: np.sqrt(self.sigma2V1d(m, z, ref='White01'))  # [km/s]
          s = np.array(map(f, M))
-         ax.loglog(M, s, label=r'$z=$'+str(z))
+         plot=ax.loglog(M, s, label=r'$z=$'+str(np.int(z))+' W01')
+         #
+         # Evrard+07 version
+         f = lambda m: np.sqrt(self.sigma2V1d(m, z, ref='Evrard07'))  # [km/s]
+         s = np.array(map(f, M))
+         ax.loglog(M, s, c=plot[0].get_color(), ls='--', label=r'$z=$'+str(z)+' E07')
       #
       ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$M$ [$M_\odot/h$]')
@@ -278,6 +292,165 @@ class Universe(object):
       ax.set_ylabel(r'$k_\text{FOG} = 1 / \sigma_d(M, z)$ [$h/$Mpc]')
       #
       plt.show()
+
+   def kMaxParaSpectroRes(self, R, z):
+      '''For an experiment with spectral
+      resolving power R = nu / sigma_{nu},
+      sigma_{chi} = c / (a H R) and thus
+      kMax = a H R / c
+      '''
+      return self.hubble(z) * R / (1.+z) / self.c_kms
+
+   def plotKMaxParaSpectroRes(self):
+      RR = np.array([40., 100., 150.])
+      Z = np.linspace(0., 7., 101)
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for R in RR[::-1]:
+         f = lambda z: self.kMaxParaSpectroRes(R, z)
+         kMax = np.array(map(f, Z))
+         ax.plot(Z, kMax, label=r'$\mathcal{R}=$'+str(R))
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      ax.set_ylim((1.e-2, 1.e-1))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$k_{\parallel\ \text{max}} \equiv a H \mathcal{R} / c$ [$h$/Mpc]')
+      #
+      plt.show()
+
+
+   def kMaxPerpPsf(self, fwhmPsf, z):
+      '''Wavevector corresponding to 1 sigma
+      of the Gaussian PSF, with the given fwhmPsf [rad]
+      kMax = 1 / (chi(z) * sigma_beam) [h/Mpc]
+      '''
+      # convert from fwhm to sigma
+      s = fwhmPsf / np.sqrt(8. * np.log(2.)) # [rad]
+      return 1. / s / self.bg.comoving_distance(z) # [h/Mpc]
+
+
+   def plotKMaxPerpPsf(self):
+      '''For an experiment with a given PSF/beam FWHM,
+      show the maximum wavevector accessible across the LOS k_perp
+      as a function of z.
+      kMax = 1 / (chi(z) * sigma_beam) 
+      '''
+      Z = np.linspace(0., 7., 101)
+      fwhmBeam = np.array([1., 6., 60.]) * np.pi/(180.*60.*60.)   # [arcsec] to [rad]
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for i in range(len(sigmaBeam)):
+         s = sigmaBeam[i]
+         f = lambda z: self.kMaxPerpPsf(fwhmBeam, z)
+         kMax = np.array(map(f, Z))
+         ax.plot(Z, kMax, label=r'PSF FWHM = '+str(fwhmBeam[i])+r"$ '' $")
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$k_{\perp\ \text{max}} \equiv 1/ \left(\chi\ \sigma_\text{PSF} \right)$ [$h$/Mpc]')
+      #
+      plt.show()
+
+
+   def kFPerp(self, z, fSky=1):
+      '''Fundamental wave vector across the LOS,
+      for a square survey of area 4 pi fSky [sr]:
+      k_f = l_f/chi = sqrt(pi/fsky) / chi [h/Mpc]
+      '''
+      return np.sqrt(np.pi/fSky)  / self.bg.comoving_distance(z)
+
+
+   def plotKFPerp(self):
+      '''For an experiment with a given fsky,
+      show the fundamental wavevector across the LOS as a function of z
+      k_f = l_f/chi = sqrt(pi/fsky) / chi 
+      '''
+      Z = np.linspace(0., 7., 101)
+      # 100 deg^2 is fsky=0.0024
+      FSky = np.array([0.0024, 0.01, 0.1, 1.])
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for fSky in FSky:
+         f = lambda z: self.kFPerp(z, fSky)
+         kF = np.array(map(f, Z))
+         ax.plot(Z, kF, label=r'$f_\text{sky} =$ '+str(fSky)+' ('+str(np.int(fSky*4.*np.pi*(180./np.pi)**2))+r' deg$^2$)')
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$k_{\perp\ \text{f}} \equiv \sqrt{\pi/f_\text{sky}} / \chi$ [$h$/Mpc]')
+      #
+      plt.show()
+
+
+   def kFPara(self, z, dchi=None, dz=None):
+      '''Fundamental wave vector along the LOS,
+      for a survey with depth dhi = c/H dz [Mpc/h]:
+      k_f = 2*pi / dchi [h/Mpc]
+      '''
+      if dchi is None and dz is not None:
+         dchi = self.c_kms/self.hubble(z) * dz
+      return 2.*np.pi / dchi
+
+
+   def plotTradeOffNModes(self):
+      '''For a given spectral resolution R,
+      survey depth Delta z,
+      k_{perp max}=0.1 h/Mpc (to be 2-halo dominated),
+      and k_{para max} determined by the spectral resolution,
+      what fsky is required to get Nmodes=200,
+      ie a 10% measurement of the amplitude of the 2-halo term?
+      '''
+      RR = np.array([40., 100., 150.])
+      Z = np.linspace(0., 7., 101)
+
+      def fSkyReq(z, R, dz=0.5, nModes=200., kPerpMax=0.1):
+         result = nModes / self.bg.comoving_distance(z)**2 / kPerpMax**2
+         result *= np.pi * (1.+z) / (dz * R) 
+         return result
+      
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for R in RR[::-1]:
+         f = lambda z: fSkyReq(z, R)
+         fSky = np.array(map(f, Z))
+         ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(R))
+      #
+      # SPHEREx: 100 deg^2
+      ax.axhline(100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.e-1))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Required sky fraction $f_\text{sky}$')
+      #
+      ax2=ax.twinx()
+      ylim = ax.get_ylim()
+      ax2.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
+      ax2.set_yscale('log', nonposy='clip')
+      ax2.set_ylabel(r'Required sky area [deg$^2$]')
+      #
+      plt.show()
+
+
+
+
 
    
    ##################################################################################

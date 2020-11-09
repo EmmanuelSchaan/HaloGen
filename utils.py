@@ -107,6 +107,27 @@ def floatExpForm(input, round=None):
    else:
       return mantissa + 'e' + exponent
 
+def floatSciForm(input, round=None):
+   """same as floatExpForm, except 10^ instead of e
+   round: number of digits to keep after the dot
+   """
+   a = '%e' % np.float(input)
+   # mantissa: remove trailing zeros
+   mantissa = a.split('e')[0].rstrip('0')
+   # round if desired
+   if round is not None:
+      intPart, decPart = mantissa.split('.')
+      mantissa = intPart + '.' + decPart[:round]
+   # exponent: remove + sign if there, and leading zeros
+   exponent = np.int(a.split('e')[1])
+   exponent = np.str(exponent)
+   if exponent=='0':
+      return mantissa
+   else:
+      return r'$' + mantissa + r'\times 10^{' + exponent+r'}$'
+
+
+
 ##################################################################################
 # Matrix inversion for ill-conditioned matrices, with SVD
 
