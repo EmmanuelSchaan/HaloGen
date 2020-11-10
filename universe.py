@@ -311,14 +311,14 @@ class Universe(object):
       for R in RR[::-1]:
          f = lambda z: self.kMaxParaSpectroRes(R, z)
          kMax = np.array(map(f, Z))
-         ax.plot(Z, kMax, label=r'$\mathcal{R}=$'+str(R))
+         ax.plot(Z, kMax, label=r'$\mathcal{R}=$'+str(np.int(R)))
       #
       ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
       ax.set_yscale('log', nonposy='clip')
       ax.set_xlim((np.min(Z), np.max(Z)))
       ax.set_ylim((1.e-2, 1.e-1))
       ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'$k_{\parallel\ \text{max}} \equiv a H \mathcal{R} / c$ [$h$/Mpc]')
+      ax.set_ylabel(r'$k_{\parallel\text{max}} \equiv a H \mathcal{R} / c$ [$h$/Mpc]')
       #
       plt.show()
 
@@ -345,18 +345,18 @@ class Universe(object):
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
-      for i in range(len(sigmaBeam)):
-         s = sigmaBeam[i]
-         f = lambda z: self.kMaxPerpPsf(fwhmBeam, z)
+      for i in range(len(fwhmBeam)):
+         #s = sigmaBeam[i]
+         f = lambda z: self.kMaxPerpPsf(fwhmBeam[i], z)
          kMax = np.array(map(f, Z))
-         ax.plot(Z, kMax, label=r'PSF FWHM = '+str(fwhmBeam[i])+r"$ '' $")
+         ax.plot(Z, kMax, label=r'PSF FWHM = '+str(np.int(round(fwhmBeam[i]*(180.*3600.)/np.pi)))+r"$ '' $")
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_yscale('log', nonposy='clip')
       ax.set_xlim((np.min(Z), np.max(Z)))
       #ax.set_ylim((1.e-2, 1.))
       ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'$k_{\perp\ \text{max}} \equiv 1/ \left(\chi\ \sigma_\text{PSF} \right)$ [$h$/Mpc]')
+      ax.set_ylabel(r'$k_{\perp\text{max}} \equiv 1/ \left(\chi\ \sigma_\text{PSF} \right)$ [$h$/Mpc]')
       #
       plt.show()
 
@@ -391,7 +391,7 @@ class Universe(object):
       ax.set_xlim((np.min(Z), np.max(Z)))
       #ax.set_ylim((1.e-2, 1.))
       ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'$k_{\perp\ \text{f}} \equiv \sqrt{\pi/f_\text{sky}} / \chi$ [$h$/Mpc]')
+      ax.set_ylabel(r'$k_{\perp f} \equiv \sqrt{\pi/f_\text{sky}} / \chi$ [$h$/Mpc]')
       #
       plt.show()
 
@@ -414,7 +414,7 @@ class Universe(object):
       what fsky is required to get Nmodes=200,
       ie a 10% measurement of the amplitude of the 2-halo term?
       '''
-      RR = np.array([40., 100., 150.])
+      RR = np.array([40., 150., 300.])
       Z = np.linspace(0., 7., 101)
 
       def fSkyReq(z, R, dz=0.5, nModes=200., kPerpMax=0.1):
@@ -425,10 +425,10 @@ class Universe(object):
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
-      for R in RR[::-1]:
+      for R in RR:
          f = lambda z: fSkyReq(z, R)
          fSky = np.array(map(f, Z))
-         ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(R))
+         ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
       #
       # SPHEREx: 100 deg^2
       ax.axhline(100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')

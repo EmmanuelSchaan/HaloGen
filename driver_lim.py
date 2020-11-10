@@ -39,7 +39,7 @@ u = UnivPlanck15()
 #u.plotSigma2V1d()
 #u.plotSigma2DispFog()
 #u.plotKMaxParaSpectroRes()
-#u.plotKMaxPerpPsf()
+u.plotKMaxPerpPsf()
 #u.plotKFPerp()
 #u.plotTradeOffNModes()
 
@@ -227,6 +227,8 @@ p = pRsdHa[key]
 #p.plotPMuDpdce(lfHa[key].Z[0])
 #p.plotP(lfHa[key].Z[0])
 #p.plotBEff()
+#p.save(z=p.Prof.Lf.Z[0])
+#p.load(z=p.Prof.Lf.Z[0])
 
 
 ##################################################################################
@@ -255,15 +257,14 @@ for key in lfHa.keys():
 ##################################################################################
 # Fisher forecast for f
 
-
-#p.save(z=p.Prof.Lf.Z[0])
-p.load(z=p.Prof.Lf.Z[0])
-
 '''
-z = 1.
-dz = 0.5
-R = 40.
-fSky = 100. * (np.pi/180.)**2 / (4.*np.pi)
-fwhmPsf = 6. * np.pi/(180.*3600.)
+# SPHEREx specs: fractional uncertainty on f
+z = p.Z[0]
+dz = 0.5 # 1.
+R = 40.  # 150.
+fSky = 100. * (np.pi/180.)**2 / (4.*np.pi)   # convert [sq deg] to [sr]
+fwhmPsf = 6. * np.pi/(180.*3600.)   # convert [arcsec] to [rad]
 print p.sFOverFFisher(z, R, fwhmPsf, fSky, dz)
 '''
+
+p.plotRequiredAreaToDetectF()

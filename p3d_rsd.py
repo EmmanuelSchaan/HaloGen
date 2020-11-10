@@ -168,7 +168,7 @@ class P3dRsdAuto(object):
       bEff, fEff, P2h, P1h, Pshot, Ptot
       and save to file
       '''
-      print("Precomputing the RSD power spectrum at z="+str(z))
+      print("Precompute the RSD power spectrum at z="+str(z))
       # arrays to compute
       bEff = np.zeros((self.nK, self.nMu))
       fEff = np.zeros((self.nK, self.nMu))
@@ -195,22 +195,23 @@ class P3dRsdAuto(object):
             print("- done "+str(iMu+1)+" of "+str(self.nMu))
 
       # save to files
-      np.savetxt('./output/p_rsd/beff_'+self.name+'_z'+str(z)+'.txt', bEff)
-      np.savetxt('./output/p_rsd/feff_'+self.name+'_z'+str(z)+'.txt', fEff)
-      np.savetxt('./output/p_rsd/p1h_'+self.name+'_z'+str(z)+'.txt', p1h)
-      np.savetxt('./output/p_rsd/p2h_'+self.name+'_z'+str(z)+'.txt', p2h)
-      np.savetxt('./output/p_rsd/pshot_'+self.name+'_z'+str(z)+'.txt', pShot)
-      np.savetxt('./output/p_rsd/ptot_'+self.name+'_z'+str(z)+'.txt', pTot)
+      np.savetxt('./output/p3d_rsd/beff_'+self.name+'_z'+str(z)+'.txt', bEff)
+      np.savetxt('./output/p3d_rsd/feff_'+self.name+'_z'+str(z)+'.txt', fEff)
+      np.savetxt('./output/p3d_rsd/p1h_'+self.name+'_z'+str(z)+'.txt', p1h)
+      np.savetxt('./output/p3d_rsd/p2h_'+self.name+'_z'+str(z)+'.txt', p2h)
+      np.savetxt('./output/p3d_rsd/pshot_'+self.name+'_z'+str(z)+'.txt', pShot)
+      np.savetxt('./output/p3d_rsd/ptot_'+self.name+'_z'+str(z)+'.txt', pTot)
 
 
    def load(self, z=1):
+      print("Load the precomputed RSD power spectrum at z="+str(z))
       # read files
-      bEff = np.genfromtxt('./output/p_rsd/beff_'+self.name+'_z'+str(z)+'.txt')
-      fEff = np.genfromtxt('./output/p_rsd/feff_'+self.name+'_z'+str(z)+'.txt')
-      p1h = np.genfromtxt('./output/p_rsd/p1h_'+self.name+'_z'+str(z)+'.txt')
-      p2h = np.genfromtxt('./output/p_rsd/p2h_'+self.name+'_z'+str(z)+'.txt')
-      pShot = np.genfromtxt('./output/p_rsd/pshot_'+self.name+'_z'+str(z)+'.txt')
-      pTot = np.genfromtxt('./output/p_rsd/ptot_'+self.name+'_z'+str(z)+'.txt')
+      bEff = np.genfromtxt('./output/p3d_rsd/beff_'+self.name+'_z'+str(z)+'.txt')
+      fEff = np.genfromtxt('./output/p3d_rsd/feff_'+self.name+'_z'+str(z)+'.txt')
+      p1h = np.genfromtxt('./output/p3d_rsd/p1h_'+self.name+'_z'+str(z)+'.txt')
+      p2h = np.genfromtxt('./output/p3d_rsd/p2h_'+self.name+'_z'+str(z)+'.txt')
+      pShot = np.genfromtxt('./output/p3d_rsd/pshot_'+self.name+'_z'+str(z)+'.txt')
+      pTot = np.genfromtxt('./output/p3d_rsd/ptot_'+self.name+'_z'+str(z)+'.txt')
       
       # interpolate
       self.bEffInt = {}
@@ -220,33 +221,12 @@ class P3dRsdAuto(object):
       self.pShotInt = {}
       self.pTotInt = {}
       #
-      KK, MMu = np.meshgrid(self.K, self.Mu)
-      #
-#      self.bEffInt[z] = interp2d(KK, MMu, bEff, kind='linear', bounds_error=False, fill_value=0.)
-#      self.fEffInt[z] = interp2d(KK, MMu, fEff, kind='linear', bounds_error=False, fill_value=0.)
-#      self.p1hInt[z] = interp2d(KK, MMu, p1h, kind='linear', bounds_error=False, fill_value=0.)
-#      self.p2hInt[z] = interp2d(KK, MMu, p2h, kind='linear', bounds_error=False, fill_value=0.)
-#      self.pShotInt[z] = interp2d(KK, MMu, pShot, kind='linear', bounds_error=False, fill_value=0.)
-#      self.pTotInt[z] = interp2d(KK, MMu, pTot, kind='linear', bounds_error=False, fill_value=0.)
-      #
-
-      intBEff = interp2d(np.log(self.K), self.Mu, np.log(bEff.T), kind='linear', bounds_error=False, fill_value=-np.inf)
-      self.bEffInt[z] = lambda k,mu: np.exp(intBEff(np.log(k), mu))
-      #
-      intFEff = interp2d(np.log(self.K), self.Mu, np.log(fEff.T), kind='linear', bounds_error=False, fill_value=-np.inf)
-      self.fEffInt[z] = lambda k,mu: np.exp(intFEff(np.log(k), mu))
-      #
-      intP1h = interp2d(np.log(self.K), self.Mu, np.log(p1h.T), kind='linear', bounds_error=False, fill_value=-np.inf)
-      self.p1hInt[z] = lambda k,mu: np.exp(intP1h(np.log(k), mu))
-      #
-      intP2h = interp2d(np.log(self.K), self.Mu, np.log(p2h.T), kind='linear', bounds_error=False, fill_value=-np.inf)
-      self.p2hInt[z] = lambda k,mu: np.exp(intP2h(np.log(k), mu))
-      #
-      intPShot = interp2d(np.log(self.K), self.Mu, np.log(pShot.T), kind='linear', bounds_error=False, fill_value=-np.inf)
-      self.pShotInt[z] = lambda k,mu: np.exp(intPShot(np.log(k), mu))
-      #
-      intPTot = interp2d(np.log(self.K), self.Mu, np.log(pTot.T), kind='linear', bounds_error=False, fill_value=-np.inf)
-      self.pTotInt[z] = lambda k,mu: np.exp(intPTot(np.log(k), mu))
+      self.bEffInt[z] = interp2d(self.K, self.Mu, bEff.T, kind='linear', bounds_error=False, fill_value=0.)
+      self.fEffInt[z] = interp2d(self.K, self.Mu, fEff.T, kind='linear', bounds_error=False, fill_value=0.)
+      self.p1hInt[z] = interp2d(self.K, self.Mu, p1h.T, kind='linear', bounds_error=False, fill_value=0.)
+      self.p2hInt[z] = interp2d(self.K, self.Mu, p2h.T, kind='linear', bounds_error=False, fill_value=0.)
+      self.pShotInt[z] = interp2d(self.K, self.Mu, pShot.T, kind='linear', bounds_error=False, fill_value=0.)
+      self.pTotInt[z] = interp2d(self.K, self.Mu, pTot.T, kind='linear', bounds_error=False, fill_value=0.)
 
 
 
@@ -263,6 +243,14 @@ class P3dRsdAuto(object):
       fSky [dimless]
       dz width of redshift slice
       '''
+      # precompute the RSD power spectrum at the requested redshift
+      try:
+         self.load(z=z)
+      except:
+         self.save(z=z)
+         self.load(z=z)
+
+
       # survey volume
       dChi = self.U.c_kms/self.U.hubble(z) * dz
       volume = 4.*np.pi*fSky  # sky area in [srd]
@@ -277,21 +265,19 @@ class P3dRsdAuto(object):
          kPara = np.exp(lnKPara)
          k = np.sqrt(kPerp**2 + kPara**2)
          mu = kPara / k
-         b = self.bEff(k, z, mu)
-         f = self.fEff(k, z, mu)
+         b = self.bEffInt[z](k, mu)
+         f = self.fEffInt[z](k, mu)
+         pTot = self.pTotInt[z](k, mu)
+         #print k, mu, b, f, pTot
          #
-         #result = ( 2.*f*mu**2 / (b+f*mu**2) )**2
-         result = 2. * mu**2 * (b+f*mu**2) * self.U.pLin(k, z)
-         result /= (b+f*mu**2)**2 * self.U.pLin(k, z) + self.p1h(k, z, mu) + self.pShot(z)
-         result = result**2
-         
-         result *= kPerp
-         result *= kPerp * kPara / (2.*np.pi)**2   # because int wrt ln
+         result = (2.*f* mu**2 * (b+f*mu**2) * self.U.pLin(k, z) / pTot)**2
+         result *= kPerp / (2.*np.pi)**2
+         result *= kPerp * kPara   # because int wrt ln
          result *= volume / 2.
          result *= 4.   # symmetry factor, since we reduce the integration domain
          return result
       
-      result = integrate.dblquad(integrand, 0., kPerpMax, lambda x: 0., lambda x: kParaMax, epsabs=0., epsrel=1.e-2)
+      result = integrate.dblquad(integrand, np.log(self.kMin), np.log(kPerpMax), lambda x: np.log(self.kMin), lambda x: np.log(kParaMax), epsabs=0., epsrel=1.e-2)[0]
       result = 1./np.sqrt(result)
       return result
 
@@ -550,6 +536,48 @@ class P3dRsdAuto(object):
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
+
+
+   def plotRequiredAreaToDetectF(self):
+      '''For a given spectral resolution R,
+      survey depth Delta z, what sky area is required
+      to give a $10\%$ measurement of the growth rate f?
+      '''
+      RR = np.array([40., 150., 300.])
+      #Z = np.linspace(0., 7., 11)
+      Z = self.Z.copy()
+
+      def fSkyReq(z, R, dz=1., fwhmPsf=6.*np.pi/(180.*3600.), target=0.1):
+         sFOverF = self.sFOverFFisher(z, R, fwhmPsf, 1., dz)
+         result = (sFOverF / target)**2
+         return result
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for R in RR:
+         f = lambda z: fSkyReq(z, R)
+         fSky = np.array(map(f, Z))
+         ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
+      #
+      # SPHEREx: 100 deg^2
+      ax.axhline(100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.e-1))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Required sky fraction $f_\text{sky}$')
+      #
+      ax2=ax.twinx()
+      ylim = ax.get_ylim()
+      ax2.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
+      ax2.set_yscale('log', nonposy='clip')
+      ax2.set_ylabel(r'Required sky area [deg$^2$]')
+      #
+      fig.savefig('./figures/p3d_rsd/fsky_tradeoff_f.pdf', bbox_inches='tight')
+      plt.show()
 
 
 
