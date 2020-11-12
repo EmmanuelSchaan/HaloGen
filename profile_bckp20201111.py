@@ -1706,11 +1706,10 @@ class ProfHODAlam16GasBattaglia16(Profile):
 
 class ProfLIMLF(Profile):
 
-   def __init__(self, U, Sfr, Lf, trunc=4., a=1.):
+   def __init__(self, U, Sfr, Lf, trunc=4.):
       super(ProfLIMLF, self).__init__(U)
       self.Sfr = Sfr
       self.Lf = Lf
-      self.a = a  # such that halo luminosity propto SFR(m,z)**a
 
       # NFW profile setup
       self.LoadNonLinMass()
@@ -1796,8 +1795,8 @@ class ProfLIMLF(Profile):
       Assumed propto SFR(m)
       '''
       result = self.Lf.nGal(z)  # [(Mpc/h)^{-3}]
-      result *= self.Sfr.sfr(m, z)**self.a   # [Msun/yr]
-      result /= self.Sfr.sfrdForInterp(z, alpha=self.a) # [(Msun/yr) (Mpc/h)^{-3}]
+      result *= self.Sfr.sfr(m, z)   # [Msun/yr]
+      result /= self.Sfr.sfrd(z) # [(Msun/yr) (Mpc/h)^{-3}]
       return result  # [dimless]
 
 
@@ -1808,8 +1807,8 @@ class ProfLIMLF(Profile):
       '''
       #return self.meanGalLum(z) * self.Ngal(m, z)
       result = self.Lf.lumDensity(z)  # [Lsun (Mpc/h)^-3] 
-      result *= self.Sfr.sfr(m, z)**self.a   # [Msun/yr]
-      result /= self.Sfr.sfrdForInterp(z, alpha=self.a) # [(Msun/yr) (Mpc/h)^{-3}]
+      result *= self.Sfr.sfr(m, z)   # [Msun/yr]
+      result /= self.Sfr.sfrd(z) # [(Msun/yr) (Mpc/h)^{-3}]
       return result
    
    def u(self, k, m, z, mu=0.):

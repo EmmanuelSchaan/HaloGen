@@ -583,5 +583,177 @@ class P3dRsdAuto(object):
 
 ##################################################################################
 ##################################################################################
+##################################################################################
+##################################################################################
 
+class P3dRsdCross(P3dRsdAuto):
+   
+   def __init__(self, U, Prof, Prof2, MassFunc, r=1., name="", nProc=1):
+      # copy classes
+      self.U = U
+      #self.IHaloModel = IHaloModel
+      self.MassFunc = MassFunc
+      self.Prof = Prof
+      self.Prof2 = Prof2
+      self.r = r
+      self.nProc = nProc
+      self.name = str(self.Prof) + '_' + str(self.Prof2) + name
+      
+      # mass bounds for integrals
+      self.mMin = np.max([self.Prof.mMin, self.Prof2.mMin, self.MassFunc.mMin])
+      self.mMax = min([self.Prof.mMax, self.Prof2.mMax, self.MassFunc.mMax])
+
+
+      # k moduli, to precompute
+      self.K = np.logspace(np.log10(1.e-3), np.log10(1.e2), 101, 10.)
+      self.nK = len(self.K)
+      self.kMin = np.min(self.K)
+      self.kMax = np.max(self.K)
+         
+      # mu values, to precompute
+      self.Mu = np.linspace(0., 1., 11)
+      self.nMu = len(self.Mu)
+      self.muMin = np.min(self.Mu)
+      self.muMax = np.max(self.Mu)
+
+      # redshifts to evaluate, from the luminosity function
+      self.Z = self.Prof.Lf.Z
+   
+      # create folder if needed
+      directory = "./output/p_rsd/"
+      if not os.path.exists(directory):
+         os.makedirs(directory)
+
+
+   ##################################################################################
+   # Power spectrum ingredients
+
+
+   def p1h(self, k, z, mu=0., mMin=0., mMax=np.inf):
+      '''Includes FOGs
+      '''
+      def integrand(lnm):
+         m = np.exp(lnm)
+         result = self.MassFunc.massfunc(m, 1./(1.+z))
+         result *= self.Prof.u(k, m, z, mu) * self.Prof2.u(k, m, z, mu)
+         result *= m # because integrating in lnm and not m
+         return result
+      # integration bounds
+      mMin = max(self.mMin, mMin)
+      mMax = min(self.mMax, mMax)
+      result = integrate.quad(integrand, np.log(mMin), np.log(mMax), epsabs=0, epsrel=1.e-2)[0]
+      return result
+
+
+
+   def fEff2(self, k, z, mu=0., mMin=0., mMax=np.inf):
+      '''Effective growth rate of structure
+      Converges to f when k-->0
+      Includes FOGs
+      '''
+      def integrand(lnm):
+         m = np.exp(lnm)
+         result = self.MassFunc.massfunc(m, z)
+         result *= self.Prof2.uMat(k, m, z, mu)
+         result *= m # because integrating in lnm and not m
+         return result
+      # integration bounds
+      mMin = max(self.mMin, mMin)
+      mMax = min(self.mMax, mMax)
+      result = integrate.quad(integrand, np.log(mMin), np.log(mMax), epsabs=0, epsrel=1.e-2)[0]
+      result *= self.U.bg.scale_independent_growth_rate(z)
+      # fix the halo model total mass problem
+      result /= self.correctionFactorI11(z, mMin=mMin, mMax=mMax)
+      return result
+
+
+
+   def bEff2(self, k, z, mu=0., mMin=0., mMax=np.inf):
+      '''Includes FOGs
+      '''
+      def integrand(lnm):
+         m = np.exp(lnm)
+         result = self.MassFunc.massfunc(m, z)
+         result *= self.MassFunc.b1(m, z)
+         result *= self.Prof2.u(k, m, z, mu)
+         result *= m # because integrating in lnm and not m
+         return result
+      # integration bounds
+      mMin = max(self.mMin, mMin)
+      mMax = min(self.mMax, mMax)
+      result = integrate.quad(integrand, np.log(mMin), np.log(mMax), epsabs=0, epsrel=1.e-2)[0]
+      if self.Prof.use_correction_factor==1:
+         result /= self.correctionFactorI11(z, mMin=mMin, mMax=mMax)
+      return result
+
+
+   def p2h(self, k, z, mu=0., mMin=0., mMax=np.inf):
+      '''Includes RSD: Kaiser effect and FOGs
+      '''
+      b1 = self.bEff(k, z, mu=mu, mMin=mMin, mMax=mMax)
+      b2 = self.bEff2(k, z, mu=mu, mMin=mMin, mMax=mMax)
+      f1 = self.fEff(k, z, mu=mu, mMin=mMin, mMax=mMax)
+      f2 = self.fEff2(k, z, mu=mu, mMin=mMin, mMax=mMax)
+      return (b1 + f1*mu**2) * (b2 + f2*mu**2) * self.U.pLin(k, z)
+
+
+   def pShot(self, z, mMin=0., mMax=np.inf):
+      '''(RSD has no effect on the shot noise power spectrum)
+      '''
+      result = self.r * np.sqrt(self.Prof.Pshot(z) * self.Prof2.Pshot(z))
+      # build up with mass,
+      # assuming phi(L|m) = N(m) * phi(L)
+      result *= self.Prof.Sfr.sfrdForInterp(z, mMin=mMin, mMax=mMax) / self.Prof.Sfr.sfrd(z)
+      return result
+
+   
+   ##################################################################################
+
+   def plotCorrCoeff(self, Z=None):
+      if Z is None:
+         Z = self.Z
+      P12 = self
+      P11 = P3dRsdAuto(self.U, self.Prof, self.MassFunc)
+      P22 = P3dRsdAuto(self.U, self.Prof2, self.MassFunc)
+
+      K = np.logspace(np.log10(1.e-3), np.log10(1.e2), 51, 10.)
+
+      Mu = np.array([0., 0.5, 1.])
+      Ls = ['-', '--', ':']
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         plot=ax.plot([],[], ls='-', label=r'$z=$'+str(round(z, 2)))
+         c = plot[0].get_color()
+         for iMu in range(len(Mu)):
+            mu = Mu[iMu]
+            f = lambda k: P12.pTot(k, z, mu)
+            p12 = np.array(map(f, K))
+            print "done 12"
+            print p12
+            f = lambda k: P11.pTot(k, z, mu)
+            p11 = np.array(map(f, K))
+            print "done 11"
+            print p11
+            f = lambda k: P22.pTot(k, z, mu)
+            p22 = np.array(map(f, K))
+            print "done 22"
+            print p22
+            #
+            plot=ax.plot(K, p12 / np.sqrt(p11 * p22), c=c, ls=Ls[iMu])
+      #
+      for iMu in range(len(Mu)):
+         ax.plot([], [], c='k', ls=Ls[iMu], label=r'$\mu=$'+str(Mu[iMu]))
+      #
+      ax.axhline(self.r, c='gray', alpha=0.3)
+      #
+      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlim((0.01, 1.e2))
+      ax.set_ylim((0., 1.))
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_xlabel(r'$k$ [$h/$Mpc]')
+      ax.set_ylabel(r'$r_{12}(k, \mu, z)$')
+      plt.show()
 

@@ -39,7 +39,7 @@ u = UnivPlanck15()
 #u.plotSigma2V1d()
 #u.plotSigma2DispFog()
 #u.plotKMaxParaSpectroRes()
-u.plotKMaxPerpPsf()
+#u.plotKMaxPerpPsf()
 #u.plotKFPerp()
 #u.plotTradeOffNModes()
 
@@ -65,9 +65,9 @@ sfr = SfrMoster13Speagle14(u, massFunc, scatter=True, nProc=3, save=False)
 #sfr.plotnHEff()
 #sfr.plotNHEffSpherex()
 #sfr.plotBEff()
-sfr.plotdbEff2dlnm()
-sfr.plotdP1hdlnm()
-sfr.plotdlnMeanIntensitydlnm()
+#sfr.plotdbEff2dlnm()
+#sfr.plotdP1hdlnm()
+#sfr.plotdlnMeanIntensitydlnm()
 
 ##################################################################################
 ##################################################################################
@@ -169,11 +169,11 @@ lfHa['Sobral12'].plotdlnPshotdlnL()
 
 profLimLfHa = {}
 for key in lfHa.keys():
-   profLimLfHa[key] = ProfLIMLF(u, sfr, lfHa[key], trunc=4.)
+   profLimLfHa[key] = ProfLIMLF(u, sfr, lfHa[key], trunc=4., a=1.)
 
 profLimLfOiii = {}
 for key in lfOiii.keys():
-   profLimLfOiii[key] = ProfLIMLF(u, sfr, lfOiii[key], trunc=4.)
+   profLimLfOiii[key] = ProfLIMLF(u, sfr, lfOiii[key], trunc=4., a=1.)
 
 
 
@@ -199,17 +199,7 @@ iHaloModel = IHaloModel(u, massFunc)
 
 ##################################################################################
 ##################################################################################
-# Power spectrum
-
-# obsolete, see previous versions
-
-##################################################################################
-##################################################################################
-# RSD power spectrum
-
-import p3d_rsd
-reload(p3d_rsd)
-from p3d_rsd import *
+# RSD auto power spectrum
 
 
 pRsdHa = {}
@@ -266,5 +256,26 @@ fSky = 100. * (np.pi/180.)**2 / (4.*np.pi)   # convert [sq deg] to [sr]
 fwhmPsf = 6. * np.pi/(180.*3600.)   # convert [arcsec] to [rad]
 print p.sFOverFFisher(z, R, fwhmPsf, fSky, dz)
 '''
-
+'''
 p.plotRequiredAreaToDetectF()
+'''
+
+
+##################################################################################
+##################################################################################
+# RSD cross power spectrum
+
+import p3d_rsd
+reload(p3d_rsd)
+from p3d_rsd import *
+
+key = 'Cochrane17'
+profHa = ProfLIMLF(u, sfr, lfHa[key], trunc=4., a=1.1)
+key = 'Mehta15'
+profOiii = ProfLIMLF(u, sfr, lfOiii[key], trunc=4., a=0.8)
+
+
+pHaOiii = P3dRsdCross(u, profHa, profOiii, massFunc, r=0.65, nProc=3)
+
+
+pHaOiii.plotCorrCoeff(Z=[1., 2.])
