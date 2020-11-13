@@ -201,6 +201,9 @@ iHaloModel = IHaloModel(u, massFunc)
 ##################################################################################
 # RSD auto power spectrum
 
+import p3d_rsd
+reload(p3d_rsd)
+from p3d_rsd import *
 
 pRsdHa = {}
 for key in lfHa.keys():
@@ -219,6 +222,8 @@ p = pRsdHa[key]
 #p.plotBEff()
 #p.save(z=p.Prof.Lf.Z[0])
 #p.load(z=p.Prof.Lf.Z[0])
+
+p.plotSigmaLumMatchedFilter()
 
 
 ##################################################################################
@@ -265,10 +270,7 @@ p.plotRequiredAreaToDetectF()
 ##################################################################################
 # RSD cross power spectrum
 
-import p3d_rsd
-reload(p3d_rsd)
-from p3d_rsd import *
-
+'''
 key = 'Cochrane17'
 profHa = ProfLIMLF(u, sfr, lfHa[key], trunc=4., a=1.1)
 key = 'Mehta15'
@@ -279,3 +281,4 @@ pHaOiii = P3dRsdCross(u, profHa, profOiii, massFunc, r=0.65, nProc=3)
 
 
 pHaOiii.plotCorrCoeff(Z=[1., 2.])
+'''

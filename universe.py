@@ -301,6 +301,15 @@ class Universe(object):
       '''
       return self.hubble(z) * R / (1.+z) / self.c_kms
 
+   def spectralPsfF(self, kPara, R, z):
+      '''Fourier transform of the spectral PSF [dimless]
+      kPara [h/Mpc]
+      R spectral resolving power [dimless]
+      '''
+      kMaxPara = self.kMaxParaSpectroRes(R, z)
+      result = np.exp(-0.5 * kPara**2 / kMaxPara**2)
+      return result
+
    def plotKMaxParaSpectroRes(self):
       RR = np.array([40., 100., 150.])
       Z = np.linspace(0., 7., 101)
@@ -331,6 +340,16 @@ class Universe(object):
       # convert from fwhm to sigma
       s = fwhmPsf / np.sqrt(8. * np.log(2.)) # [rad]
       return 1. / s / self.bg.comoving_distance(z) # [h/Mpc]
+
+
+   def psfF(self, kPerp, fwhmPsf, z):
+      '''Fourier transform of the PSF [dimless]
+      kPerp [h/Mpc]
+      fwhmPsf [rad]
+      '''
+      kMaxPara = self.kMaxPerpPsf(fwhmPsf, z)
+      result = np.exp(-0.5 * kPerp**2 / kMaxPara**2)
+      return result
 
 
    def plotKMaxPerpPsf(self):

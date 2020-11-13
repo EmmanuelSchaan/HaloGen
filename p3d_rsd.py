@@ -580,6 +580,150 @@ class P3dRsdAuto(object):
       plt.show()
 
 
+   ##################################################################################
+
+   def sigmaFluxMatchedFilter(self, detNoisePower, R, fwhmPsf, z):
+      '''Computes the uncertainty on the flux [Lsun / (Mpc/h)^2]
+      of a point source in the map,
+      given the detector noise power spectrum detNoisePower.
+      detNoisePower: default unit [(Lsun/(Mpc/h)^2/sr/Hz)^2 (Mpc/h)^3],
+      ie [Lsun^2/(Mpc/h)/sr^2/Hz^2].
+      This assumes a matched filter is used, with the point source profile
+      determined by the PSF and SPSF of the instrument.
+      R: spectral resolving power [dimless]
+      fwhmPsf: [rad]
+      '''
+      # precompute the RSD power spectrum at the requested redshift
+      try:
+         self.load(z=z)
+      except:
+         self.save(z=z)
+         self.load(z=z)
+
+      # survey volume
+#      dChi = self.U.c_kms/self.U.hubble(z) * dz
+#      volume = 4.*np.pi*fSky  # sky area in [srd]
+#      volume *= self.U.bg.comoving_distance(z)**2 * dChi # volume [(Mpc/h)^3]
+      # k perp max
+      # k para max
+
+
+      def integrand(lnKPara, lnKPerp):
+         kPerp = np.exp(lnKPerp)
+         kPara = np.exp(lnKPara)
+         k = np.sqrt(kPerp**2 + kPara**2)
+         mu = kPara / k
+         
+         # keep default unit [(Lsun/(Mpc/h)^2/sr/Hz)^2 (Mpc/h)^3]
+         # ie [Lsun^2/(Mpc/h)/sr^2/Hz^2]
+         pTot = self.pTotInt[z](k, mu)
+         if pTot==0.:
+            print "watch out ", k, mu, pTot
+         # convert to cgs
+         #pTot *= self.Prof.Lf.convertPowerSpectrumUnit('cgs')
+         
+         psf = self.U.psfF(kPerp, fwhmPsf, z)   # [dimless]
+         # normalize properly for matched filter   
+         psf *= self.U.bg.comoving_distance(z)**2  # [(Mpc/h)^2 / sr]
+         
+         spsf = self.U.spectralPsfF(kPara, R, z)   # [dimless]
+         # normalize properly for matched filter
+         spsf *= (1.+z) * self.U.c_kms / self.U.hubble(z) / self.Prof.Lf.nuHz  # [(Mpc/h) / Hz]
+         
+         result = (psf * spsf)**2   # [(Mpc/h)^6 / sr^2 / Hz^2]
+         result /= pTot + detNoisePower   # [(Mpc/h)^7 / Lsun^2]
+         result *= kPerp / (2.*np.pi)**2  # [(Mpc/h)^6 / Lsun^2]
+         result *= kPerp * kPara   # [(Mpc/h)^4 / Lsun^2] because int wrt ln
+         result *= 2.   # symmetry factor, since we reduce the integration domain
+         return result  # [(Mpc/h)^4 / Lsun^2]
+
+
+
+#      # integration bounds: 5 * sigma of the PSF and SPSF
+#      kPerpMax = self.U.kMaxPerpPsf(fwhmPsf, z)
+#      kParaMax = self.U.kMaxParaSpectroRes(R, z)
+      
+      # compute 2d integral
+      # integration bounds: if modulus of k goes above self.kMax, 
+      # pTot will be zero, and sigmaMatchedFilter will be zero
+      # if det noise is zero. --> avoid this!
+      result = integrate.dblquad(integrand, np.log(self.kMin), np.log(self.kMax/np.sqrt(2.)), lambda x: np.log(self.kMin), lambda x: np.log(self.kMax/np.sqrt(2.)), epsabs=0., epsrel=1.e-2)[0]
+      return 1. / np.sqrt(result)
+
+
+   def sigmaLumMatchedFilter(self, detNoisePower, R, fwhmPsf, z):
+      '''Return the matched filter uncertainty in terms of luminosity [Lsun]
+      '''
+      # get the flux
+      result = self.sigmaFluxMatchedFilter(detNoisePower, R, fwhmPsf, z)   # [Lsun / (Mpc/h)^2]
+      # convert to luminosity
+      result *= 4.*np.pi * (1.+z)**2 * self.U.bg.comoving_distance(z)   # [Lsun]
+      return result
+
+
+   def plotSigmaLumMatchedFilter(self, z=None):
+      if z is None:
+         z = self.Z[0]
+
+      # default power units, converted later when plotting
+      DetNoisePower = np.logspace(np.log10(1.e-12), np.log10(1.e-4), 51, 10.)
+
+      # SPHEREx specs
+      R = 40.
+      fwhmPsf = 6. * np.pi / (180.*3600.)
+
+      # min luminosity detectable: 5 sigma
+      f = lambda detNoisePower: 5. * self.sigmaLumMatchedFilter(detNoisePower, R, fwhmPsf, z)
+      LMin = np.array(map(f, DetNoisePower))
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+      ax.plot(x, LMin*self.Prof.Lf.convertLumUnit('cgs'))
+      #
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
+      ax.set_ylabel(r'$L_\text{min}$ [erg/s]')
+      #
+      plt.show()
+
+
+      # fraction of mean intensity from undetected sources
+      def f(lMin):
+         result = self.Prof.Lf.lumMoment(z, 1, lMin=0., lMax=lMin)
+         result /= self.Prof.Lf.lumMoment(z, 1, lMin=0., lMax=np.inf)
+         return result
+      fracMeanIntensity = np.array(map(f, LMin))
+      #
+      # fraction of shot noise from undetected sources
+      def f(lMin):
+         result = self.Prof.Lf.lumMoment(z, 2, lMin=0., lMax=lMin)
+         result /= self.Prof.Lf.lumMoment(z, 2, lMin=0., lMax=np.inf)
+         return result
+      fracShotNoise = np.array(map(f, LMin))
+
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+      ax.plot(x, fracMeanIntensity, label=r'Mean intensity')
+      ax.plot(x, fracShotNoise, label=r'Shot noise')
+      #
+      ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      #ax.set_ylim((1.e-5, 1.))
+      ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
+      ax.set_ylabel(r'Fraction from undetected sources')
+      #
+      plt.show()
+
+
+
+
 
 ##################################################################################
 ##################################################################################
