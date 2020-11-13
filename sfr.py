@@ -317,6 +317,44 @@ class Sfr(object):
       #plt.show()
 
 
+   def kennicuttSchmidtConstant(self, z, Lf, alpha=1.):
+      '''Given a luminosity function Lf,
+      find the Kennicutt-Schmidt constant K
+      L = K * SFR^alpha
+      such that the mean luminosity per unit volume 
+      from integrating the LF and the SFR match
+      '''
+      # compute mean intensity from LF
+      result = Lf.lumMoment(z, n=1)
+      # divide by the mean intensity from SFR
+      # to obtain the Kennicutt-Schmidt constant
+      if alpha==1.:
+         result /= self.sfrd(z)
+      else:
+         result /= self.sfrdForInterp(z, alpha=alpha)
+      return result
+
+
+   def luminosity(self, m, z, K, alpha=1.):
+      '''K: Kennicutt-Schmidt constant
+      m: mVir [Msun/h]
+      z: redshift
+      returns luminosity in the units given by K
+      '''
+      return K * self.sfr(m, z)**alpha
+
+
+   def massFromLum(self, L, z, K, alpha=1.):
+      '''Find the halo mass [Msun/h] corresponding
+      to the requested luminosity, given the Kennicutt-Schmidt
+      relation L = K * SFR(m,z)**alpha
+      '''
+      f = lambda m: self.luminosity(m, z, K, alpha=alpha) - L
+      mMin = 1.e6 # [Msun/h]
+      mMax = 1.e15 # [Msun/h]
+      return optimize.brentq(f, mMin, mMax)
+
+
 ##################################################################################
 
 

@@ -666,7 +666,7 @@ class P3dRsdAuto(object):
          z = self.Z[0]
 
       # default power units, converted later when plotting
-      DetNoisePower = np.logspace(np.log10(1.e-12), np.log10(1.e-4), 51, 10.)
+      DetNoisePower = np.logspace(np.log10(1.e-12), np.log10(1.e-4), 11, 10.)
 
       # SPHEREx specs
       R = 40.
@@ -704,6 +704,33 @@ class P3dRsdAuto(object):
          return result
       fracShotNoise = np.array(map(f, LMin))
 
+      # Convert the minimum detected luminosity lMin
+      # into a minimum detected halo mass
+      # get the Kennicutt-Schmidt constant 
+      K = self.Prof.Sfr.kennicuttSchmidtConstant(z, self.Prof.Lf, alpha=1.)
+      print "KS constant", K
+      # use it to convert lMin to mMin
+      f = lambda l: self.Prof.Sfr.massFromLum(l, z, K, alpha=1.)
+      MMin = np.array(map(f, LMin))
+
+      # fraction of 2h from undetected sources
+      # at a fiducial k
+      def f(mMin):
+         k = 0.01
+         result = self.p2h(k, z, mu=0., mMin=0., mMax=mMin)
+         result /= self.p2h(k, z, mu=0., mMin=0., mMax=np.inf)
+         return result
+      frac2h = np.array(map(f, MMin))
+      #
+      # fraction of 1h from undetected sources
+      # at a fiducial k
+      def f(mMin):
+         k = 0.1
+         result = self.p1h(k, z, mu=0., mMin=0., mMax=mMin)
+         result /= self.p1h(k, z, mu=0., mMin=0., mMax=np.inf)
+         return result
+      frac1h = np.array(map(f, MMin))
+
 
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
@@ -711,11 +738,14 @@ class P3dRsdAuto(object):
       x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
       ax.plot(x, fracMeanIntensity, label=r'Mean intensity')
       ax.plot(x, fracShotNoise, label=r'Shot noise')
+      ax.plot(x, frac2h, label=r'2h ($k=0.01h/$Mpc)')
+      ax.plot(x, frac1h, label=r'1h ($k=0.1h/$Mpc)')
       #
-      ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+      #ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
       ax.set_xscale('log', nonposx='clip')
-      ax.set_yscale('log', nonposy='clip')
-      #ax.set_ylim((1.e-5, 1.))
+      #ax.set_yscale('log', nonposy='clip')
+      ax.set_ylim((0., 1.))
       ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
       ax.set_ylabel(r'Fraction from undetected sources')
       #
