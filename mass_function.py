@@ -10,7 +10,7 @@ class MassFunction(object):
       # required variables: path_MassFunc, path_B1, path_B2
       
       # masses to compute mass function and biases
-      self.mMin = 1.e10  # in (h^-1 solarM)
+      self.mMin = 1.e6  # in (h^-1 solarM)
       self.mMax = 1.e16  # in (h^-1 solarM)
       self.Nm = 201 # nb of m pts
       self.M = np.logspace(np.log10(self.mMin), np.log10(self.mMax), self.Nm, 10.) # masses in h^-1 solarM

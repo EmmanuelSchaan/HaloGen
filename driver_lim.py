@@ -48,9 +48,9 @@ u = UnivPlanck15()
 ##################################################################################
 
 # Several mass functions implemented: Press-Schechter, Sheth-Tormen, Tinker
-#massFunc = MassFuncPS(u, save=False)
+#massFunc = MassFuncPS(u, save=True)
 massFunc = MassFuncST(u, save=False)
-#massFunc = MassFuncTinker(u, save=False)
+#massFunc = MassFuncTinker(u, save=True)
 
 
 ##################################################################################
@@ -58,16 +58,16 @@ massFunc = MassFuncST(u, save=False)
 #sfr = SfrFonseca16(u, massFunc)
 #sfr = SfrMoster13(u, massFunc)
 
-sfr = SfrMoster13Speagle14(u, massFunc, scatter=True, nProc=3, save=False)
+sfr = SfrMoster13Speagle14(u, massFunc, scatter=False, nProc=3, save=False)
 
 #sfr.plotSfr()
 #sfr.plotSfrd()
 #sfr.plotnHEff()
 #sfr.plotNHEffSpherex()
 #sfr.plotBEff()
-#sfr.plotdbEff2dlnm()
-#sfr.plotdP1hdlnm()
 #sfr.plotdlnMeanIntensitydlnm()
+#sfr.plotdlnbEff2dlnm()
+#sfr.plotdlnP1hdlnm()
 
 ##################################################################################
 ##################################################################################
@@ -158,10 +158,10 @@ lfOiii['Colbert13'].plotShotNoise(lfs=[lfOiii[key] for key in lfOiii.keys()])
 
 ##################################################################################
 # Contributions from each luminosity
-'''
+
 lfHa['Sobral12'].plotdlnMeanIntensitydlnL()
 lfHa['Sobral12'].plotdlnPshotdlnL()
-'''
+
 
 ##################################################################################
 ##################################################################################
@@ -223,8 +223,19 @@ p = pRsdHa[key]
 #p.save(z=p.Prof.Lf.Z[0])
 #p.load(z=p.Prof.Lf.Z[0])
 
-p.plotSigmaLumMatchedFilter()
 
+##################################################################################
+# LIM vs galaxy surveys
+'''
+p.plotSigmaLumMatchedFilter()
+'''
+
+##################################################################################
+# Compare references
+'''
+pRsdHa['Cochrane17'].compareP(ps=[pRsdHa[key] for key in pRsdHa.keys()])
+pRsdOiii['Colbert13'].compareP(ps=[pRsdOiii[key] for key in pRsdOiii.keys()])
+'''
 
 ##################################################################################
 # Compute the mass build up of the power spectrum

@@ -13,9 +13,8 @@ class LF(object):
 
       # required attributes
       #self.name
-      #self.nameLatex   # which line and which paper reference
-      #self.refLatex # paper reference
-      #self.lineName # which line this is
+      #self.nameLatex
+      #self.lineName
       #self.lambdaMicrons = 656.28e-3   # [mu]
       #self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
       #self.lMin
@@ -25,40 +24,46 @@ class LF(object):
       #self.Z
       #self.phi(l, z)#  [number / (Mpc/h)^3 / Lsun]
 
+      # interpolate moments of LF
+      def f(z): return self.lumMoment(z, 0)
+      x = np.array(map(f, self.Z))
+      self.nGal = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   # [(Mpc/h)^-3]
+      #
+      def f(z): return self.lumMoment(z, 1)
+      x = np.array(map(f, self.Z))
+      self.lumDensity = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   #[Lsun (Mpc/h)^-3]
+      #
+      def f(z): return self.lumMoment(z, 2)
+      x = np.array(map(f, self.Z))
+      self.sqLumDensity = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   #[Lsun (Mpc/h)^-3]
 
-      # Interpolate for speed
-      x = np.array(map(self.nGal, self.Z))
-      self.nGalInterp = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   # [(Mpc/h)^-3]
-      #
-      x = np.array(map(self.lumDensity, self.Z))
-      self.lumDensityInterp = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   #[Lsun (Mpc/h)^-3]
-      #
-      x = np.array(map(self.sqLumDensity, self.Z))
-      self.sqLumDensityInterp = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   #[Lsun^2 (Mpc/h)^-3]
-      #
-      x = np.array(map(self.meanIntensity, self.Z))
-      self.meanIntensityInterp = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   #[Lsun / (Mpc/h)^2 / sr / Hz]
-      #
-      x = np.array(map(self.meanGalLum, self.Z))
-      self.meanGalLumInterp = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   #[Lsun]
-      #
-      x = np.array(map(self.pShot, self.Z))
-      self.pShotInterp = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   # [(intensity unit)^2 (Mpc/h)^3] = [Lsun^2 / (Mpc/h) / sr^2 / Hz^2]
-      #
-      x = np.array(map(self.nGalEff, self.Z))
-      self.nGalEffInterp = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   # [(Mpc/h)^-3]
-      #
-      x = np.array(map(self.s2, self.Z))
-      self.s2Interp = interp1d(self.Z, x, kind='linear', bounds_error=False, fill_value=0.)   # [(Mpc/h)^-3]
+      # Mean galaxy luminosity [Lsun]
+      # ill-defined because very cutoff dependent
+      self.meanGalLum = lambda z: self.lumDensity(z) / self.nGal(z)
 
+      # Shot noise quantities
+      #
+      # Effective galaxy number density for shot noise [(Mpc/h)^-3]
+      self.nGalEff = lambda z: self.meanIntensity(z)**2 / self.Pshot(z)
+      #
+      # Fractional luminosity variance s2 = var(L_Ha) / mean(L_Ha)^2 [dimless]
+      # Again, ill-defined because highly cutoff dependent
+      self.s2 = lambda z: self.nGal(z) / self.nGalEff(z) - 1.
+
+
+
+   def Pshot(self, z):
+      '''[(intensity unit)^2 (Mpc/h)^3] = [Lsun^2 / (Mpc/h) / sr^2 / Hz^2]
+      '''
+      result = self.sqLumDensity(z)  # [Lsun^2 / (Mpc/h)^3]
+      result *= (3.e5 / self.U.hubble(z))**2   # *[(Mpc/h)^2]
+      result /= (4. * np.pi * self.nuHz)**2 # *[1/sr^2/Hz^2]
+      return result
 
 
    def __str__(self):
       return self.name
 
-
-   ##################################################################################
-   # Moments of the luminosity function
 
    def lumMoment(self, z, n, lMin=0., lMax=np.inf):
       ''' [Lsun^n (Mpc/h)^-3]
@@ -77,87 +82,25 @@ class LF(object):
       return result
 
 
-   def nGal(self, z, lMin=0., lMax=np.inf):
-      '''Mean number density of galaxies [(Mpc/h)^{-3}]
-      This quantity may be luminosity-cutoff dependent, and may not converge,
-      depending on the LF
-      '''
-      return self.lumMoment(z, 0, lMin=lMin, lMax=lMax)
-
-
-   def lumDensity(self, z, lMin=0., lMax=np.inf):
-      '''Mean luminosity density [Lsun (Mpc/h)^-3]
-      '''
-      return self.lumMoment(z, 1, lMin=lMin, lMax=lMax)
-
-
-   def sqLumDensity(self, z, lMin=0., lMax=np.inf):
-      '''Mean squared luminosity density [Lsun^2 (Mpc/h)^-3]
-      '''
-      return self.lumMoment(z, 2, lMin=lMin, lMax=lMax)
-
-
-   ##################################################################################
-   # Quantities derived from the moments of the luminosity function
-
-   def meanIntensity(self, z, lMin=0., lMax=np.inf):
+   def meanIntensity(self, z):
       '''[Lsun / (Mpc/h)^2 / sr / Hz]
       '''
-      result = self.lumDensity(z, lMin=lMin, lMax=lMax)  # [Lsun / (Mpc/h)^3]
+      result = self.lumDensity(z)  # [Lsun / (Mpc/h)^3]
       result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
       result /= 4. * np.pi * self.nuHz # *[/sr/Hz]
       return result
 
 
-   def meanGalLum(self, z, lMin=0., lMax=np.inf):
-      '''Mean galaxy luminosity [Lsun]
-      This quantity may be luminosity-cutoff dependent,
-      depending on the LF
-      '''
-      result = self.lumDensity(z, lMin=lMin, lMax=lMax)  # [Lsun / (Mpc/h)^3]
-      result /= self.nGal(z, lMin=lMin, lMax=lMax) # / [(Mpc/h)^{-3}] = [Lsun]
-      return result
 
 
-   def pShot(self, z, lMin=0., lMax=np.inf):
-      '''[(intensity unit)^2 (Mpc/h)^3] = [Lsun^2 / (Mpc/h) / sr^2 / Hz^2]
-      '''
-      result = self.sqLumDensity(z, lMin=lMin, lMax=lMax)  # [Lsun^2 / (Mpc/h)^3]
-      result *= (3.e5 / self.U.hubble(z))**2   # *[(Mpc/h)^2]
-      result /= (4. * np.pi * self.nuHz)**2 # *[1/sr^2/Hz^2]
-      return result
-
-
-   def nGalEff(self, z, lMin=0., lMax=np.inf):
-      '''Effective galaxy number density for the shot noise [(Mpc/h)^{-3}]
-      '''
-      result = self.meanIntensity(z, lMin=lMin, lMax=lMax)**2
-      result /= self.pShot(z, lMin=lMin, lMax=lMax)
-      return result
-
-   
-   def s2(self, z, lMin=0., lMax=np.inf):
-      '''Fractional luminosity variance s2 = var(L_Ha) / mean(L_Ha)^2 [dimless]
-      This quantity may be luminosity-cutoff dependent,
-      depending on the LF
-      '''
-      result = self.nGal(z, lMin=lMin, lMax=lMax) 
-      result /= self.nGalEff(z, lMin=lMin, lMax=lMax) 
-      result -= 1.
-      return result
-
-
-   def dlnLumMomentdlnL(self, z, l, n, lMin=0., lMax=np.inf):
+   def dlnLumMomentdlnL(self, z, l, n):
       '''l is galaxy luminosity in Lsun
-      Result is [dimless]
+      Result is dimensionless
       '''
       result = self.phi(z, l) * l**(n+1)
-      result /= self.lumMoment(z, n, lMin=lMin, lMax=lMax)
-      result *= (l>=lMin) * (l<=lMax)
+      result /= self.lumMoment(z, n)
       return result
 
-
-   ##################################################################################
 
    def plotdlnMeanIntensitydlnL(self):
       L_cgs = np.logspace(np.log10(1.e35), np.log10(1.e44), 101, 10.) # [erg/s]
@@ -262,44 +205,28 @@ class LF(object):
       L_cgs = np.logspace(np.log10(1.e40), np.log10(1.e44), 501, 10.) # [erg/s]
       L_Lsun = L_cgs / self.convertLumUnit('cgs')
       
-      # find min and max redshifts in all the LFs to plot
-      zMin = np.min([lf.zMin for lf in lfs])
-      zMax = np.max([lf.zMax for lf in lfs])
-
       # "Observed" LF,
       # ie affected by dust attenuation
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
-      lineStyles = np.array(['-', '--', ':'])
-      legendItems = []
-      for iLf in range(len(lfs)):
-         lf = lfs[iLf]
-         ls = lineStyles[iLf]
-         for iZ in range(lf.nZ):
-            z = lf.Z[iZ]
-            c = plt.cm.cool((z-zMin)/(zMax-zMin))
-            #c = plt.cm.rainbow((z-zMin)/(zMax-zMin))
+      for lf in lfs:
+         for iZ in range(self.nZ):
+            z = self.Z[iZ]
             #
             # Schechter fit
             if hasattr(lf, 'phi'):
                y = lf.phi(z, L_Lsun) * L_Lsun * np.log(10.) * self.U.bg.h**3
-               #ax.plot(L_cgs, y, label=r'$z=$'+str(round(z,2))+' '+lf.nameLatex)
-               #line, =ax.plot(L_cgs, y, c=c, ls=ls,label=r'$z=$'+str(round(z,2))+' '+lf.refLatex)
-               line, =ax.plot(L_cgs, y, c=c, ls=ls)
-               legendItems.append((z, line, r'$z=$'+str(round(z,2))+' '+lf.refLatex))
+               #ax.plot(L_cgs, y, label=r'$z=$'+str(round(z,2))+' '+str(lf).replace('_', ' '))
+               ax.plot(L_cgs, y, label=r'$z=$'+str(round(z,2))+' '+lf.nameLatex)
       #
-      legendItems.sort()
-      #ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
-      ax.legend([x[1] for x in legendItems], [x[2] for x in legendItems], loc=3, fontsize='x-small', labelspacing=0.1)
-      #
+      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1, handlelength=0.2)
       ax.set_xscale('log', nonposx='clip')
       ax.set_yscale('log', nonposy='clip')
       ax.set_xlim((10.**(40.), 10.**(44)))
       ax.set_ylim((1.e-8, 1.))
       ax.set_xlabel(r'$L$ [erg/s]')
       ax.set_ylabel(r'$\text{log}_{10} \left( \Phi \times \text{Mpc}^3 \right)$')
-      ax.set_title(self.lineNameLatex+' Luminosity function')
       #
       path = './figures/lf/lf_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -351,13 +278,13 @@ class LF(object):
          # center values
          path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_center.csv"
          data = np.genfromtxt(path, delimiter=', ')
-         plt.plot(data[:,0], data[:,1], 'b', label=r'HB06')
+         plt.plot(data[:,0], data[:,1], 'b', label=r'Hopkins Beacom 06')
          # error band
-         #path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_low.csv"
-         #low = np.genfromtxt(path, delimiter=', ')
-         #path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_high.csv"
-         #high = np.genfromtxt(path, delimiter=', ')
-         #plt.fill(np.append(low[:,0], high[::-1,0]), np.append(low[:,1], high[::-1,1]), facecolor='b', alpha=0.5)
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_low.csv"
+         low = np.genfromtxt(path, delimiter=', ')
+         path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_high.csv"
+         high = np.genfromtxt(path, delimiter=', ')
+         plt.fill(np.append(low[:,0], high[::-1,0]), np.append(low[:,1], high[::-1,1]), facecolor='b', alpha=0.5)
       #
       for lf in lfs:
          f = lambda z: lf.meanIntensity(z) * self.convertIntensityUnit('Jy/sr') 
@@ -367,9 +294,8 @@ class LF(object):
             Z = np.linspace(0.71, 6.,101)
          meanIntensity = np.array(map(f, Z))
          #ax.plot(Z, meanIntensity, label=str(lf).replace('_', ' '))
-         ax.plot(Z, meanIntensity, label=lf.refLatex)
+         ax.plot(Z, meanIntensity, label=lf.nameLatex)
       #
-      ax.set_title(self.lineNameLatex+' Mean intensity')
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{I}(z)$ [Jy/sr]')
@@ -412,12 +338,11 @@ class LF(object):
             Z = np.linspace(0.71, 6.,101)
          nGalEff = np.array(map(lf.nGalEff, Z))
          #ax.semilogy(Z, nGalEff, label=str(lf).replace('_', ' '))
-         ax.semilogy(Z, nGalEff, label=lf.refLatex)
+         ax.semilogy(Z, nGalEff, label=lf.nameLatex)
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{n}_\text{gal eff}$ [(Mpc/h)$^{-3}$]')
-      ax.set_title(self.lineNameLatex)
       #
       path = './figures/lf/ngaleff_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -449,14 +374,13 @@ class LF(object):
          # effective number of galaxies
          n = np.array(map(lf.nGalEff, Z))
          n *= vVoxSpherex
-         ax.plot(Z, n, label=lf.refLatex)
+         ax.plot(Z, n, label=lf.nameLatex)
       #
-      ax.legend(loc='center right', fontsize='x-small', labelspacing=0.1)
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
-      #ax.set_xlim((0., 7.))
+      ax.set_xlim((0., 7.))
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{N}^\text{gal eff}$ per SPHEREx voxel')
-      ax.set_title(self.lineNameLatex)
       #
       path = './figures/lf/galaxy_sparsity_spherex_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -480,16 +404,15 @@ class LF(object):
          else:
             Z = np.linspace(0.71, 6.,101)
          #f = lambda z: 1. / lf.nGalEff(z) # shot noise power of dI/I
-         f = lambda z: lf.pShot(z)
+         f = lambda z: lf.Pshot(z)
          pShot = np.array(map(f, Z)) * self.convertPowerSpectrumUnit('Jy/sr')
-         plt.plot(Z, pShot, label=lf.refLatex)
+         plt.plot(Z, pShot, label=lf.nameLatex)
          
       #
       ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
       #ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$P_\text{shot}$ [(Jy/sr)$^2$(Mpc/h)$^3$]')
-      ax.set_title(self.lineNameLatex+' Shot noise')
       #
       path = './figures/lf/shot_noise_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -533,9 +456,7 @@ class LFHaSobral12(LF):
       # required attributes
       self.name = 'sobral12halpha'
       self.nameLatex = r'S13 H$\alpha$'
-      self.refLatex = 'S13'
       self.lineName = 'halpha'
-      self.lineNameLatex = r'H$\alpha$'
       self.lambdaMicrons = 656.28e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
 
@@ -658,6 +579,93 @@ class LFHaSobral12(LF):
          self.fPhiObsLowMeas[iZ] = interp1d(self.LObs[iZ], self.PhiObsLow[iZ], kind='linear', bounds_error=False, fill_value=0.)
       
 
+#   def phi(self, z, l, obs=True, lStar=None, phiStar=None, alpha=None):
+#      '''output in [(Mpc/h)^-3 (erg/s)^-1]
+#      luminosity in [erg/s]
+#      obs = True for dust extincted luminosities
+#      obs = False for intrinsic luminosities
+#      '''
+#      if obs:
+#         lStarCorr = 100.**(1./5.)
+#      else:
+#         lStarCorr = 1.
+#
+#      if lStar is None:
+#         lStar = self.lStar(z) / lStarCorr
+#      elif lStar is 'high':
+#         lStar = self.lStarHigh(z) / lStarCorr
+#      elif lStar is 'low':
+#         lStar = self.lStarLow(z) / lStarCorr
+#
+#
+#      if phiStar is None:
+#         phiStar = self.phiStar(z)
+#      elif phiStar is 'high':
+#         phiStar = self.phiStarHigh(z)
+#      elif phiStar is 'low':
+#         phiStar = self.phiStarLow(z)
+#
+#      if alpha is None:
+#         alpha = self.alpha(z)
+#      elif alpha is 'high':
+#         alpha = self.alphaHigh(z)
+#      elif alpha is 'low':
+#         alpha = self.alphaLow(z)
+#
+#      result = phiStar * (l/lStar)**alpha * np.exp(-l/lStar) / lStar
+#
+#      return result
+
+
+
+#   def plotShotNoiseUncertainty(self, compareProfs=None):
+#      '''Vary the Schechter fit parameters to get an idea of the uncertainty 
+#      on the shot noise power spectrum
+#      '''
+#
+#      fig=plt.figure(0)
+#      ax=fig.add_subplot(111)
+#      #
+#      colors = ['gray', 'g', 'r', 'b']
+#      for iZ in range(self.nZ):
+#         z = self.Z[iZ]
+#         y = [self.Pshot(z, lStar=None, phiStar=None, alpha=None, unit='dI/I'),
+#              self.Pshot(z, lStar='high', phiStar=None, alpha=None, unit='dI/I'),
+#              self.Pshot(z, lStar='low', phiStar=None, alpha=None, unit='dI/I'),
+#              self.Pshot(z, lStar=None, phiStar='high', alpha=None, unit='dI/I'),
+#              self.Pshot(z, lStar=None, phiStar='low', alpha=None, unit='dI/I'),
+#              self.Pshot(z, lStar=None, phiStar=None, alpha='high', unit='dI/I'),
+#              self.Pshot(z, lStar=None, phiStar=None, alpha='low', unit='dI/I')]
+#         #ax.axhline(y[0], xmin=1.*iZ/self.nZ, xmax=(iZ+1.)/self.nZ, color=colors[iZ], label=r'$z=$'+str(z) )
+#         #ax.axhspan(np.min(y), np.max(y), xmin=1.*iZ/self.nZ, xmax=(iZ+1.)/self.nZ, color=colors[iZ], alpha=0.3)
+#         
+#         ax.errorbar([z], [y[0]], yerr=[0.5*(np.max(y) - np.min(y))], c='b', fmt='o-')
+#      ax.errorbar([], [], c='b', label=r'Sobral+12')
+#
+#
+#
+#      #
+#      for prof in compareProfs:
+#         if hasattr(prof, 'Z'):
+#            Z = prof.Z
+#         else:
+#            Z = np.linspace(0.71, 6.,101)
+#         f = lambda z: prof.Pshot(z, unit='dI/I')
+#         pShot = np.array(map(f, Z))
+#         plt.plot(Z, pShot, label=str(prof))
+#         
+#      #
+#      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+#      #ax.axes.xaxis.set_visible(False)
+#      #ax.set_xscale('log', nonposx='clip')
+#      ax.set_yscale('log', nonposy='clip')
+#      ax.set_ylabel(r'$P_\text{shot}$ [(Mpc/h)$^3$]')
+#      #ax.set_xlabel(r'$k$ [h/Mpc]')
+#      #
+#      path = './figures/profile/Sobral12/'+'shot_noise_uncertainty.pdf'
+#      fig.savefig(path, bbox_inches='tight')
+#      plt.show()
+
 
    def plotLf(self, lfs=None):
       '''Reproduces fig 8 in Sobral+12.
@@ -775,9 +783,7 @@ class LFHaCochrane17(LF):
       # required attributes
       self.name = 'cochrane17halpha'
       self.nameLatex = r'C17 H$\alpha$'
-      self.refLatex = 'C17'
       self.lineName = 'halpha'
-      self.lineNameLatex = r'H$\alpha$'
       self.lambdaMicrons = 656.28e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
 
@@ -874,9 +880,7 @@ class LFOiiiMehta15(LF):
       # required attributes
       self.name = 'mehta15oiii'
       self.nameLatex = r'M15 O{\sc iii}'
-      self.refLatex = 'M15'
       self.lineName = 'oiii'
-      self.lineNameLatex = r'[O{\sc iii}]'
       self.lambdaMicrons = 495.9e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
 
@@ -1119,9 +1123,7 @@ class LFHaColbert13(LF):
       # required attributes
       self.name = 'colbert13halpha'
       self.nameLatex = r'C13 H$\alpha$'
-      self.refLatex = 'C13'
       self.lineName = 'halpha'
-      self.lineNameLatex = r'H$\alpha$'
       self.lambdaMicrons = 656.28e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
 
@@ -1179,9 +1181,7 @@ class LFOiiiColbert13(LF):
       # required attributes
       self.name = 'colbert13oiii'
       self.nameLatex = r'C13 O{\sc iii}'
-      self.refLatex = 'C13'
       self.lineName = 'oiii'
-      self.lineNameLatex = r'[O{\sc iii}]'
       self.lambdaMicrons = 495.9e-3   # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
 
@@ -1251,7 +1251,6 @@ class LFEGG(LF):
       # required attributes
       self.lineName = lineName
       self.name = 'egg' + self.lineName
-      self.refLatex = 'EGG'
       self.nameLatex = ('EGG ' + self.lineName).replace('_', ' ')
 
       # Luminosity bounds 
@@ -1294,49 +1293,39 @@ class LFEGG(LF):
       self.s2 = interp1d(self.Z, d4[:, iLine, iLine], kind='linear', bounds_error=False, fill_value=0.)      
       self.nGalEff = lambda z: self.nGal(z) / (1. + self.s2(z))
       #self.sqLumDensity = 
-      self.pShot = lambda z: self.meanIntensity(z)**2 / self.nGalEff(z)
+      self.Pshot = lambda z: self.meanIntensity(z)**2 / self.nGalEff(z)
 
       #super(LFEGG, self).__init__(U)
 
 
-   ##################################################################################
-   # Quantities derived from the moments of the luminosity function
-   # !!! had to be repeated here to remove the lMin and lMax arguments inside,
-   # which break everything
 
-   def meanIntensity(self, z, lMin=0., lMax=np.inf):
-      '''[Lsun / (Mpc/h)^2 / sr / Hz]
-      '''
-      result = self.lumDensity(z)  # [Lsun / (Mpc/h)^3]
-      result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
-      result /= 4. * np.pi * self.nuHz # *[/sr/Hz]
-      return result
-
-
-   def meanGalLum(self, z, lMin=0., lMax=np.inf):
-      '''Mean galaxy luminosity [Lsun]
-      This quantity may be luminosity-cutoff dependent,
-      depending on the LF
-      '''
-      result = self.lumDensity(z)  # [Lsun / (Mpc/h)^3]
-      result /= self.nGal(z, lMin=lMin, lMax=lMax) # / [(Mpc/h)^{-3}] = [Lsun]
-      return result
-
-
-   def pShot(self, z, lMin=0., lMax=np.inf):
-      '''[(intensity unit)^2 (Mpc/h)^3] = [Lsun^2 / (Mpc/h) / sr^2 / Hz^2]
-      '''
-      result = self.sqLumDensity(z)  # [Lsun^2 / (Mpc/h)^3]
-      result *= (3.e5 / self.U.hubble(z))**2   # *[(Mpc/h)^2]
-      result /= (4. * np.pi * self.nuHz)**2 # *[1/sr^2/Hz^2]
-      return result
-
-
-   def nGalEff(self, z, lMin=0., lMax=np.inf):
-      '''Effective galaxy number density for the shot noise [(Mpc/h)^{-3}]
-      '''
-      result = self.meanIntensity(z)**2
-      result /= self.pShot(z)
-      return result
-
+#   def pshot(self, z, linename1=none, linename2=none, unit=none):
+#      '''shot noise power spectrum in [(mpc/h)^3] multiplied
+#      by the square of the intensity unit
+#      '''
+#      if unit is none:
+#         unit = self.unit
+#      if linename1 is none:
+#         linename1 = self.linename
+#      if linename2 is none:
+#         linename2 = self.linename
+#
+#      result = 1. / self.ngaleff(z, linename1, linename2)
+#
+#      if unit=='di/i':
+#         return result
+#      else:
+##!!!! manuwaring: this is super super slow. fix it
+#         if linename1==self.linename:
+#            p1 = self
+#         else:
+#            p1 = proflimegg(self.u, self.sfr, linename=linename1, trunc=self.trunc, unit=unit)
+#         if linename2==self.linename:
+#            p2 = self
+#         else:
+#            p2 = proflimegg(self.u, self.sfr, linename=linename2, trunc=self.trunc, unit=unit)
+#         result *= p1.meanintensity(z, unit=unit)
+#         result *= p2.meanintensity(z, unit=unit)
+#         return result
+      
 

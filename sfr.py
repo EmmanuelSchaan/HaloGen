@@ -1,6 +1,10 @@
 from headers import *
 
 class Sfr(object):
+   '''Generic SFR class
+   Default SFR unit [Msun/yr]
+   Default SFRD unit [Msun/yr/(Mpc/h)^3]
+   '''
 
    def __init__(self, U, MassFunc):
       self.U = U
@@ -86,7 +90,7 @@ class Sfr(object):
       ax=fig.add_subplot(111)
       #
       # range of reasonable scalings for L = SFR^alpha
-      A = [0.8, 1.0, 1.1]
+      A = [0.6, 0.8, 1.0, 1.1]
       for a in A:
          f = lambda z: self.nHEff(z, alpha1=a, alpha2=a)
          n = np.array(map(f, self.Z))
@@ -109,7 +113,7 @@ class Sfr(object):
       ax=fig.add_subplot(111)
       #
       # range of reasonable scalings for L = SFR^alpha
-      A = [0.8, 1.0, 1.1]
+      A = [0.6, 0.8, 1.0, 1.1]
       for a in A:
          f = lambda z: self.nHEff(z, alpha1=a, alpha2=a)
          n = np.array(map(f, self.Z))
@@ -150,7 +154,7 @@ class Sfr(object):
       ax=fig.add_subplot(111)
       #
       # range of reasonable scalings for L = SFR^alpha
-      A = [0.8, 1.0, 1.1]
+      A = [0.6, 0.8, 1.0, 1.1]
       for a in A:
          f = lambda z: self.nHEff(z, alpha1=a, alpha2=a) 
          n = np.array(map(f, self.Z))
@@ -170,23 +174,22 @@ class Sfr(object):
 
    
 
-   def bEff(self, z, alpha=1.):
+   def bEff(self, z, alpha=1., mMin=0., mMax=np.inf):
       '''Effective halo bias [dimless]
       bEff = int dm n(m) SFR(m)^alpha b(m) / SFRD,
       SFRD = int dm n(m) SFR(m)
       '''
-      result = self.sfrdForInterp(z, alpha=alpha, bias=True)
-      result /= self.sfrdForInterp(z, alpha=1, bias=False)
+      result = self.sfrdForInterp(z, alpha=alpha, bias=True, mMin=mMin, mMax=mMax)
+      result /= self.sfrdForInterp(z, alpha=1, bias=False, mMin=mMin, mMax=mMax)
       return result
 
 
    def plotBEff(self):
-
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
       # range of reasonable scalings for L = SFR^alpha
-      A = [0.8, 1.0, 1.1]
+      A = [0.6, 0.8, 1.0, 1.1]
       for a in A:
          f = lambda z: self.bEff(z, alpha=a) 
          b = np.array(map(f, self.Z))
@@ -200,7 +203,7 @@ class Sfr(object):
       ax.set_xlim((0., 7.))
       ax.set_ylim((0., 8.))
       ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'$b^h_\text{eff}$')
+      ax.set_ylabel(r'Effective bias $b$')
       ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
       #
       path = './figures/sfr/bheff_'+self.name+'.pdf'
@@ -219,8 +222,9 @@ class Sfr(object):
       return result
 
    def plotdlnMeanIntensitydlnm(self):
-      M = np.logspace(np.log10(1.e10), np.log10(2.e14), 101, 10.) # [Msun/h]
-      Z = np.array([0.001, 1., 2., 5.])
+      M = np.logspace(np.log10(1.e6), np.log10(1.e16), 101, 10.) # [Msun/h]
+      Z = np.array([0.001, 1., 2., 3., 4.])
+      #Z = self.Z.copy()
 
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
@@ -234,6 +238,7 @@ class Sfr(object):
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.2)
       ax.set_xscale('log', nonposx='clip')
       #ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((M.min(), M.max()))
       ax.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
       ax.set_ylabel(r'$d \text{ln} I / d\text{ln} m$')
       #
@@ -257,9 +262,9 @@ class Sfr(object):
       return result
 
 
-   def plotdbEff2dlnm(self):
-      M = np.logspace(np.log10(1.e10), np.log10(2.e14), 101, 10.) # [Msun/h]
-      Z = np.array([0.001, 1., 2., 5.])
+   def plotdlnbEff2dlnm(self):
+      M = np.logspace(np.log10(1.e6), np.log10(1.e16), 101, 10.) # [Msun/h]
+      Z = np.array([0.001, 1., 2., 3., 4.])
 
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
@@ -268,15 +273,16 @@ class Sfr(object):
          z = Z[iZ]
          f = lambda m: self.dbEff2dlnm(m, z)
          y = np.array(map(f, M))
+         y /= self.bEff(z)**2
          ax.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.2)
       ax.set_xscale('log', nonposx='clip')
       #ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
-      ax.set_ylabel(r'$d b^{h\, 2}_\text{eff}(z) / d\text{ln} m$')
+      ax.set_ylabel(r'$d\text{ln} b^2(z) / d\text{ln} m$')
       #
-      path = './figures/sfr/dbheff2dlnm_'+self.name+'.pdf'
+      path = './figures/sfr/dlnbheff2dlnm_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
@@ -291,10 +297,20 @@ class Sfr(object):
       result /= self.sfrdForInterp(z, alpha=alpha1) * self.sfrdForInterp(z, alpha=alpha2)
       return result
 
+   def p1h(self, z, alpha1=1, alpha2=1):
+      '''k=0 limit of P1h [(Mpc/h)^3]
+      '''
+      def integrand(lnm):
+         m = np.exp(lnm)
+         result = self.dP1hdlnm(m, z, alpha1=alpha1, alpha2=alpha2)
+         return result
+      result = integrate.quad(integrand, np.log(self.mMin), np.log(self.mMax), epsabs=0., epsrel=1.e-3)[0]
+      return result
 
-   def plotdP1hdlnm(self):
-      M = np.logspace(np.log10(1.e10), np.log10(2.e14), 101, 10.) # [Msun/h]
-      Z = np.array([0.001, 1., 2., 5.])
+
+   def plotdlnP1hdlnm(self):
+      M = np.logspace(np.log10(1.e6), np.log10(1.e16), 101, 10.) # [Msun/h]
+      Z = np.array([0.001, 1., 2., 3., 4.])
 
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
@@ -303,15 +319,16 @@ class Sfr(object):
          z = Z[iZ]
          f = lambda m: self.dP1hdlnm(m, z)
          y = np.array(map(f, M))
+         y /= self.p1h(z)
          ax.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.2)
       ax.set_xscale('log', nonposx='clip')
       #ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
-      ax.set_ylabel(r'$dP^\text{1h}(z) / d\text{ln} m$  [(Mpc/h)$^3$]')
+      ax.set_ylabel(r'$d\text{ln}P^\text{1h}(z) / d\text{ln} m$  [(Mpc/h)$^3$]')
       #
-      path = './figures/sfr/dp1hdlnm_'+self.name+'.pdf'
+      path = './figures/sfr/dlnp1hdlnm_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
@@ -319,35 +336,36 @@ class Sfr(object):
 
    def kennicuttSchmidtConstant(self, z, Lf, alpha=1.):
       '''Given a luminosity function Lf,
-      find the Kennicutt-Schmidt constant K
-      L = K * SFR^alpha
+      find the Kennicutt-Schmidt constant K [Lsun / (Msun/yr)^alpha]
+      L = K * SFR^alpha [Lsun]
       such that the mean luminosity per unit volume 
       from integrating the LF and the SFR match
       '''
       # compute mean intensity from LF
-      result = Lf.lumMoment(z, n=1)
-      # divide by the mean intensity from SFR
+      result = Lf.lumMoment(z, n=1) # [Lsun / (Mpc/h)^3]
+      # divide by the mean intensity from SFR   [(Msun/yr)^alpha / (Mpc/h)^3]
       # to obtain the Kennicutt-Schmidt constant
       if alpha==1.:
          result /= self.sfrd(z)
       else:
          result /= self.sfrdForInterp(z, alpha=alpha)
-      return result
+      return result  # [Lsun / (Msun/yr)^alpha]
 
 
    def luminosity(self, m, z, K, alpha=1.):
-      '''K: Kennicutt-Schmidt constant
+      '''K: Kennicutt-Schmidt constant [Lsun / (Msun/yr)^alpha]
       m: mVir [Msun/h]
       z: redshift
-      returns luminosity in the units given by K
+      returns luminosity [Lsun]
       '''
-      return K * self.sfr(m, z)**alpha
+      return K * self.sfr(m, z)**alpha # [Lsun]
 
 
    def massFromLum(self, L, z, K, alpha=1.):
       '''Find the halo mass [Msun/h] corresponding
-      to the requested luminosity, given the Kennicutt-Schmidt
+      to the requested luminosity [Lsun], given the Kennicutt-Schmidt
       relation L = K * SFR(m,z)**alpha
+      K [Lsun / (Msun/yr)^alpha]
       '''
       f = lambda m: self.luminosity(m, z, K, alpha=alpha) - L
       mMin = 1.e6 # [Msun/h]
@@ -499,9 +517,23 @@ class SfrMoster13Speagle14(Sfr):
       # values of z to precompute SFR
       self.zMin = 0.
       self.zMax = 10.
-      self.Nz = 101
+      self.Nz = 10  #101
       self.Z = np.linspace(self.zMin, self.zMax, self.Nz)
       
+      # integration bounds, for the scatter in mStar and sfr
+      self.mStarMin = 1.e3 #1.e8 # [Msun]
+      self.mStarMax = 1.e13   # [Msun]
+      #
+      self.sfrMin = 1.e-8  # [Msun/yr]
+      self.sfrMax = 1.e5   # [Msun/yr]
+
+      # values of mVir to precompute SFR 
+      self.mMin = 1.e6  # in (h^-1 solarM)
+      self.mMax = 1.e16  # in (h^-1 solarM)
+      self.Nm = 101   #201 # nb of m pts
+      self.M = np.logspace(np.log10(self.mMin), np.log10(self.mMax), self.Nm, 10.) # masses in h^-1 solarM
+
+
       # decide whether to take into account
       # the scatters in mVir-mStar and mStar-SFR relations
       if not scatter:
@@ -511,18 +543,6 @@ class SfrMoster13Speagle14(Sfr):
          # path to precompute SFR
          self.pathSfr = './output/sfr/sfr_moster13speagle14.txt'
          
-         # integration bounds, for the scatter in mStar and sfr
-         self.mStarMin = 1.e8 # [Msun]
-         self.mStarMax = 1.e13   # [Msun
-         self.sfrMin = 1.e-2  # [Msun/yr]
-         self.sfrMax = 1.e4   # [Msun/yr]
-
-         # values of mVir to precompute SFR 
-         self.mMin = 1.e10  # in (h^-1 solarM)
-         self.mMax = 1.e16  # in (h^-1 solarM)
-         self.Nm = 201 # nb of m pts
-         self.M = np.logspace(np.log10(self.mMin), np.log10(self.mMax), self.Nm, 10.) # masses in h^-1 solarM
-
          if save:
             self.save()
          self.load()
@@ -637,7 +657,7 @@ class SfrMoster13Speagle14(Sfr):
       at redshift z,
       ignoring the scatter in the mVir-mStar and mStar-SFR relations
       '''
-      return meanSfr(meanMStar(mVir, z), z)
+      return self.meanSfr(self.meanMStar(mVir, z), z)
 
 
    def sfrForInterp(self, mVir, z, alpha=1.):

@@ -1720,7 +1720,7 @@ class ProfLIMLF(Profile):
       self.mMax = np.inf
 
       # shot noise power spectrum
-      self.Pshot = self.Lf.Pshot
+      self.pShot = self.Lf.pShotInterp
 
    def __str__(self):
       return "lim" + self.Lf.name
@@ -1795,7 +1795,7 @@ class ProfLIMLF(Profile):
       of mass m [Msun/h] at redshift z.
       Assumed propto SFR(m)
       '''
-      result = self.Lf.nGal(z)  # [(Mpc/h)^{-3}]
+      result = self.Lf.nGalInterp(z)  # [(Mpc/h)^{-3}]
       result *= self.Sfr.sfr(m, z)**self.a   # [Msun/yr]
       result /= self.Sfr.sfrdForInterp(z, alpha=self.a) # [(Msun/yr) (Mpc/h)^{-3}]
       return result  # [dimless]
@@ -1807,7 +1807,7 @@ class ProfLIMLF(Profile):
       Equal to self.meanGalLum(z) * self.Ngal(m, z).
       '''
       #return self.meanGalLum(z) * self.Ngal(m, z)
-      result = self.Lf.lumDensity(z)  # [Lsun (Mpc/h)^-3] 
+      result = self.Lf.lumDensityInterp(z)  # [Lsun (Mpc/h)^-3] 
       result *= self.Sfr.sfr(m, z)**self.a   # [Msun/yr]
       result /= self.Sfr.sfrdForInterp(z, alpha=self.a) # [(Msun/yr) (Mpc/h)^{-3}]
       return result
@@ -1835,7 +1835,7 @@ class ProfLIMLF(Profile):
       i.e. [Lsun*(Mpc/h)/sr/Hz]
       '''
       result = self.nfw(k, m, z) * m / self.U.rho_m(z)
-      result *= self.Lf.lumDensity(z)  # [Lsun (Mpc/h)^-3] 
+      result *= self.Lf.lumDensityInterp(z)  # [Lsun (Mpc/h)^-3] 
       result *= 3.e5 / self.U.hubble(z)   # *[Mpc/h]
       result /= 4. * np.pi * self.Lf.nuHz # *[/sr/Hz]
       # FOG
