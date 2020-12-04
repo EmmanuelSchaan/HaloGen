@@ -326,12 +326,84 @@ class Sfr(object):
       ax.set_xscale('log', nonposx='clip')
       #ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
-      ax.set_ylabel(r'$d\text{ln}P^\text{1h}(z) / d\text{ln} m$  [(Mpc/h)$^3$]')
+      ax.set_ylabel(r'$d\text{ln}P^\text{1h}(z) / d\text{ln} m$]')
       #
       path = './figures/sfr/dlnp1hdlnm_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
+
+
+   def plotdlnAlldlnm(self):
+      '''Plot dlnI/dlnm, dlnb^2/dlnm and dlnP1h/dlnm
+      in the same figure.
+      '''
+      M = np.logspace(np.log10(1.e6), np.log10(1.e16), 101, 10.) # [Msun/h]
+      Z = np.array([0.001, 1., 2., 3., 4.])
+
+#      fig=plt.figure(0)
+#      gs=gridspec.GridSpec(1, 3, width_ratios=[1, 1, 1]) 
+
+      fig, ax = plt.subplots(1,3, sharex=True, sharey=True, gridspec_kw={'wspace': 0}, figsize=(16,6))
+      ax0 = ax[0]
+      ax1 = ax[1]
+      ax2 = ax[2]
+      
+      # Mean intensity
+      #ax0=plt.subplot(gs[0])
+      for iZ in range(len(Z)):
+         z = Z[iZ]
+         f = lambda m: self.dlnMeanIntensitydlnm(m, z)
+         y = np.array(map(f, M))
+         ax0.plot(M, 2. * y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+      #
+      ax0.set_xscale('log', nonposx='clip')
+      ax0.set_xlim((M.min(), M.max()))
+      ax0.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+      ax0.set_title(r'$2\ d \text{ln} I / d\text{ln} m$')
+
+      # Bias squared
+      #ax1=plt.subplot(gs[1], sharey=ax0)
+      for iZ in range(len(Z)):
+         z = Z[iZ]
+         f = lambda m: self.dbEff2dlnm(m, z)
+         y = np.array(map(f, M))
+         y /= self.bEff(z)**2
+         ax1.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+      #
+      ax1.set_xscale('log', nonposx='clip')
+      ax1.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+      ax1.set_title(r'$d\text{ln} b^2(z) / d\text{ln} m$')
+      
+      # 1-halo term
+      #ax2=plt.subplot(gs[2], sharey=ax1)
+      for iZ in range(len(Z)):
+         z = Z[iZ]
+         f = lambda m: self.dP1hdlnm(m, z)
+         y = np.array(map(f, M))
+         y /= self.p1h(z)
+         ax2.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+      #
+      ax2.legend(loc=1, fontsize='x-small', labelspacing=0.2)
+      ax2.set_xscale('log', nonposx='clip')
+      ax2.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+      ax2.set_title(r'$d\text{ln}P^\text{1h}(z) / d\text{ln} m$]')
+
+      # remove vertical gap between subplots
+      #plt.subplots_adjust(wspace=0.)
+#      plt.setp(ax1.get_yticklabels(), visible=False)
+#      plt.setp(ax2.get_yticklabels(), visible=False)
+#      fig.subplots_adjust(wspace=0)
+
+      # Save to file
+      path = './figures/sfr/dlnalldlnm_'+self.name+'.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+      
+
+
+
 
 
    def kennicuttSchmidtConstant(self, z, Lf, alpha=1.):

@@ -68,6 +68,7 @@ sfr = SfrMoster13Speagle14(u, massFunc, scatter=False, nProc=3, save=False)
 #sfr.plotdlnMeanIntensitydlnm()
 #sfr.plotdlnbEff2dlnm()
 #sfr.plotdlnP1hdlnm()
+#sfr.plotdlnAlldlnm()
 
 ##################################################################################
 ##################################################################################
@@ -158,10 +159,10 @@ lfOiii['Colbert13'].plotShotNoise(lfs=[lfOiii[key] for key in lfOiii.keys()])
 
 ##################################################################################
 # Contributions from each luminosity
-
+'''
 lfHa['Sobral12'].plotdlnMeanIntensitydlnL()
 lfHa['Sobral12'].plotdlnPshotdlnL()
-
+'''
 
 ##################################################################################
 ##################################################################################
@@ -226,9 +227,10 @@ p = pRsdHa[key]
 
 ##################################################################################
 # LIM vs galaxy surveys
-'''
-p.plotSigmaLumMatchedFilter()
-'''
+
+pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter()
+pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter()
+
 
 ##################################################################################
 # Compare references
