@@ -1224,9 +1224,221 @@ class LFOiiiColbert13(LF):
 
 
 
+##################################################################################
+##################################################################################
+
+
+class LFCiiPopping16(LF):
+   '''[Cii] luminosity functions from Popping+16, table 2.
+   '''
+
+   def __init__(self, U):
+      # required attributes
+      self.name = 'popping16cii'
+      self.nameLatex = r'P16 [C{\sc ii}]'
+      self.refLatex = 'P16'
+      self.lineName = 'cii'
+      self.lineNameLatex = r'[C{\sc ii}]'
+      self.lambdaMicrons = 158.  # [mu]
+      self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
+
+      # Luminosity bounds 
+      # the measurements only span 1.e40 to 1.e44 [erg/sec]
+      self.lMin = 1.e35 / 3.839e33  # convert from [erg/sec] to [Lsun]
+      self.lMax = 1.e44 / 3.839e33  # convert from [erg/sec] to [Lsun]
+      #self.phi(l, z) = #  [number / (Mpc/h)^3 / (luminosity unit)]
+
+
+      # Schechter fits to the intrinsic luminosity functions
+      # table 2
+      self.Z = np.array([0., 1., 2., 3. 4., 6.])
+      self.zMin = np.min(self.Z)
+      self.zMax = np.max(self.Z)
+      self.nZ = len(self.Z)
+      #
+      Alpha = np.array([-1.25, -1.43, -1.52, -1.41, -1.53, -1.77]) 
+      self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+      #
+      LStar = 10.**np.array([7.47, 7.66, 7.81, 7.80, 7.85, 7.80])  # [Lsun]
+      self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+      #
+      PhiStar = 10.**np.array([-2.33, -2.15, -2.20, -2.12, -2.37, -2.95]) / U.bg.h**3  # [(Mpc/h)^-3]
+      self.phiStar = interp1d(self.Z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+     
+      # Observed LF
+      self.phi = lambda z,l: self.phiStar(z) * (l/self.lStar(z))**self.alpha(z) * np.exp(-l/self.lStar(z)) / self.lStar(z) # [(Mpc/h)^-3 / Lsun]
+
+      super(LFCiiPopping16, self).__init__(U)
 
 
 
+##################################################################################
+##################################################################################
+
+
+class LFCOPopping16(LF):
+   '''[CO j->j-1] luminosity functions from Popping+16, table 1.
+   '''
+
+   def __init__(self, U, j):
+      # choose the line CO j->j-1
+      self.j = j
+      # required attributes
+      self.name = 'popping16co'+str(j)+'-'+str(j-1)
+      self.nameLatex = r'P16 [C0'+str(j)+'-'+str(j-1)+']'
+      self.refLatex = 'P16'
+      self.lineName = 'co'+str(j)+'-'+str(j-1)
+      self.lineNameLatex = r'[C0'+str(j)+'-'+str(j-1)+']'
+      # frequency of j->j-1 transition:
+      self.nuHz = 115.271208e9 * j   # [Hz]
+      self.lambdaMicrons = 299792458. / self.nuHz * 1.e6 # [mu]
+
+      # Luminosity bounds 
+      self.lMin = 1.e35 / 3.839e33  # convert from [erg/sec] to [Lsun]
+      self.lMax = 1.e44 / 3.839e33  # convert from [erg/sec] to [Lsun]
+      #self.phi(l, z) = #  [number / (Mpc/h)^3 / (luminosity unit)]
+
+
+      # Schechter fits to the intrinsic luminosity functions
+      # table 1
+      self.Z = np.array([0., 1., 2., 3. 4., 6.])
+      self.zMin = np.min(self.Z)
+      self.zMax = np.max(self.Z)
+      self.nZ = len(self.Z)
+      
+      if self.j==1:
+         Alpha = np.array([-1.36, -1.49, -1.52, -1.71, -1.94]) 
+         self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         LStar = 10.**np.array([6.97, 7.25, 7.30, 7.26, 6.99])  # [Jy * km/s * Mpc^2]
+         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
+         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
+         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         PhiStar = 10.**np.array([-2.85, -2.73, -2.63, -2.94, -3.46]) / U.bg.h**3  # [(Mpc/h)^-3]
+         self.phiStar = interp1d(self.Z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+
+      if self.j==2:
+         Alpha = np.array([-1.35, -1.47, -1.52, -1.75, -2.00]) 
+         self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         LStar = 10.**np.array([7.54, 7.84, 7.92, 7.89, 7.62])  # [Jy * km/s * Mpc^2]
+         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
+         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
+         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         PhiStar = 10.**np.array([-2.85, -2.72, -2.66, -3.00, -3.56]) / U.bg.h**3  # [(Mpc/h)^-3]
+         self.phiStar = interp1d(self.Z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+     
+      if self.j==3:
+         Alpha = np.array([-1.29, -1.47, -1.53, -1.76, -2.00]) 
+         self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         LStar = 10.**np.array([7.83, 8.23, 8.36, 8.26, 7.95])  # [Jy * km/s * Mpc^2]
+         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
+         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
+         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         PhiStar = 10.**np.array([-2.81, -2.79, -2.78, -3.11, -3.60]) / U.bg.h**3  # [(Mpc/h)^-3]
+         self.phiStar = interp1d(self.Z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+     
+      if self.j==4:
+         Alpha = np.array([-1.29, -1.45, -1.51, -1.80, -2.03]) 
+         self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         LStar = 10.**np.array([8.16, 8.50, 8.64, 8.70, 8.23])  # [Jy * km/s * Mpc^2]
+         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
+         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
+         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         PhiStar = 10.**np.array([-2.93, -2.84, -2.85, -3.45, -3.78]) / U.bg.h**3  # [(Mpc/h)^-3]
+         self.phiStar = interp1d(self.Z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+
+      if self.j==5:
+         Alpha = np.array([-1.20, -1.47, -1.45, -1.76, -1.95]) 
+         self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         LStar = 10.**np.array([8.37, 8.80, 8.74, 8.73, 8.30])  # [Jy * km/s * Mpc^2]
+         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
+         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
+         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         PhiStar = 10.**np.array([-2.94, -3.03, -2.80, -3.34, -3.67]) / U.bg.h**3  # [(Mpc/h)^-3]
+         self.phiStar = interp1d(self.Z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+
+      if self.j==6:
+         Alpha = np.array([-1.15, -1.41, -1.43, -1.73, -1.93]) 
+         self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         LStar = 10.**np.array([8.38, 8.74, 8.77, 8.84, 8.38])  # [Jy * km/s * Mpc^2]
+         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
+         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
+         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+         #
+         PhiStar = 10.**np.array([-2.92, -2.92, -2.80, -3.40, -3.72]) / U.bg.h**3  # [(Mpc/h)^-3]
+         self.phiStar = interp1d(self.Z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+
+      # Observed LF
+      self.phi = lambda z,l: self.phiStar(z) * (l/self.lStar(z))**self.alpha(z) * np.exp(-l/self.lStar(z)) / self.lStar(z) # [(Mpc/h)^-3 / Lsun]
+
+      super(LFCOPopping16, self).__init__(U)
+
+
+
+##################################################################################
+##################################################################################
+
+
+class LFLyaCassata11(LF):
+   '''Lyman-alpha luminosity functions from Cassata+11, table 2.
+   '''
+
+   def __init__(self, U):
+      # required attributes
+      self.name = 'popping16cii'
+      self.nameLatex = r'P16 [C{\sc ii}]'
+      self.refLatex = 'P16'
+      self.lineName = 'cii'
+      self.lineNameLatex = r'[C{\sc ii}]'
+      self.lambdaMicrons = 121.567e3  # [mu]
+      self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
+
+      # Luminosity bounds 
+      # the measurements only span 1.e40 to 1.e44 [erg/sec]
+      self.lMin = 1.e35 / 3.839e33  # convert from [erg/sec] to [Lsun]
+      self.lMax = 1.e44 / 3.839e33  # convert from [erg/sec] to [Lsun]
+      #self.phi(l, z) = #  [number / (Mpc/h)^3 / (luminosity unit)]
+
+
+      # Schechter fits to the intrinsic luminosity functions
+      # table 2
+      zMin = np.array([1.95, 3., 4.55])  # lower bin edge
+      zMax = np.array([3., 4.55, 6.6])   # higher bin edge
+      self.Z = 0.5 * (zMin + zMax)
+      self.zMin = np.min(self.Z)
+      self.zMax = np.max(self.Z)
+      self.nZ = len(self.Z)
+      #
+      Alpha = np.array([-1.6, -1.78, -1.69]) 
+      self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
+      #
+      # luminosities after IGM absorption
+      LStar = 10.**np.array([42.70, 42.70, 42.72]) / 3.839e33  # convert from [erg/s] to [Lsun]
+      self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
+      #
+      PhiStar = 10.**np.array([7.1, 4.8, 9.2]) / U.bg.h**3  # [(Mpc/h)^-3]
+      self.phiStar = interp1d(self.Z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
+     
+      # Observed LF
+      self.phi = lambda z,l: self.phiStar(z) * (l/self.lStar(z))**self.alpha(z) * np.exp(-l/self.lStar(z)) / self.lStar(z) # [(Mpc/h)^-3 / Lsun]
+
+      super(LFLyaCassata11, self).__init__(U)
 
 
 

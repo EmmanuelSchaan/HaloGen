@@ -227,10 +227,10 @@ p = pRsdHa[key]
 
 ##################################################################################
 # LIM vs galaxy surveys
-
+'''
 pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter()
 pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter()
-
+'''
 
 ##################################################################################
 # Compare references
