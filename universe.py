@@ -395,7 +395,7 @@ class Universe(object):
       '''
       Z = np.linspace(0., 7., 101)
       # 100 deg^2 is fsky=0.0024
-      FSky = np.array([0.0024, 0.01, 0.1, 1.])
+      FSky = np.array([0.0048, 0.01, 0.1, 1.])
 
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
@@ -450,7 +450,7 @@ class Universe(object):
          ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
       #
       # SPHEREx: 100 deg^2
-      ax.axhline(100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')
+      ax.axhline(2.*100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')
       #
       ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
       ax.set_yscale('log', nonposy='clip')
@@ -792,7 +792,8 @@ class Universe(object):
 
       # get R200 and M200
       f = lambda x: -1. + 1./(1.+x) + np.log(1.+x) - value/3.*(rhoRef/rhoS)*x**3
-      x = optimize.brentq(f , 0.1, 100.)
+      #x = optimize.brentq(f , 0.1, 100.)
+      x = optimize.brentq(f , 1.e-3, 1.e3)
       Rnew = x * Rs
       Mnew = 4./3.*np.pi*Rnew**3 * rhoRef * value
 

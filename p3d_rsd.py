@@ -233,8 +233,8 @@ class P3dRsdAuto(object):
 
    ##################################################################################
 
-   def sFOverFFisher(self, z, R, fwhmPsf, fSky, dz):
-      '''Relative uncertainty on growth of structure f
+   def sBetaOverBetaFisher(self, z, R, fwhmPsf, fSky, dz):
+      '''Relative uncertainty on RSD parameter beta = f/b
       at redshift z
       From Fisher forecast, without marginalizing over
       any other parameter.
@@ -270,16 +270,89 @@ class P3dRsdAuto(object):
          pTot = self.pTotInt[z](k, mu)
          #print k, mu, b, f, pTot
          #
-         result = (2.*f* mu**2 * (b+f*mu**2) * self.U.pLin(k, z) / pTot)**2
+         # derivative wrt f, at fixed b
+         #result = (2.*f* mu**2 * (b+f*mu**2) * self.U.pLin(k, z) / pTot)**2
+         # derivative wrt beta, at fixed b
+         result = (2.*b**2 * mu**2 * (1.+(f/b)*mu**2) * self.U.pLin(k, z) / pTot)**2
          result *= kPerp / (2.*np.pi)**2
          result *= kPerp * kPara   # because int wrt ln
          result *= volume / 2.
          result *= 4.   # symmetry factor, since we reduce the integration domain
          return result
       
+      # Fisher matrix element
       result = integrate.dblquad(integrand, np.log(self.kMin), np.log(kPerpMax), lambda x: np.log(self.kMin), lambda x: np.log(kParaMax), epsabs=0., epsrel=1.e-2)[0]
+      # Unmarginalized uncertainty
       result = 1./np.sqrt(result)
       return result
+
+
+   def sAOverAFisher(self, i, z, R, fwhmPsf, fSky, dz, kMax=np.inf):
+      '''Relative uncertainty on A_i in the multipole expansion
+      P(k, mu) = A_0 P_0(k) + A_2 P_2(k) 1/2*(3mu^2-1) + ...
+      Fiducial:
+      P_0(k) = (1 + 13*beta/15) * I^2 * b^2 * Plin(k)
+      P_2(k) = 4*beta/3 * I^2 * b^2 * Plin(k)
+      at redshift z
+      From Fisher forecast.
+      Since the angular dependences are orthogonal,
+      no need to marginalize over other A_j.
+      R spectral resolving power [dimless]
+      fwhmPsf [rad]
+      fSky [dimless]
+      dz width of redshift slice
+      '''
+      # precompute the RSD power spectrum at the requested redshift
+      try:
+         self.load(z=z)
+      except:
+         self.save(z=z)
+         self.load(z=z)
+
+
+      # survey volume
+      dChi = self.U.c_kms/self.U.hubble(z) * dz
+      volume = 4.*np.pi*fSky  # sky area in [srd]
+      volume *= self.U.bg.comoving_distance(z)**2 * dChi # volume [(Mpc/h)^3]
+      # k perp max, impose additional cut if requested
+      kPerpMax = min(kMax, self.U.kMaxPerpPsf(fwhmPsf, z))
+      # k para max
+      kParaMax = min(kMax, self.U.kMaxParaSpectroRes(R, z))
+      print "kPerpMax", kPerpMax
+      print "kParaMax", kParaMax
+
+      def integrand(lnKPara, lnKPerp):
+         kPerp = np.exp(lnKPerp)
+         kPara = np.exp(lnKPara)
+         k = np.sqrt(kPerp**2 + kPara**2)
+         if k>=kMax:
+            return 0.
+         mu = kPara / k
+         b = self.bEffInt[z](k, mu)
+         f = self.fEffInt[z](k, mu)
+         beta = f / b
+         pTot = self.pTotInt[z](k, mu)
+         #print k, mu, b, f, pTot
+         #
+         if i==0:
+            result = (1. + 2./3.*beta + beta**2/5.)
+         elif i==2:
+            result = 4./3.*beta + 4./7.*beta**2
+            result *= 0.5 * (3 * mu**2 - 1.)
+         result *= b**2 * self.U.pLin(k, z) 
+         result = result**2 / pTot**2
+         result *= kPerp / (2.*np.pi)**2
+         result *= kPerp * kPara   # because int wrt ln
+         result *= volume / 2.
+         result *= 2.   # symmetry factor, since we reduce the integration domain
+         return result
+      
+      # Fisher matrix element
+      result = integrate.dblquad(integrand, np.log(self.kMin), np.log(kPerpMax), lambda x: np.log(self.kMin), lambda x: np.log(kParaMax), epsabs=0., epsrel=1.e-2)[0]
+      # Unmarginalized uncertainty
+      result = 1./np.sqrt(result)
+      return result
+
 
 
    ##################################################################################
@@ -345,11 +418,11 @@ class P3dRsdAuto(object):
          # Show the scales probed by SPHEREx
          if mu==0.:
             # k_perp
-            fSky = 100.*(np.pi/180.)**2 / (4.*np.pi)
+            fSky = 2.*100.*(np.pi/180.)**2 / (4.*np.pi)  # SPHEREx deep fields
             fwhmPsf = 6. * np.pi/(180.*3600.)   # [arcsec] to [rad]
             kFPerp = self.U.kFPerp(z, fSky)
             kMaxPerp = self.U.kMaxPerpPsf(fwhmPsf, z)
-            print "perp", kFPerp, kMaxPerp
+            print "perp k_min, k_max =", kFPerp, kMaxPerp
             #ax.hlines(5.e3, xmin=kFPerp, xmax=kMaxPerp, colors=plot[0].get_color())
             ax.axvspan(kFPerp, kMaxPerp, fc=plot[0].get_color(), ec=None, alpha=0.1)
          if mu==1.:
@@ -358,7 +431,7 @@ class P3dRsdAuto(object):
             dz = 0.5
             kFPara = self.U.kFPara(z, dz=dz)
             kMaxPara = self.U.kMaxParaSpectroRes(R, z)
-            print "para", kFPara, kMaxPara
+            print "para k_min, k_max =", kFPara, kMaxPara
             #ax.hlines(5.e3, xmin=kFPara, xmax=kMaxPara, colors=plot[0].get_color())
             ax.axvspan(kFPara, kMaxPara, fc=plot[0].get_color(), ec=None, alpha=0.1)
       #
@@ -425,7 +498,7 @@ class P3dRsdAuto(object):
       ax.legend([x[1] for x in legendItems], [x[2] for x in legendItems], loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$k$ [$h$/Mpc]')
       ax.set_ylabel(r'$P(k,z, \mu=0.5)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
-      ax.set_ylim((1.e3, 1.e8))
+      #ax.set_ylim((1.e3, 1.e8))
       ax.set_title(self.Prof.Lf.lineNameLatex+' Power spectrum')
       #
       path = './figures/p3d_rsd/ptot_'+self.name+'.pdf'
@@ -554,7 +627,7 @@ class P3dRsdAuto(object):
       #plt.show()
 
 
-   def plotRequiredAreaToDetectF(self):
+   def plotRequiredAreaToDetectBeta(self):
       '''For a given spectral resolution R,
       survey depth Delta z, what sky area is required
       to give a $10\%$ measurement of the growth rate f?
@@ -564,8 +637,8 @@ class P3dRsdAuto(object):
       Z = self.Z.copy()
 
       def fSkyReq(z, R, dz=1., fwhmPsf=6.*np.pi/(180.*3600.), target=0.1):
-         sFOverF = self.sFOverFFisher(z, R, fwhmPsf, 1., dz)
-         result = (sFOverF / target)**2
+         sBetaOverBeta = self.sBetaOverBetaFisher(z, R, fwhmPsf, 1., dz)
+         result = (sBetaOverBeta / target)**2
          return result
 
       fig=plt.figure(0)
@@ -577,7 +650,7 @@ class P3dRsdAuto(object):
          ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
       #
       # SPHEREx: 100 deg^2
-      ax.axhline(100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')
+      ax.axhline(2.*100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')
       #
       ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
       ax.set_yscale('log', nonposy='clip')
@@ -592,8 +665,98 @@ class P3dRsdAuto(object):
       ax2.set_yscale('log', nonposy='clip')
       ax2.set_ylabel(r'Required sky area [deg$^2$]')
       #
-      fig.savefig('./figures/p3d_rsd/fsky_tradeoff_f.pdf', bbox_inches='tight')
+      fig.savefig('./figures/p3d_rsd/fsky_tradeoff_beta.pdf', bbox_inches='tight')
       plt.show()
+
+
+
+   def plotRequiredAreaToDetectA(self, i, kMax=np.inf, exp='SPHEREx'):
+      '''For a given spectral resolution R,
+      survey depth Delta z, what sky area is required
+      to give a $10\%$ measurement of the power spectrum multipole amplitude A_i?
+      '''
+
+      if exp=='SPHEREx':
+         RR = np.array([40., 150., 300.])
+         fwhmPsf = 6.*np.pi/(180.*3600.)  # 6'' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2. * 100. * (np.pi/180.)**2 / (4.*np.pi) # 2 * 100 deg2 deep fields
+      elif exp=='COMAP':
+         RR = np.array([800.])
+         fwhmPsf = 3.*np.pi/(180.*60.) # 3' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2.5 * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+      elif exp=='CONCERTO':
+         RR = np.array([300.])
+         fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2. * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+         
+
+         
+
+      def fSkyReq(z, R, dz=dz, fwhmPsf=fwhmPsf, target=0.1):
+         sAOverA = self.sAOverAFisher(i, z, R, fwhmPsf, 1., dz, kMax=kMax)
+         result = (sAOverA / target)**2
+         return result
+
+      # Naive mode counting, to check the Fisher forecast
+      # for the monopole power spectrum
+      #def fSkyReqNaiveModeCounting(z, R, dz=0.5, nModes=200., kPerpMax=0.1):
+      def fSkyReqNaiveModeCounting(z, R, dz=dz, fwhmPsf=fwhmPsf, target=0.1):
+         nModes = 2. / target**2
+         kPerpMax = kMax   # here loosely equating these two
+         result = nModes / self.U.bg.comoving_distance(z)**2 / kPerpMax**2
+         result *= np.pi * (1.+z) / (dz * R) 
+         return result
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      # Sky area of experiment considered
+      ax.axhline(fSkyExp, ls='--', label=exp)
+      #
+      for R in RR:
+         f = lambda z: fSkyReq(z, R)
+         fSky = np.array(map(f, Z))
+         plot=ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
+
+         # if power spectrum monopole, compare with
+         # naive Nmode forecast
+         if i==0:
+            f = lambda z: fSkyReqNaiveModeCounting(z, R)
+            fSky = np.array(map(f, Z))
+            ax.plot(Z, fSky, c=plot[0].get_color(), ls=':', alpha=0.5)
+      # add legend entry for the naive mode counting   
+      if i==0:
+         ax.plot([], [], c='gray', ls=':', alpha=0.5, label=r'Na\"ive mode counting')
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.e-1))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Required sky fraction $f_\text{sky}$')
+      if i==0:
+         ax.set_title(r'Power spectrum monopole')
+      elif i==2:
+         ax.set_title(r'Power spectrum quadrupole')
+      #
+      ax2=ax.twinx()
+      ylim = ax.get_ylim()
+      ax2.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
+      ax2.set_yscale('log', nonposy='clip')
+      ax2.set_ylabel(r'Required sky area [deg$^2$]')
+      #
+      fig.savefig('./figures/p3d_rsd/fsky_tradeoff_a'+str(i)+'_'+self.name+'_'+exp+'_kmax'+str(kMax)+'.pdf', bbox_inches='tight')
+      #plt.show()
+      fig.clf()
+
+
+
 
 
    ##################################################################################
@@ -660,22 +823,30 @@ class P3dRsdAuto(object):
 
 
 
-   def plotSigmaLumMatchedFilter(self, z=None):
+   def plotSigmaLumMatchedFilter(self, exp='spherex'):
       #if z is None:
       #   z = self.Z[0]
 
-      for z in self.Z:
+      for z in self.Z[2:]:
 
          # default power units, converted later when plotting
-         DetNoisePower = np.logspace(np.log10(1.e-12), np.log10(1.e-4), 51, 10.)
+         DetNoisePower = np.logspace(np.log10(1.e-12), np.log10(1.e-4), 11, 10.)
 
-         # SPHEREx specs
-         R = 40.
-         fwhmPsf = 6. * np.pi / (180.*3600.)
+         if exp=='spherex':
+            # SPHEREx specs
+            R = 40.
+            fwhmPsf = 6. * np.pi / (180.*3600.)
+         elif exp=='ccatprime':
+            R = 1.
+            fwhmPsf = 1. * np.pi / (180. * 60.)
+         elif exp=='comap':
+            R = 800.
+            fwhmPsf = 3. * np.pi / (180. * 60.)
 
          # min luminosity detectable [Lsun]: 5 sigma
          f = lambda detNoisePower: 5. * self.sigmaLumMatchedFilter(detNoisePower, R, fwhmPsf, z)
          LMin = np.array(map(f, DetNoisePower))
+         print "LMin", LMin
 
          fig=plt.figure(0)
          ax=fig.add_subplot(111)
@@ -688,7 +859,7 @@ class P3dRsdAuto(object):
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
          ax.set_ylabel(r'$L_\text{min}$ [erg/s]')
          #
-         fig.savefig('./figures/p3d_rsd/lmin_detnoise_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_lmin_detnoise_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
 
@@ -714,7 +885,7 @@ class P3dRsdAuto(object):
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
          ax.set_ylabel(r'$M_\text{min}$ [$M_\odot/h$]')
          #
-         fig.savefig('./figures/p3d_rsd/mmin_detnoise_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_mmin_detnoise_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
 
@@ -773,7 +944,7 @@ class P3dRsdAuto(object):
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
          ax.set_ylabel(r'Fraction from undetected sources')
          #
-         fig.savefig('./figures/p3d_rsd/fracundetected_detnoise_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_fracundetected_detnoise_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
          
@@ -813,7 +984,7 @@ class P3dRsdAuto(object):
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
          ax.set_ylabel(r'Effective bias $b$')
          #
-         fig.savefig('./figures/p3d_rsd/bias_detnoise_lim_vs_brightgal_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_bias_detnoise_lim_vs_brightgal_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
 
@@ -834,7 +1005,7 @@ class P3dRsdAuto(object):
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
          ax.set_ylabel(r'Effective bias $b$')
          #
-         fig.savefig('./figures/p3d_rsd/bias_detnoise_masked_vs_unmasked_lim_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_bias_detnoise_masked_vs_unmasked_lim_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
 
@@ -855,7 +1026,7 @@ class P3dRsdAuto(object):
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
          ax.set_ylabel(r'Effective bias $b$')
          #
-         fig.savefig('./figures/p3d_rsd/bias_detnoise_brightgal_weighting_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_bias_detnoise_brightgal_weighting_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
          
@@ -917,7 +1088,7 @@ class P3dRsdAuto(object):
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
          ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}$ [(Mpc/$h$)$^{-3}$]')
          #
-         fig.savefig('./figures/p3d_rsd/neff_detnoise_lim_vs_brightgal_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_neff_detnoise_lim_vs_brightgal_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
 
@@ -938,7 +1109,7 @@ class P3dRsdAuto(object):
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
          ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}$ [(Mpc/$h$)$^{-3}$]')
          #
-         fig.savefig('./figures/p3d_rsd/neff_detnoise_masked_vs_unmasked_lim_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_neff_detnoise_masked_vs_unmasked_lim_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
 
@@ -959,7 +1130,7 @@ class P3dRsdAuto(object):
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
          ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}$ [(Mpc/$h$)$^{-3}$]')
          #
-         fig.savefig('./figures/p3d_rsd/neff_detnoise_brightgal_weighting_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_neff_detnoise_brightgal_weighting_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
          
@@ -1043,7 +1214,7 @@ class P3dRsdAuto(object):
          #ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}\ b^2 P_\text{lin}$')
          ax.set_ylabel(r'$\text{SNR}_{P_\text{lin}}(k=0.1 h/\text{Mpc})$')
          #
-         fig.savefig('./figures/p3d_rsd/snr_detnoise_lim_vs_brightgal_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_snr_detnoise_lim_vs_brightgal_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
 
@@ -1066,7 +1237,7 @@ class P3dRsdAuto(object):
          #ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}\ b^2 P_\text{lin}$')
          ax.set_ylabel(r'$\text{SNR}_{P_\text{lin}}(k=0.1 h/\text{Mpc})$')
          #
-         fig.savefig('./figures/p3d_rsd/snr_detnoise_masked_vs_unmasked_lim_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_snr_detnoise_masked_vs_unmasked_lim_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
 
@@ -1089,7 +1260,7 @@ class P3dRsdAuto(object):
          #ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}\ b^2 P_\text{lin}$')
          ax.set_ylabel(r'$\text{SNR}_{P_\text{lin}}(k=0.1 h/\text{Mpc})$')
          #
-         fig.savefig('./figures/p3d_rsd/snr_detnoise_brightgal_weighting_'+self.name+'_z'+str(z)+'.pdf')
+         fig.savefig('./figures/p3d_rsd/'+exp+'_snr_detnoise_brightgal_weighting_'+self.name+'_z'+str(z)+'.pdf')
          plt.clf()
          #plt.show()
 

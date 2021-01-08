@@ -60,15 +60,19 @@ massFunc = MassFuncST(u, save=False)
 
 sfr = SfrMoster13Speagle14(u, massFunc, scatter=False, nProc=3, save=False)
 
-#sfr.plotSfr()
-#sfr.plotSfrd()
-#sfr.plotnHEff()
-#sfr.plotNHEffSpherex()
-#sfr.plotBEff()
-#sfr.plotdlnMeanIntensitydlnm()
-#sfr.plotdlnbEff2dlnm()
-#sfr.plotdlnP1hdlnm()
-#sfr.plotdlnAlldlnm()
+'''
+sfr.plotSfr()
+sfr.plotSfrd()
+sfr.plotnHEff()
+sfr.plotNHEffSparsity(exp='SPHEREx')
+sfr.plotNHEffSparsity(exp='COMAP')
+sfr.plotNHEffSparsity(exp='CONCERTO')
+sfr.plotBEff()
+sfr.plotdlnMeanIntensitydlnm()
+sfr.plotdlnbEff2dlnm()
+sfr.plotdlnP1hdlnm()
+sfr.plotdlnAlldlnm()
+'''
 
 ##################################################################################
 ##################################################################################
@@ -102,6 +106,14 @@ lfOiii['Mehta15'] = LFOiiiMehta15(u)
 #lfOiii['5007Egg'] = LFEGG(u, lineName='o3_5007')
 ##lfOiii['4959Egg'] = LFEGG(u, lineName='o3_4959')
 
+lfCii = {}
+lfCii['Popping16'] = LFCiiPopping16(u)
+
+lfCO = {}
+lfCO['Popping16'] = LFCOPopping16(u, 1)   # CO 1-0 transition
+
+lfLya = {}
+lfLya['Cassata11'] = LFLyaCassata11(u)
 
 # lf = lfHaSobral12
 #lf.plotnGal()
@@ -128,17 +140,30 @@ lfOiii['Mehta15'] = LFOiiiMehta15(u)
 
 '''
 lfHa['Cochrane17'].plotLf(lfs=[lfHa[key] for key in lfHa.keys()])
-
 lfOiii['Colbert13'].plotLf(lfs=[lfOiii[key] for key in lfOiii.keys()])
+
+# check that I reproduce fig 9 in Popping+16
+#lfCii['Popping16'].plotLf(xLim=(1.e6, 1.e9), yLim=(1.e-6, 0.1), unit='Lsun')
+lfCii['Popping16'].plotLf(xLim=(1.e6 * 3.846e33, 1.e9 * 3.846e33), yLim=(1.e-6, 0.1))
+
+#unit = lfCO['Popping16'].convertLumUnit('cgs') / lfCO['Popping16'].convertLumUnit('Jy*km/s*Mpc^2')
+#lfCO['Popping16'].plotLf(xLim=(1.e5*unit, 1.e10*unit), yLim=(10.**(-4.5), 10.**(-0.5)))
+lfCO['Popping16'].plotLf(xLim=(1.e36, 1.e40), yLim=(10.**(-4.5), 10.**(-0.5)))
+
+lfLya['Cassata11'].plotLf(xLim=(1.e41, 1.e44), yLim=(1.e-5, 0.1))
 '''
+
+
 
 ##################################################################################
 # Plot: mean intensity
-
 '''
-lfHa['Sobral12'].plotMeanIntensity(lfs=[lfHa[key] for key in lfHa.keys()])
-
-lfOiii['Colbert13'].plotMeanIntensity(lfs=[lfOiii[key] for key in lfOiii.keys()])
+unit = 'Jy/sr'
+#lfHa['Sobral12'].plotMeanIntensity(lfs=[lfHa[key] for key in lfHa.keys()], unit=unit)
+#lfOiii['Colbert13'].plotMeanIntensity(lfs=[lfOiii[key] for key in lfOiii.keys()], unit=unit)
+lfCii['Popping16'].plotMeanIntensity(unit=unit)
+#lfCO['Popping16'].plotMeanIntensity(unit=unit)
+#lfLya['Cassata11'].plotMeanIntensity(unit=unit)
 '''
 
 ##################################################################################
@@ -146,15 +171,31 @@ lfOiii['Colbert13'].plotMeanIntensity(lfs=[lfOiii[key] for key in lfOiii.keys()]
 
 '''
 lfHa['Sobral12'].plotnGalEff(lfs=[lfHa[key] for key in lfHa.keys()])
-
 lfOiii['Colbert13'].plotnGalEff(lfs=[lfOiii[key] for key in lfOiii.keys()])
+lfCii['Popping16'].plotnGalEff()
+lfCO['Popping16'].plotnGalEff()
+lfLya['Cassata11'].plotnGalEff()
 '''
+
+##################################################################################
+# Plot: NGalEff
+
+
+lfHa['Sobral12'].plotNGalEffSparsity(lfs=[lfHa[key] for key in lfHa.keys()], exp='SPHEREx')
+lfOiii['Colbert13'].plotNGalEffSparsity(lfs=[lfOiii[key] for key in lfOiii.keys()], exp='SPHEREx')
+lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO')
+lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP')
+lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx')
+
 
 ##################################################################################
 # Plot: shot noise
 '''
 lfHa['Sobral12'].plotShotNoise(lfs=[lfHa[key] for key in lfHa.keys()])
 lfOiii['Colbert13'].plotShotNoise(lfs=[lfOiii[key] for key in lfOiii.keys()])
+lfCii['Popping16'].plotShotNoise()
+lfCO['Popping16'].plotShotNoise()
+lfLya['Cassata11'].plotShotNoise()
 '''
 
 ##################################################################################
@@ -175,6 +216,18 @@ for key in lfHa.keys():
 profLimLfOiii = {}
 for key in lfOiii.keys():
    profLimLfOiii[key] = ProfLIMLF(u, sfr, lfOiii[key], trunc=4., a=1.)
+
+profLimLfCii = {}
+for key in lfCii.keys():
+   profLimLfCii[key] = ProfLIMLF(u, sfr, lfCii[key], trunc=4., a=1.)
+
+profLimLfCO = {}
+for key in lfCO.keys():
+   profLimLfCO[key] = ProfLIMLF(u, sfr, lfCO[key], trunc=4., a=1.)
+
+profLimLfLya = {}
+for key in lfLya.keys():
+   profLimLfLya[key] = ProfLIMLF(u, sfr, lfLya[key], trunc=4., a=1.)
 
 
 
@@ -214,6 +267,20 @@ pRsdOiii = {}
 for key in lfOiii.keys():
    pRsdOiii[key] = P3dRsdAuto(u, profLimLfOiii[key], massFunc, nProc=3)
 
+pRsdCii = {}
+for key in lfCii.keys():
+   pRsdCii[key] = P3dRsdAuto(u, profLimLfCii[key], massFunc, nProc=3)
+
+pRsdCO = {}
+for key in lfCO.keys():
+   pRsdCO[key] = P3dRsdAuto(u, profLimLfCO[key], massFunc, nProc=3)
+
+pRsdLya = {}
+for key in lfLya.keys():
+   pRsdLya[key] = P3dRsdAuto(u, profLimLfLya[key], massFunc, nProc=3)
+
+
+
 key = 'Cochrane17'
 p = pRsdHa[key]
 
@@ -228,15 +295,25 @@ p = pRsdHa[key]
 ##################################################################################
 # LIM vs galaxy surveys
 '''
-pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter()
-pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter()
+pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(exp='spherex')
+pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter(exp='spherex')
+#pRsdCii['Popping16'].plotSigmaLumMatchedFilter(exp='spherex')
+#pRsdCO['Popping16'].plotSigmaLumMatchedFilter(exp='spherex')
+#pRsdLya['Cassata11'].plotSigmaLumMatchedFilter(exp='spherex')
 '''
+
+#pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(exp='spherex')
+#pRsdCii['Popping16'].plotSigmaLumMatchedFilter(exp='ccatprime')
+#pRsdCO['Popping16'].plotSigmaLumMatchedFilter(exp='comap')
 
 ##################################################################################
 # Compare references
 '''
 pRsdHa['Cochrane17'].compareP(ps=[pRsdHa[key] for key in pRsdHa.keys()])
 pRsdOiii['Colbert13'].compareP(ps=[pRsdOiii[key] for key in pRsdOiii.keys()])
+pRsdCii['Popping16'].compareP()
+pRsdCO['Popping16'].compareP()
+pRsdLya['Cassata11'].compareP()
 '''
 
 ##################################################################################
@@ -265,17 +342,33 @@ for key in lfHa.keys():
 ##################################################################################
 # Fisher forecast for f
 
+
+## SPHEREx specs: fractional uncertainty on f
+#z = p.Z[0]
+#dz = 0.5 # 1.
+#R = 40.  # 150.
+#fSky = 100. * (np.pi/180.)**2 / (4.*np.pi)   # convert [sq deg] to [sr]
+#fwhmPsf = 6. * np.pi/(180.*3600.)   # convert [arcsec] to [rad]
+#print p.sFOverFFisher(z, R, fwhmPsf, fSky, dz)
+
+
 '''
-# SPHEREx specs: fractional uncertainty on f
-z = p.Z[0]
-dz = 0.5 # 1.
-R = 40.  # 150.
-fSky = 100. * (np.pi/180.)**2 / (4.*np.pi)   # convert [sq deg] to [sr]
-fwhmPsf = 6. * np.pi/(180.*3600.)   # convert [arcsec] to [rad]
-print p.sFOverFFisher(z, R, fwhmPsf, fSky, dz)
+# Halpha with SPHEREx
+##p.plotRequiredAreaToDetectBeta()
+#p.plotRequiredAreaToDetectA(2)
+#p.plotRequiredAreaToDetectA(0)
+p.plotRequiredAreaToDetectA(0, kMax=0.1, exp='SPHEREx')
+p.plotRequiredAreaToDetectA(2, kMax=0.1, exp='SPHEREx')
 '''
 '''
-p.plotRequiredAreaToDetectF()
+# CO with COMAP
+pRsdCO['Popping16'].plotRequiredAreaToDetectA(0, kMax=0.1, exp='COMAP')
+pRsdCO['Popping16'].plotRequiredAreaToDetectA(2, kMax=0.1, exp='COMAP')
+'''
+'''
+# [CII] with CONCERTO
+pRsdCii['Popping16'].plotRequiredAreaToDetectA(0, kMax=0.1, exp='CONCERTO')
+pRsdCii['Popping16'].plotRequiredAreaToDetectA(2, kMax=0.1, exp='CONCERTO')
 '''
 
 

@@ -226,6 +226,11 @@ class LF(object):
          result = 3.827e26   # [Lsun] to [W]
          result /= 1.e-26  # [W] to [Jy*m^2*Hz]
          return result
+      elif unit=='Jy*km/s*Mpc^2':
+         result = 299792458.e-3 / self.nuHz  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
+         result /= 3.086e24**2 # convert to [1.e-23 * erg/s]
+         result /= 1.e-23 / 3.846e33   # convert to [Lsun]
+         return result
 
    def convertLfUnit(self, unit):
       return 1. / self.convertLumUnit(unit)
@@ -254,13 +259,16 @@ class LF(object):
 
    ##################################################################################
 
-   def plotLf(self, lfs=None):
+   def plotLf(self, lfs=None, xLim=None, yLim=None, unit='cgs'):
       
       if lfs is None:
          lfs = [self]
 
-      L_cgs = np.logspace(np.log10(1.e40), np.log10(1.e44), 501, 10.) # [erg/s]
+      L_cgs = np.logspace(np.log10(1.e36), np.log10(1.e44), 501, 10.) # [erg/s]
       L_Lsun = L_cgs / self.convertLumUnit('cgs')
+
+      # luminosity unit to be plotted
+      L_plot = L_Lsun * self.convertLumUnit(unit)
       
       # find min and max redshifts in all the LFs to plot
       zMin = np.min([lf.zMin for lf in lfs])
@@ -284,9 +292,8 @@ class LF(object):
             # Schechter fit
             if hasattr(lf, 'phi'):
                y = lf.phi(z, L_Lsun) * L_Lsun * np.log(10.) * self.U.bg.h**3
-               #ax.plot(L_cgs, y, label=r'$z=$'+str(round(z,2))+' '+lf.nameLatex)
-               #line, =ax.plot(L_cgs, y, c=c, ls=ls,label=r'$z=$'+str(round(z,2))+' '+lf.refLatex)
-               line, =ax.plot(L_cgs, y, c=c, ls=ls)
+               #line, =ax.plot(L_cgs, y, c=c, ls=ls)
+               line, =ax.plot(L_plot, y, c=c, ls=ls)
                legendItems.append((z, line, r'$z=$'+str(round(z,2))+' '+lf.refLatex))
       #
       legendItems.sort()
@@ -295,10 +302,25 @@ class LF(object):
       #
       ax.set_xscale('log', nonposx='clip')
       ax.set_yscale('log', nonposy='clip')
-      ax.set_xlim((10.**(40.), 10.**(44)))
-      ax.set_ylim((1.e-8, 1.))
-      ax.set_xlabel(r'$L$ [erg/s]')
-      ax.set_ylabel(r'$\text{log}_{10} \left( \Phi \times \text{Mpc}^3 \right)$')
+      if xLim is None:
+         ax.set_xlim((10.**(40.), 10.**(44)))
+      else:
+         ax.set_xlim(xLim)
+      if yLim is None:
+         ax.set_ylim((1.e-8, 1.))
+      else:
+         ax.set_ylim(yLim)
+
+      if unit=='cgs':
+         ax.set_xlabel(r'$L$ [erg/s]')
+      elif unit=='Lsun':
+         ax.set_xlabel(r'$L$ [$L_\odot$]')
+      elif unit=='Jy*m^2*Hz':
+         ax.set_xlabel(r'$L$ [Jy.m$^2$.Hz]')
+      elif unit=='Jy*km/s*Mpc^2':
+         ax.set_xlabel(r'$L$ [Jy.(km/s).Mpc$^2$]')
+      #ax.set_ylabel(r'$\Phi \times \text{Mpc}^3$')
+      ax.set_ylabel(r'$\frac{dN}{d\text{log}_{10}L\ dV}\ [\text{Mpc}^{-3}]$')
       ax.set_title(self.lineNameLatex+' Luminosity function')
       #
       path = './figures/lf/lf_'+self.name+'.pdf'
@@ -336,7 +358,7 @@ class LF(object):
       plt.show()
 
 
-   def plotMeanIntensity(self, lfs=None):
+   def plotMeanIntensity(self, lfs=None, unit='Jy/sr'):
       if lfs is None:
          lfs = [self]
 
@@ -351,6 +373,8 @@ class LF(object):
          # center values
          path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_center.csv"
          data = np.genfromtxt(path, delimiter=', ')
+         # convert intensity from Jy/sr to requested unit
+         data[:,1] *= self.convertIntensityUnit(unit) / self.convertIntensityUnit('Jy/sr')
          plt.plot(data[:,0], data[:,1], 'b', label=r'HB06')
          # error band
          #path = "./input/LIM_literature/Gong+17/fig3/mean_intensity_"+self.lineName+"_hopkinsbeacom06_low.csv"
@@ -360,7 +384,8 @@ class LF(object):
          #plt.fill(np.append(low[:,0], high[::-1,0]), np.append(low[:,1], high[::-1,1]), facecolor='b', alpha=0.5)
       #
       for lf in lfs:
-         f = lambda z: lf.meanIntensity(z) * self.convertIntensityUnit('Jy/sr') 
+         #f = lambda z: lf.meanIntensity(z) * self.convertIntensityUnit('Jy/sr') 
+         f = lambda z: lf.meanIntensity(z) * self.convertIntensityUnit(unit) 
          if hasattr(lf, 'Z'):
             Z = lf.Z
          else:
@@ -372,9 +397,14 @@ class LF(object):
       ax.set_title(self.lineNameLatex+' Mean intensity')
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'$\bar{I}(z)$ [Jy/sr]')
+      if unit=='Jy/sr':
+         ax.set_ylabel(r'$\bar{I}(z)$ [Jy/sr]')
+      elif unit=='Lsun/(Mpc/h)^2/sr/Hz':
+         ax.set_ylabel(r'$\bar{I}(z)$ [$L_\odot$/(Mpc/h)$^2$/sr/Hz]')
+      elif unit=='cgs':
+         ax.set_ylabel(r'$\bar{I}(z)$ [erg/s/cm$^2$/sr/Hz]')
       ax.set_xlim((0., 5.))
-      ax.set_ylim((0., 40.))
+      #ax.set_ylim((0., 40.))
       #
       path = './figures/lf/mean_intensity_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -425,6 +455,65 @@ class LF(object):
       #plt.show()
 
 
+#      fig=plt.figure(0)
+#      ax=fig.add_subplot(111)
+#      #
+#      for lf in lfs:
+#         if hasattr(lf, 'Z'):
+#            Z = lf.Z
+#         else:
+#            Z = np.linspace(0.71, 6.,101)
+#         # SPHEREx voxel size
+#         # the spectral resolution power is R=40 for the lower z, and 150 for the high z
+#         R = 40.
+#         # hence the redshift size of the voxel
+#         dz = (1. + Z) / R
+#         # and the comoving depth of the voxel
+#         dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+#         # angular pixel size: 6.2 arcsec
+#         thetaPix = 6.2 * np.pi/(180.*3600.)
+#         # hence the voxel comoving volume
+#         vVoxSpherex = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+#         #print "vVoxSpherex=", vVoxSpherex, "(Mpc/h)^3"
+#
+#         # effective number of galaxies
+#         n = np.array(map(lf.nGalEff, Z))
+#         n *= vVoxSpherex
+#         ax.plot(Z, n, label=lf.refLatex)
+#      #
+#      ax.legend(loc='center right', fontsize='x-small', labelspacing=0.1)
+#      #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+#      #ax.set_xlim((0., 7.))
+#      ax.set_xlabel(r'$z$')
+#      ax.set_ylabel(r'$\bar{N}^\text{gal eff}$ per SPHEREx voxel')
+#      ax.set_title(self.lineNameLatex)
+#      #
+#      path = './figures/lf/galaxy_sparsity_spherex_'+self.name+'.pdf'
+#      fig.savefig(path, bbox_inches='tight')
+#      fig.clf()
+#      #plt.show()
+
+
+   def plotNGalEffSparsity(self, lfs=None, exp='SPHEREx'):
+      if lfs is None:
+         lfs = [self]
+
+      # spectral resolution and angular pixel size
+      # for the requested experiment
+      if exp=='SPHEREx':
+         # the spectral resolution power is R=40 for the lower z, and 150 for the high z
+         R = 40.
+         thetaPix = 6.2 * np.pi/(180.*3600.)
+      elif exp=='COMAP':
+         R = 800.
+         # choose half the PSF FWHM
+         thetaPix = 0.5 * 3. * np.pi/(180.*60.)
+      elif exp=='CONCERTO':
+         R = 300.
+         # choose half the PSF FWHM
+         thetaPix = 0.5 * 0.24 * np.pi/(180.*60.)
+         
+
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
@@ -433,35 +522,37 @@ class LF(object):
             Z = lf.Z
          else:
             Z = np.linspace(0.71, 6.,101)
-         # SPHEREx voxel size
-         # the spectral resolution power is R=40 for the lower z, and 150 for the high z
-         R = 40.
+
+         # compute voxel size
+         # avoid z=0
+         Z = self.Z.copy()
+         if Z[0]==0.:
+            Z[0] = 1.e-2
          # hence the redshift size of the voxel
          dz = (1. + Z) / R
          # and the comoving depth of the voxel
          dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
-         # angular pixel size: 6.2 arcsec
-         thetaPix = 6.2 * np.pi/(180.*3600.)
          # hence the voxel comoving volume
-         vVoxSpherex = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
-         #print "vVoxSpherex=", vVoxSpherex, "(Mpc/h)^3"
-
+         vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+         print "vVox=", vVox, "(Mpc/h)^3"
          # effective number of galaxies
          n = np.array(map(lf.nGalEff, Z))
-         n *= vVoxSpherex
+         n *= vVox
          ax.plot(Z, n, label=lf.refLatex)
       #
       ax.legend(loc='center right', fontsize='x-small', labelspacing=0.1)
       #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
       #ax.set_xlim((0., 7.))
+      ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'$\bar{N}^\text{gal eff}$ per SPHEREx voxel')
+      ax.set_ylabel(r'$\bar{N}^\text{gal eff}$ per '+exp+' voxel')
       ax.set_title(self.lineNameLatex)
       #
-      path = './figures/lf/galaxy_sparsity_spherex_'+self.name+'.pdf'
+      path = './figures/lf/galaxy_sparsity_'+exp+'_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
+
 
 
 
@@ -493,7 +584,8 @@ class LF(object):
       #
       path = './figures/lf/shot_noise_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
-      plt.show()
+      fig.clf()
+      #plt.show()
 
 
    def plotS2(self, lfs=None):
@@ -1242,6 +1334,9 @@ class LFCiiPopping16(LF):
       self.lambdaMicrons = 158.  # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
 
+      self.lambdaMicrons = 656.28e-3   # [mu]
+      self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
+
       # Luminosity bounds 
       # the measurements only span 1.e40 to 1.e44 [erg/sec]
       self.lMin = 1.e35 / 3.839e33  # convert from [erg/sec] to [Lsun]
@@ -1251,7 +1346,7 @@ class LFCiiPopping16(LF):
 
       # Schechter fits to the intrinsic luminosity functions
       # table 2
-      self.Z = np.array([0., 1., 2., 3. 4., 6.])
+      self.Z = np.array([0.001, 1., 2., 3., 4., 6.])
       self.zMin = np.min(self.Z)
       self.zMax = np.max(self.Z)
       self.nZ = len(self.Z)
@@ -1277,7 +1372,7 @@ class LFCiiPopping16(LF):
 
 
 class LFCOPopping16(LF):
-   '''[CO j->j-1] luminosity functions from Popping+16, table 1.
+   '''CO j->j-1 luminosity functions from Popping+16, table 1.
    '''
 
    def __init__(self, U, j):
@@ -1285,10 +1380,10 @@ class LFCOPopping16(LF):
       self.j = j
       # required attributes
       self.name = 'popping16co'+str(j)+'-'+str(j-1)
-      self.nameLatex = r'P16 [C0'+str(j)+'-'+str(j-1)+']'
+      self.nameLatex = r'P16 C0'+str(j)+'-'+str(j-1)+''
       self.refLatex = 'P16'
       self.lineName = 'co'+str(j)+'-'+str(j-1)
-      self.lineNameLatex = r'[C0'+str(j)+'-'+str(j-1)+']'
+      self.lineNameLatex = r'CO'+str(j)+'-'+str(j-1)+''
       # frequency of j->j-1 transition:
       self.nuHz = 115.271208e9 * j   # [Hz]
       self.lambdaMicrons = 299792458. / self.nuHz * 1.e6 # [mu]
@@ -1301,7 +1396,7 @@ class LFCOPopping16(LF):
 
       # Schechter fits to the intrinsic luminosity functions
       # table 1
-      self.Z = np.array([0., 1., 2., 3. 4., 6.])
+      self.Z = np.array([0.001, 1., 2., 4., 6.])
       self.zMin = np.min(self.Z)
       self.zMax = np.max(self.Z)
       self.nZ = len(self.Z)
@@ -1311,9 +1406,7 @@ class LFCOPopping16(LF):
          self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
          #
          LStar = 10.**np.array([6.97, 7.25, 7.30, 7.26, 6.99])  # [Jy * km/s * Mpc^2]
-         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
-         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
-         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         LStar /= self.convertLumUnit('Jy*km/s*Mpc^2')   # convert to [Lsun]
          self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
          #
          PhiStar = 10.**np.array([-2.85, -2.73, -2.63, -2.94, -3.46]) / U.bg.h**3  # [(Mpc/h)^-3]
@@ -1324,9 +1417,7 @@ class LFCOPopping16(LF):
          self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
          #
          LStar = 10.**np.array([7.54, 7.84, 7.92, 7.89, 7.62])  # [Jy * km/s * Mpc^2]
-         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
-         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
-         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         LStar /= self.convertLumUnit('Jy*km/s*Mpc^2')   # convert to [Lsun]
          self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
          #
          PhiStar = 10.**np.array([-2.85, -2.72, -2.66, -3.00, -3.56]) / U.bg.h**3  # [(Mpc/h)^-3]
@@ -1337,9 +1428,7 @@ class LFCOPopping16(LF):
          self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
          #
          LStar = 10.**np.array([7.83, 8.23, 8.36, 8.26, 7.95])  # [Jy * km/s * Mpc^2]
-         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
-         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
-         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         LStar /= self.convertLumUnit('Jy*km/s*Mpc^2')   # convert to [Lsun]
          self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
          #
          PhiStar = 10.**np.array([-2.81, -2.79, -2.78, -3.11, -3.60]) / U.bg.h**3  # [(Mpc/h)^-3]
@@ -1350,9 +1439,7 @@ class LFCOPopping16(LF):
          self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
          #
          LStar = 10.**np.array([8.16, 8.50, 8.64, 8.70, 8.23])  # [Jy * km/s * Mpc^2]
-         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
-         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
-         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         LStar /= self.convertLumUnit('Jy*km/s*Mpc^2')   # convert to [Lsun]
          self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
          #
          PhiStar = 10.**np.array([-2.93, -2.84, -2.85, -3.45, -3.78]) / U.bg.h**3  # [(Mpc/h)^-3]
@@ -1363,9 +1450,7 @@ class LFCOPopping16(LF):
          self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
          #
          LStar = 10.**np.array([8.37, 8.80, 8.74, 8.73, 8.30])  # [Jy * km/s * Mpc^2]
-         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
-         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
-         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         LStar /= self.convertLumUnit('Jy*km/s*Mpc^2')   # convert to [Lsun]
          self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
          #
          PhiStar = 10.**np.array([-2.94, -3.03, -2.80, -3.34, -3.67]) / U.bg.h**3  # [(Mpc/h)^-3]
@@ -1376,9 +1461,7 @@ class LFCOPopping16(LF):
          self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
          #
          LStar = 10.**np.array([8.38, 8.74, 8.77, 8.84, 8.38])  # [Jy * km/s * Mpc^2]
-         LStar *= self.nuHz / 299792458.e-3  # convert to [Jy * Hz * Mpc^2] = [1.e-23 * erg/s /cm^2 * Mpc^2]
-         LStar *= 3.086e24**2 # convert to [1.e-23 * erg/s]
-         LStar *= 1.e-23 / 3.846e33   # convert to [Lsun]
+         LStar /= self.convertLumUnit('Jy*km/s*Mpc^2')   # convert to [Lsun]
          self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
          #
          PhiStar = 10.**np.array([-2.92, -2.92, -2.80, -3.40, -3.72]) / U.bg.h**3  # [(Mpc/h)^-3]
@@ -1401,12 +1484,12 @@ class LFLyaCassata11(LF):
 
    def __init__(self, U):
       # required attributes
-      self.name = 'popping16cii'
-      self.nameLatex = r'P16 [C{\sc ii}]'
-      self.refLatex = 'P16'
-      self.lineName = 'cii'
-      self.lineNameLatex = r'[C{\sc ii}]'
-      self.lambdaMicrons = 121.567e3  # [mu]
+      self.name = 'cassata11lya'
+      self.nameLatex = r'C11 Ly-$\alpha$'
+      self.refLatex = 'C11'
+      self.lineName = 'lya'
+      self.lineNameLatex = r'Ly-$\alpha$'
+      self.lambdaMicrons = 121.567e-3  # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
 
       # Luminosity bounds 
@@ -1428,11 +1511,13 @@ class LFLyaCassata11(LF):
       Alpha = np.array([-1.6, -1.78, -1.69]) 
       self.alpha = interp1d(self.Z, Alpha, kind='linear', bounds_error=False, fill_value=0.)
       #
-      # luminosities after IGM absorption
+      # observed luminosities, affected IGM absorption
       LStar = 10.**np.array([42.70, 42.70, 42.72]) / 3.839e33  # convert from [erg/s] to [Lsun]
+      # intrinsic luminosities, before IGM absorption occurs
+      #LStar = 10.**np.array([42.74, 42.83, 43.0]) / 3.839e33  # convert from [erg/s] to [Lsun]
       self.lStar = interp1d(self.Z, LStar, kind='linear', bounds_error=False, fill_value=0.)
       #
-      PhiStar = 10.**np.array([7.1, 4.8, 9.2]) / U.bg.h**3  # [(Mpc/h)^-3]
+      PhiStar = np.array([7.1e-4, 4.8e-4, 9.2e-4]) / U.bg.h**3  # [(Mpc/h)^-3]
       self.phiStar = interp1d(self.Z, PhiStar, kind='linear', bounds_error=False, fill_value=0.)
      
       # Observed LF

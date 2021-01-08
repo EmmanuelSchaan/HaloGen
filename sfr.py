@@ -135,20 +135,35 @@ class Sfr(object):
 
 
 
-   def plotNHEffSpherex(self):
-      # SPHEREx voxel size
-      # the spectral resolution power is R=40 for the lower z, and 150 for the high z
-      R = 40.
-      # hence the redshift size of the voxel
-      dz = (1. + self.Z) / R
-      # and the comoving depth of the voxel
-      dChi = dz * 3.e5 / self.U.hubble(self.Z)   # [Mpc/h]
-      # angular pixel size: 6.2 arcsec
-      thetaPix = 6.2 * np.pi/(180.*3600.)
-      # hence the voxel comoving volume
-      vVoxSpherex = (self.U.bg.comoving_distance(self.Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
-      #print "vVoxSpherex=", vVoxSpherex, "(Mpc/h)^3"
+   def plotNHEffSparsity(self, exp='SPHEREx'):
 
+      # spectral resolution and angular pixel size
+      # for the requested experiment
+      if exp=='SPHEREx':
+         # the spectral resolution power is R=40 for the lower z, and 150 for the high z
+         R = 40.
+         thetaPix = 6.2 * np.pi/(180.*3600.)
+      elif exp=='COMAP':
+         R = 800.
+         # choose half the PSF FWHM
+         thetaPix = 0.5 * 3. * np.pi/(180.*60.)
+      elif exp=='CONCERTO':
+         R = 300.
+         # choose half the PSF FWHM
+         thetaPix = 0.5 * 0.24 * np.pi/(180.*60.)
+         
+      # avoid z=0
+#      Z = self.Z.copy()
+#      if Z[0]==0.:
+#         Z[0] = 1.e-2
+      Z = np.linspace(0.01, 6., 51)
+      # hence the redshift size of the voxel
+      dz = (1. + Z) / R
+      # and the comoving depth of the voxel
+      dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+      # hence the voxel comoving volume
+      vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+      print "vVox=", vVox, "(Mpc/h)^3"
 
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
@@ -157,17 +172,18 @@ class Sfr(object):
       A = [0.6, 0.8, 1.0, 1.1]
       for a in A:
          f = lambda z: self.nHEff(z, alpha1=a, alpha2=a) 
-         n = np.array(map(f, self.Z))
-         n *= vVoxSpherex
-         ax.plot(self.Z, n, label=r'$\alpha_i=\alpha_j=$'+str(round(a, 1)))
+         n = np.array(map(f, Z))
+         n *= vVox
+         ax.plot(Z, n, label=r'$\alpha_i=\alpha_j=$'+str(round(a, 1)))
       #
-      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
       #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
       ax.set_xlim((0., 7.))
+      ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'$\bar{N}^h_\text{eff}$ per SPHEREx voxel')
+      ax.set_ylabel(r'$\bar{N}^h_\text{eff}$ per '+exp+' voxel')
       #
-      path = './figures/sfr/halo_sparsity_spherex_'+self.name+'.pdf'
+      path = './figures/sfr/halo_sparsity_'+exp+'_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
@@ -439,9 +455,11 @@ class Sfr(object):
       relation L = K * SFR(m,z)**alpha
       K [Lsun / (Msun/yr)^alpha]
       '''
+      print "massFromLum", L, z
+      print self.luminosity(1.e3, z, K, alpha=alpha), self.luminosity(1.e30, z, K, alpha=alpha)
       f = lambda m: self.luminosity(m, z, K, alpha=alpha) - L
-      mMin = 1.e6 # [Msun/h]
-      mMax = 1.e15 # [Msun/h]
+      mMin = 1.e3 # [Msun/h]
+      mMax = 1.e30 # [Msun/h]
       return optimize.brentq(f, mMin, mMax)
 
 
