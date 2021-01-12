@@ -209,6 +209,91 @@ class LF(object):
       #plt.show()
 
 
+   def plotdlnAlldlnL(self):
+
+      #L_cgs = np.logspace(np.log10(1.e35), np.log10(1.e44), 7, 10.) # [erg/s]
+      L_cgs = np.logspace(np.log10(1.e35), np.log10(1.e44), 101, 10.) # [erg/s]
+      L_Lsun = L_cgs / self.convertLumUnit('cgs')
+
+      fig, ax = plt.subplots(2,2, sharex=True, gridspec_kw={'wspace': 0, 'hspace': 0.1, 'height_ratios': [3,1]}, figsize=(16,6))
+      ax0 = ax[0,0]
+      ax1 = ax[0,1]
+      #
+      # CDF panels below
+      axb0 = ax[1,0]
+      axb1 = ax[1,1]
+      
+      # mark the 10th and 90th percentiles
+      axb0.axhline(0.1, c='gray', alpha=0.5, linestyle='--')
+      axb0.axhline(0.9, c='gray', alpha=0.5, linestyle='--')
+      axb1.axhline(0.1, c='gray', alpha=0.5, linestyle='--')
+      axb1.axhline(0.9, c='gray', alpha=0.5, linestyle='--')
+
+
+      # Mean intensity
+      for iZ in range(len(self.Z)):
+         z = self.Z[iZ]
+         f = lambda l: self.dlnLumMomentdlnL(z, l, 1)
+         y = np.array(map(f, L_Lsun))
+         plot=ax0.plot(L_cgs, 2. * y, c=plt.cm.cool(iZ/(len(self.Z)-1.)), label=r'$z=$'+str(z))
+         #
+         # cumulative version
+         cdf = integrate.cumtrapz(y, np.log(L_cgs), initial=0.)
+         cdf /= cdf[-1]
+         axb0.plot(L_cgs, cdf, c=plot[0].get_color())
+      #
+      ax0.legend(loc=2, fontsize='small', labelspacing=0.2)
+      ax0.set_xscale('log', nonposx='clip')
+      ax0.set_xlim((L_cgs.min(), L_cgs.max()))
+      ax0.set_ylim((0., 0.5))
+      ax0.set_title(r'$2\ d \text{ln} I / d\text{ln} L$')
+      #
+      axb0.set_xscale('log', nonposx='clip')
+      axb0.set_xlim((L_cgs.min(), L_cgs.max()))
+      axb0.set_ylim((0., 1.))
+      axb0.set_xlabel(r'$L$ [erg/s]')
+      axb0.set_ylabel(r'Cumulative')
+      
+
+      # Shot noise power spectrum
+      for iZ in range(len(self.Z)):
+         z = self.Z[iZ]
+         f = lambda l: self.dlnLumMomentdlnL(z, l, 2)
+         y = np.array(map(f, L_Lsun))
+         plot=ax1.plot(L_cgs, y, c=plt.cm.cool(iZ/(len(self.Z)-1.)), label=r'$z=$'+str(z))
+         #
+         # cumulative version
+         cdf = integrate.cumtrapz(y, np.log(L_cgs), initial=0.)
+         cdf /= cdf[-1]
+         axb1.plot(L_cgs, cdf, c=plot[0].get_color())
+      #
+      ax1.set_xscale('log', nonposx='clip')
+      ax1.set_xlim((L_cgs.min(), L_cgs.max()))
+      ax1.set_ylim((0., 0.5))
+      ax1.set_title(r'$d \text{ln} P_\text{shot} / d\text{ln} L$')
+      #
+      axb1.set_xscale('log', nonposx='clip')
+      axb1.set_xlim((L_cgs.min(), L_cgs.max()))
+      axb1.set_ylim((0., 1.))
+      axb1.set_xlabel(r'$L$ [erg/s]')
+      
+      # remove vertical gap between subplots
+      #plt.subplots_adjust(wspace=0.)
+      plt.setp(ax1.get_yticklabels(), visible=False)
+      #
+      plt.setp(axb1.get_yticklabels(), visible=False)
+      #fig.subplots_adjust(wspace=0)
+
+      path = './figures/lf/dlnalldlnl_'+self.name+'.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+      
+
+
+
+
+
    ##################################################################################
 
    def convertLumUnit(self, unit):
@@ -553,6 +638,120 @@ class LF(object):
       fig.clf()
       #plt.show()
 
+
+   def plotNGalEffSparsitySummary(self):
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+
+      # SPHEREx: Ha
+      # Ha LF
+      lf = LFHaSobral12(self.U)
+      # the spectral resolution power is R=40 for the lower z, and 150 for the high z
+      R = 40.
+      thetaPix = 6.2 * np.pi/(180.*3600.)
+      # compute voxel size
+      # avoid z=0
+      Z = lf.Z.copy()
+      if Z[0]==0.:
+         Z[0] = 1.e-2
+      # hence the redshift size of the voxel
+      dz = (1. + Z) / R
+      # and the comoving depth of the voxel
+      dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+      # hence the voxel comoving volume
+      vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+      print "vVox=", vVox, "(Mpc/h)^3"
+      # effective number of galaxies
+      n = np.array(map(lf.nGalEff, Z))
+      n *= vVox
+      ax.plot(Z, n, label=r'SPHEREx: H$\alpha$')
+
+      # SPHEREx: OIII
+      # Ha LF
+      lf = LFOiiiColbert13(self.U)
+      #lf = LFOiiiMehta15(self.U)
+      # the spectral resolution power is R=40 for the lower z, and 150 for the high z
+      R = 40.
+      thetaPix = 6.2 * np.pi/(180.*3600.)
+      # compute voxel size
+      # avoid z=0
+      Z = lf.Z.copy()
+      if Z[0]==0.:
+         Z[0] = 1.e-2
+      # hence the redshift size of the voxel
+      dz = (1. + Z) / R
+      # and the comoving depth of the voxel
+      dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+      # hence the voxel comoving volume
+      vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+      print "vVox=", vVox, "(Mpc/h)^3"
+      # effective number of galaxies
+      n = np.array(map(lf.nGalEff, Z))
+      n *= vVox
+      ax.plot(Z, n, label=r'SPHEREx: O{\sc iii}')
+
+      # COMAP: CO
+      # CO LF
+      lf = LFCOPopping16(self.U, 1)   # CO 1-0 transition
+      # spectral resolution and angular pixel size
+      R = 800.
+      # choose half the PSF FWHM
+      thetaPix = 0.5 * 3. * np.pi/(180.*60.)
+      # compute voxel size
+      # avoid z=0
+      Z = lf.Z.copy()
+      if Z[0]==0.:
+         Z[0] = 1.e-2
+      # hence the redshift size of the voxel
+      dz = (1. + Z) / R
+      # and the comoving depth of the voxel
+      dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+      # hence the voxel comoving volume
+      vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+      print "vVox=", vVox, "(Mpc/h)^3"
+      # effective number of galaxies
+      n = np.array(map(lf.nGalEff, Z))
+      n *= vVox
+      ax.plot(Z, n, label=r'COMAP: CO')
+      
+      # CONCERTO: CII
+      lf = LFCiiPopping16(self.U)
+      # spectral resolution and angular pixel size
+      R = 300.
+      # choose half the PSF FWHM
+      thetaPix = 0.5 * 0.24 * np.pi/(180.*60.)
+      # compute voxel size
+      # avoid z=0
+      Z = lf.Z.copy()
+      if Z[0]==0.:
+         Z[0] = 1.e-2
+      # hence the redshift size of the voxel
+      dz = (1. + Z) / R
+      # and the comoving depth of the voxel
+      dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+      # hence the voxel comoving volume
+      vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+      print "vVox=", vVox, "(Mpc/h)^3"
+      # effective number of galaxies
+      n = np.array(map(lf.nGalEff, Z))
+      n *= vVox
+      ax.plot(Z, n, label=r'CONCERTO: [C{\sc ii}]')
+
+
+      ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
+      #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      ax.set_xlim((0., 6.))
+      ax.set_ylim((1.e-4, 1.))
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\bar{N}^\text{gal eff}$ per voxel')
+      ax.set_title('Galaxy sparsity')
+      #
+      path = './figures/lf/galaxy_sparsity_summary.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
 
 
 

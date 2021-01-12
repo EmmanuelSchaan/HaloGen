@@ -1410,7 +1410,7 @@ class P3dRsdCross(P3dRsdAuto):
    def pShot(self, z, mMin=0., mMax=np.inf):
       '''(RSD has no effect on the shot noise power spectrum)
       '''
-      result = self.r * np.sqrt(self.Prof.Pshot(z) * self.Prof2.Pshot(z))
+      result = self.r * np.sqrt(self.Prof.pShot(z) * self.Prof2.pShot(z))
       # build up with mass,
       # assuming phi(L|m) = N(m) * phi(L)
       result *= self.Prof.Sfr.sfrdForInterp(z, mMin=mMin, mMax=mMax) / self.Prof.Sfr.sfrd(z)
@@ -1419,6 +1419,61 @@ class P3dRsdCross(P3dRsdAuto):
    
    ##################################################################################
 
+#   def plotCorrCoeff(self, Z=None):
+#      if Z is None:
+#         Z = self.Z
+#      P12 = self
+#      P11 = P3dRsdAuto(self.U, self.Prof, self.MassFunc)
+#      P22 = P3dRsdAuto(self.U, self.Prof2, self.MassFunc)
+#
+#      #K = np.logspace(np.log10(1.e-3), np.log10(1.e2), 7, 10.)
+#      K = np.logspace(np.log10(1.e-3), np.log10(1.e2), 51, 10.)
+#
+#      Mu = np.array([0., 0.5, 1.])
+#      Ls = ['-', '--', ':']
+#
+#      fig=plt.figure(0)
+#      ax=fig.add_subplot(111)
+#      #
+#      for z in Z:
+#         plot=ax.plot([],[], ls='-', label=r'$z=$'+str(round(z, 2)))
+#         c = plot[0].get_color()
+#         for iMu in range(len(Mu)):
+#            mu = Mu[iMu]
+#            f = lambda k: P12.pTot(k, z, mu)
+#            p12 = np.array(map(f, K))
+#            print "done 12"
+#            print p12
+#            f = lambda k: P11.pTot(k, z, mu)
+#            p11 = np.array(map(f, K))
+#            print "done 11"
+#            print p11
+#            f = lambda k: P22.pTot(k, z, mu)
+#            p22 = np.array(map(f, K))
+#            print "done 22"
+#            print p22
+#            #
+#            plot=ax.plot(K, p12 / np.sqrt(p11 * p22), c=c, ls=Ls[iMu])
+#      #
+#      for iMu in range(len(Mu)):
+#         ax.plot([], [], c='k', ls=Ls[iMu], label=r'$\mu=$'+str(Mu[iMu]))
+#      #
+#      ax.axhline(self.r, c='gray', alpha=0.3)
+#      #
+#      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+#      ax.set_xlim((0.01, 1.e2))
+#      ax.set_ylim((0., 1.))
+#      ax.set_xscale('log', nonposx='clip')
+#      ax.set_xlabel(r'$k$ [$h/$Mpc]')
+#      ax.set_ylabel(r'$r_{12}(k, \mu, z)$')
+#      ax.set_title(self.Prof.Lf.lineNameLatex+r' -- '+self.Prof2.Lf.lineNameLatex)
+#      #
+#      fig.savefig('./figures/p3d_rsd/r_'+str(self.Prof)+'_'+str(self.Prof2)+'.pdf', bbox_inches='tight')
+#      fig.clf()
+#      #plt.show()
+
+
+
    def plotCorrCoeff(self, Z=None):
       if Z is None:
          Z = self.Z
@@ -1426,16 +1481,26 @@ class P3dRsdCross(P3dRsdAuto):
       P11 = P3dRsdAuto(self.U, self.Prof, self.MassFunc)
       P22 = P3dRsdAuto(self.U, self.Prof2, self.MassFunc)
 
+      #K = np.logspace(np.log10(1.e-3), np.log10(1.e2), 5, 10.)
       K = np.logspace(np.log10(1.e-3), np.log10(1.e2), 51, 10.)
 
       Mu = np.array([0., 0.5, 1.])
       Ls = ['-', '--', ':']
 
+      # plot r
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
-      #
+
+      # plot 1-r**2
+      fig2=plt.figure(1)
+      ax2=fig2.add_subplot(111)
+
+
+
+      # compute the correlation coefficients
       for z in Z:
          plot=ax.plot([],[], ls='-', label=r'$z=$'+str(round(z, 2)))
+         plot2=ax2.plot([],[], ls='-', label=r'$z=$'+str(round(z, 2)))
          c = plot[0].get_color()
          for iMu in range(len(Mu)):
             mu = Mu[iMu]
@@ -1452,18 +1517,59 @@ class P3dRsdCross(P3dRsdAuto):
             print "done 22"
             print p22
             #
-            plot=ax.plot(K, p12 / np.sqrt(p11 * p22), c=c, ls=Ls[iMu])
-      #
+            r = p12 / np.sqrt(p11 * p22)
+            plot=ax.plot(K, r, c=c, ls=Ls[iMu])
+            plot2=ax2.plot(K, 1. - r**2, c=c, ls=Ls[iMu])
+      
+
       for iMu in range(len(Mu)):
          ax.plot([], [], c='k', ls=Ls[iMu], label=r'$\mu=$'+str(Mu[iMu]))
-      #
+         ax2.plot([], [], c='k', ls=Ls[iMu], label=r'$\mu=$'+str(Mu[iMu]))
+
+      # expected r corr coeff in the shot noise regime
       ax.axhline(self.r, c='gray', alpha=0.3)
-      #
+      ax2.axhline(1. - self.r**2, c='gray', alpha=0.3)
+      
+
+      # Clean up r plot
       ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
       ax.set_xlim((0.01, 1.e2))
       ax.set_ylim((0., 1.))
       ax.set_xscale('log', nonposx='clip')
       ax.set_xlabel(r'$k$ [$h/$Mpc]')
       ax.set_ylabel(r'$r_{12}(k, \mu, z)$')
-      plt.show()
+      ax.set_title(self.Prof.Lf.lineNameLatex+r' -- '+self.Prof2.Lf.lineNameLatex)
+      #
+      fig.savefig('./figures/p3d_rsd/r_'+str(self.Prof)+'_'+str(self.Prof2)+'.pdf', bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+      # Clean up 1-r**2 plot
+      ax2.legend(loc=4, fontsize='x-small', labelspacing=0.1)
+      ax2.set_xlim((0.01, 1.e2))
+      ax2.set_ylim((0., 1.))
+      ax2.set_xscale('log', nonposx='clip')
+      ax2.set_xlabel(r'$k$ [$h/$Mpc]')
+      ax2.set_ylabel(r'$1 - r^2_{12}(k, \mu, z)$')
+      ax2.set_title(self.Prof.Lf.lineNameLatex+r' -- '+self.Prof2.Lf.lineNameLatex)
+      #
+      fig2.savefig('./figures/p3d_rsd/r2_'+str(self.Prof)+'_'+str(self.Prof2)+'.pdf', bbox_inches='tight')
+      fig2.clf()
+      #plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -153,9 +153,6 @@ class Sfr(object):
          thetaPix = 0.5 * 0.24 * np.pi/(180.*60.)
          
       # avoid z=0
-#      Z = self.Z.copy()
-#      if Z[0]==0.:
-#         Z[0] = 1.e-2
       Z = np.linspace(0.01, 6., 51)
       # hence the redshift size of the voxel
       dz = (1. + Z) / R
@@ -187,6 +184,88 @@ class Sfr(object):
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
+
+
+   def plotNHEffSparsitySummary(self):
+      # avoid z=0
+      Z = np.linspace(0.01, 6., 51)
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+
+      # SPHEREx: Ha, OIII
+      # the spectral resolution power is R=40 for the lower z, and 150 for the high z
+      R = 40.
+      thetaPix = 6.2 * np.pi/(180.*3600.)
+      # hence the redshift size of the voxel
+      dz = (1. + Z) / R
+      # and the comoving depth of the voxel
+      dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+      # hence the voxel comoving volume
+      vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+      print "vVox=", vVox, "(Mpc/h)^3"
+      # use alpha = 1 for optical and UV lines
+      f = lambda z: self.nHEff(z, alpha1=1., alpha2=1.) 
+      n = np.array(map(f, Z))
+      n *= vVox
+      ax.plot(Z, n, label=r'SPHEREx: H$\alpha$, O{\sc iii} ($\alpha=1$)')
+      # get the color palette moving
+      ax.plot([], [])
+
+      # COMAP: CO
+      R = 800.
+      # choose half the PSF FWHM
+      thetaPix = 0.5 * 3. * np.pi/(180.*60.)
+      # hence the redshift size of the voxel
+      dz = (1. + Z) / R
+      # and the comoving depth of the voxel
+      dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+      # hence the voxel comoving volume
+      vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+      print "vVox=", vVox, "(Mpc/h)^3"
+      # use alpha = 0.6 for CO
+      f = lambda z: self.nHEff(z, alpha1=0.6, alpha2=0.6) 
+      n = np.array(map(f, Z))
+      n *= vVox
+      ax.plot(Z, n, label=r'COMAP: CO ($\alpha=0.6$)')
+
+      # CONCERTO: CII
+      R = 300.
+      # choose half the PSF FWHM
+      thetaPix = 0.5 * 0.24 * np.pi/(180.*60.)
+      # hence the redshift size of the voxel
+      dz = (1. + Z) / R
+      # and the comoving depth of the voxel
+      dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+      # hence the voxel comoving volume
+      vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+      print "vVox=", vVox, "(Mpc/h)^3"
+      # use alpha = 1 for CII
+      f = lambda z: self.nHEff(z, alpha1=0.6, alpha2=0.6) 
+      n = np.array(map(f, Z))
+      n *= vVox
+      ax.plot(Z, n, label=r'CONCERTO: [C{\sc ii}] ($\alpha=1$)')
+
+      ax.axhline(1., c='gray', alpha=0.5)
+      #
+      ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
+      #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
+      ax.set_xlim((0., 6.))
+      ax.set_ylim((1.e-4, 20.))
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\bar{N}^h_\text{eff}$ per voxel')
+      ax.set_title(r'Halo sparsity')
+      #
+      path = './figures/sfr/halo_sparsity_summary_'+self.name+'.pdf'
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+
+
+
+
 
    
 
@@ -350,33 +429,127 @@ class Sfr(object):
       #plt.show()
 
 
+#   def plotdlnAlldlnm(self):
+#      '''Plot dlnI/dlnm, dlnb^2/dlnm and dlnP1h/dlnm
+#      in the same figure.
+#      '''
+#      M = np.logspace(np.log10(1.e6), np.log10(1.e16), 101, 10.) # [Msun/h]
+#      Z = np.array([0.001, 1., 2., 3., 4.])
+#
+##      fig=plt.figure(0)
+##      gs=gridspec.GridSpec(1, 3, width_ratios=[1, 1, 1]) 
+#
+#      fig, ax = plt.subplots(1,3, sharex=True, sharey=True, gridspec_kw={'wspace': 0}, figsize=(16,6))
+#      ax0 = ax[0]
+#      ax1 = ax[1]
+#      ax2 = ax[2]
+#      
+#      # Mean intensity
+#      #ax0=plt.subplot(gs[0])
+#      for iZ in range(len(Z)):
+#         z = Z[iZ]
+#         f = lambda m: self.dlnMeanIntensitydlnm(m, z)
+#         y = np.array(map(f, M))
+#         ax0.plot(M, 2. * y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+#      #
+#      ax0.set_xscale('log', nonposx='clip')
+#      ax0.set_xlim((M.min(), M.max()))
+#      ax0.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+#      ax0.set_title(r'$2\ d \text{ln} I / d\text{ln} m$')
+#
+#      # Bias squared
+#      #ax1=plt.subplot(gs[1], sharey=ax0)
+#      for iZ in range(len(Z)):
+#         z = Z[iZ]
+#         f = lambda m: self.dbEff2dlnm(m, z)
+#         y = np.array(map(f, M))
+#         y /= self.bEff(z)**2
+#         ax1.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+#      #
+#      ax1.set_xscale('log', nonposx='clip')
+#      ax1.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+#      ax1.set_title(r'$d\text{ln} b^2(z) / d\text{ln} m$')
+#      
+#      # 1-halo term
+#      #ax2=plt.subplot(gs[2], sharey=ax1)
+#      for iZ in range(len(Z)):
+#         z = Z[iZ]
+#         f = lambda m: self.dP1hdlnm(m, z)
+#         y = np.array(map(f, M))
+#         y /= self.p1h(z)
+#         ax2.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+#      #
+#      ax2.legend(loc=1, fontsize='x-small', labelspacing=0.2)
+#      ax2.set_xscale('log', nonposx='clip')
+#      ax2.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+#      ax2.set_title(r'$d\text{ln}P^\text{1h}(z) / d\text{ln} m$]')
+#
+#      # remove vertical gap between subplots
+#      #plt.subplots_adjust(wspace=0.)
+##      plt.setp(ax1.get_yticklabels(), visible=False)
+##      plt.setp(ax2.get_yticklabels(), visible=False)
+##      fig.subplots_adjust(wspace=0)
+#
+#      # Save to file
+#      path = './figures/sfr/dlnalldlnm_'+self.name+'.pdf'
+#      fig.savefig(path, bbox_inches='tight')
+#      fig.clf()
+#      #plt.show()
+      
+
    def plotdlnAlldlnm(self):
       '''Plot dlnI/dlnm, dlnb^2/dlnm and dlnP1h/dlnm
       in the same figure.
       '''
+      #M = np.logspace(np.log10(1.e6), np.log10(1.e16), 5, 10.) # [Msun/h]
       M = np.logspace(np.log10(1.e6), np.log10(1.e16), 101, 10.) # [Msun/h]
       Z = np.array([0.001, 1., 2., 3., 4.])
 
 #      fig=plt.figure(0)
 #      gs=gridspec.GridSpec(1, 3, width_ratios=[1, 1, 1]) 
 
-      fig, ax = plt.subplots(1,3, sharex=True, sharey=True, gridspec_kw={'wspace': 0}, figsize=(16,6))
-      ax0 = ax[0]
-      ax1 = ax[1]
-      ax2 = ax[2]
+      #fig, ax = plt.subplots(2,3, sharex=True, sharey=True, gridspec_kw={'wspace': 0, 'hspace': 0}, figsize=(16,8))
+      fig, ax = plt.subplots(2,3, sharex=True, gridspec_kw={'wspace': 0, 'hspace': 0.1, 'height_ratios': [3,1]}, figsize=(16,7))
+      ax0 = ax[0,0]
+      ax1 = ax[0,1]
+      ax2 = ax[0,2]
+      #
+      # CDF panels below
+      axb0 = ax[1,0]
+      axb1 = ax[1,1]
+      axb2 = ax[1,2]
       
+      # mark the 10th and 90th percentiles
+      axb0.axhline(0.1, c='gray', alpha=0.5, linestyle='--')
+      axb0.axhline(0.9, c='gray', alpha=0.5, linestyle='--')
+      axb1.axhline(0.1, c='gray', alpha=0.5, linestyle='--')
+      axb1.axhline(0.9, c='gray', alpha=0.5, linestyle='--')
+      axb2.axhline(0.1, c='gray', alpha=0.5, linestyle='--')
+      axb2.axhline(0.9, c='gray', alpha=0.5, linestyle='--')
+
       # Mean intensity
       #ax0=plt.subplot(gs[0])
       for iZ in range(len(Z)):
          z = Z[iZ]
          f = lambda m: self.dlnMeanIntensitydlnm(m, z)
          y = np.array(map(f, M))
-         ax0.plot(M, 2. * y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+         plot=ax0.plot(M, 2. * y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+         #
+         # cumulative version
+         cdf = integrate.cumtrapz(y, np.log(M), initial=0.)
+         cdf /= cdf[-1]
+         axb0.plot(M, cdf, c=plot[0].get_color())
       #
       ax0.set_xscale('log', nonposx='clip')
       ax0.set_xlim((M.min(), M.max()))
-      ax0.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+      ax0.set_ylim((0., 0.5))
       ax0.set_title(r'$2\ d \text{ln} I / d\text{ln} m$')
+      #
+      axb0.set_xscale('log', nonposx='clip')
+      axb0.set_xlim((M.min(), M.max()))
+      axb0.set_ylim((0., 1.))
+      axb0.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+      axb0.set_ylabel(r'Cumulative')
 
       # Bias squared
       #ax1=plt.subplot(gs[1], sharey=ax0)
@@ -385,11 +558,22 @@ class Sfr(object):
          f = lambda m: self.dbEff2dlnm(m, z)
          y = np.array(map(f, M))
          y /= self.bEff(z)**2
-         ax1.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+         plot=ax1.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+         #
+         # cumulative version
+         cdf = integrate.cumtrapz(y, np.log(M), initial=0.)
+         cdf /= cdf[-1]
+         axb1.plot(M, cdf, c=plot[0].get_color())
       #
       ax1.set_xscale('log', nonposx='clip')
-      ax1.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+      ax1.set_xlim((M.min(), M.max()))
+      ax1.set_ylim((0., 0.5))
       ax1.set_title(r'$d\text{ln} b^2(z) / d\text{ln} m$')
+      #
+      axb1.set_xscale('log', nonposx='clip')
+      axb1.set_xlim((M.min(), M.max()))
+      axb1.set_ylim((0., 1.))
+      axb1.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
       
       # 1-halo term
       #ax2=plt.subplot(gs[2], sharey=ax1)
@@ -398,26 +582,37 @@ class Sfr(object):
          f = lambda m: self.dP1hdlnm(m, z)
          y = np.array(map(f, M))
          y /= self.p1h(z)
-         ax2.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+         plot=ax2.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
+         #
+         # cumulative version
+         cdf = integrate.cumtrapz(y, np.log(M), initial=0.)
+         cdf /= cdf[-1]
+         axb2.plot(M, cdf, c=plot[0].get_color())
       #
-      ax2.legend(loc=1, fontsize='x-small', labelspacing=0.2)
+      ax2.legend(loc=1, fontsize='small', labelspacing=0.2)
       ax2.set_xscale('log', nonposx='clip')
-      ax2.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
-      ax2.set_title(r'$d\text{ln}P^\text{1h}(z) / d\text{ln} m$]')
+      ax2.set_ylim((0., 0.5))
+      ax2.set_title(r'$d\text{ln}P^\text{1h}(z) / d\text{ln} m$')
+      #
+      axb2.set_xscale('log', nonposx='clip')
+      axb2.set_xlim((M.min(), M.max()))
+      axb2.set_ylim((0., 1.))
+      axb2.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
 
       # remove vertical gap between subplots
       #plt.subplots_adjust(wspace=0.)
-#      plt.setp(ax1.get_yticklabels(), visible=False)
-#      plt.setp(ax2.get_yticklabels(), visible=False)
-#      fig.subplots_adjust(wspace=0)
+      plt.setp(ax1.get_yticklabels(), visible=False)
+      plt.setp(ax2.get_yticklabels(), visible=False)
+      #
+      plt.setp(axb1.get_yticklabels(), visible=False)
+      plt.setp(axb2.get_yticklabels(), visible=False)
+      #fig.subplots_adjust(wspace=0)
 
       # Save to file
       path = './figures/sfr/dlnalldlnm_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
-      
-
 
 
 

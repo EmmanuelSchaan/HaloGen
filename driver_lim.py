@@ -64,14 +64,15 @@ sfr = SfrMoster13Speagle14(u, massFunc, scatter=False, nProc=3, save=False)
 sfr.plotSfr()
 sfr.plotSfrd()
 sfr.plotnHEff()
-sfr.plotNHEffSparsity(exp='SPHEREx')
-sfr.plotNHEffSparsity(exp='COMAP')
-sfr.plotNHEffSparsity(exp='CONCERTO')
+sfr.plotNHEffSparsitySummary()
+#sfr.plotNHEffSparsity(exp='SPHEREx')
+#sfr.plotNHEffSparsity(exp='COMAP')
+#sfr.plotNHEffSparsity(exp='CONCERTO')
 sfr.plotBEff()
-sfr.plotdlnMeanIntensitydlnm()
-sfr.plotdlnbEff2dlnm()
-sfr.plotdlnP1hdlnm()
 sfr.plotdlnAlldlnm()
+#sfr.plotdlnMeanIntensitydlnm()
+#sfr.plotdlnbEff2dlnm()
+#sfr.plotdlnP1hdlnm()
 '''
 
 ##################################################################################
@@ -180,13 +181,14 @@ lfLya['Cassata11'].plotnGalEff()
 ##################################################################################
 # Plot: NGalEff
 
-
-lfHa['Sobral12'].plotNGalEffSparsity(lfs=[lfHa[key] for key in lfHa.keys()], exp='SPHEREx')
-lfOiii['Colbert13'].plotNGalEffSparsity(lfs=[lfOiii[key] for key in lfOiii.keys()], exp='SPHEREx')
-lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO')
-lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP')
-lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx')
-
+'''
+lfHa['Sobral12'].plotNGalEffSparsitySummary()
+#lfHa['Sobral12'].plotNGalEffSparsity(lfs=[lfHa[key] for key in lfHa.keys()], exp='SPHEREx')
+#lfOiii['Colbert13'].plotNGalEffSparsity(lfs=[lfOiii[key] for key in lfOiii.keys()], exp='SPHEREx')
+#lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO')
+#lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP')
+#lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx')
+'''
 
 ##################################################################################
 # Plot: shot noise
@@ -200,10 +202,11 @@ lfLya['Cassata11'].plotShotNoise()
 
 ##################################################################################
 # Contributions from each luminosity
-'''
-lfHa['Sobral12'].plotdlnMeanIntensitydlnL()
-lfHa['Sobral12'].plotdlnPshotdlnL()
-'''
+
+lfHa['Sobral12'].plotdlnAlldlnL()
+#lfHa['Sobral12'].plotdlnMeanIntensitydlnL()
+#lfHa['Sobral12'].plotdlnPshotdlnL()
+
 
 ##################################################################################
 ##################################################################################
@@ -223,7 +226,7 @@ for key in lfCii.keys():
 
 profLimLfCO = {}
 for key in lfCO.keys():
-   profLimLfCO[key] = ProfLIMLF(u, sfr, lfCO[key], trunc=4., a=1.)
+   profLimLfCO[key] = ProfLIMLF(u, sfr, lfCO[key], trunc=4., a=0.6)
 
 profLimLfLya = {}
 for key in lfLya.keys():
@@ -387,4 +390,19 @@ pHaOiii = P3dRsdCross(u, profHa, profOiii, massFunc, r=0.65, nProc=3)
 
 
 pHaOiii.plotCorrCoeff(Z=[1., 2.])
+'''
+
+'''
+# Example with high correlation coefficients: Ha - Oiii
+# line correlation coefficient from Mehta+15
+pHaOiii = P3dRsdCross(u, profLimLfHa['Cochrane17'], profLimLfOiii['Mehta15'], massFunc, r=0.65, nProc=3)
+
+pHaOiii.plotCorrCoeff(Z=[1., 2.])
+'''
+'''
+# Example with low correlation coefficient: Lya - CO
+# line correlation coefficient from EGG
+pLyaCO = P3dRsdCross(u, profLimLfLya['Cassata11'], profLimLfCO['Popping16'], massFunc, r=0.087, nProc=3)
+
+pLyaCO.plotCorrCoeff(Z=[3., 4.])
 '''
