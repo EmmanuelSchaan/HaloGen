@@ -30,6 +30,10 @@ import p3d_rsd
 reload(p3d_rsd)
 from p3d_rsd import *
 
+import lim_specs
+reload(lim_specs)
+from lim_specs import *
+
 
 ##################################################################################
 
@@ -202,11 +206,11 @@ lfLya['Cassata11'].plotShotNoise()
 
 ##################################################################################
 # Contributions from each luminosity
-
+'''
 lfHa['Sobral12'].plotdlnAlldlnL()
 #lfHa['Sobral12'].plotdlnMeanIntensitydlnL()
 #lfHa['Sobral12'].plotdlnPshotdlnL()
-
+'''
 
 ##################################################################################
 ##################################################################################
@@ -406,3 +410,19 @@ pLyaCO = P3dRsdCross(u, profLimLfLya['Cassata11'], profLimLfCO['Popping16'], mas
 
 pLyaCO.plotCorrCoeff(Z=[3., 4.])
 '''
+
+
+##################################################################################
+# Experimental specs
+
+
+import lim_specs
+reload(lim_specs)
+from lim_specs import *
+
+spherexSpecs = LimSpecs(u, exp='SPHEREx')
+print spherexSpecs.whiteNoisePower(1.)
+
+spherexSpecs = LimSpecs(u, exp='COMAP')
+print spherexSpecs.whiteNoisePower(1.)
+
