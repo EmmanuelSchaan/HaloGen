@@ -423,6 +423,12 @@ from lim_specs import *
 spherexSpecs = LimSpecs(u, exp='SPHEREx')
 print spherexSpecs.whiteNoisePower(1.)
 
-spherexSpecs = LimSpecs(u, exp='COMAP')
-print spherexSpecs.whiteNoisePower(1.)
+comapSpecs = LimSpecs(u, exp='COMAP')
+print comapSpecs.whiteNoisePower(1.)
+
+concertoSpecs = LimSpecs(u, exp='CONCERTO')
+print concertoSpecs.whiteNoisePower(5.)
+
+
+
 

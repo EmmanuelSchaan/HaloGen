@@ -124,7 +124,24 @@ class LimSpecs(object):
          # to white noise power spectrum [(Jy/sr)^2 * (Mpc/h)^3]
          result = sigmaIPixel**2 * self.voxelComovingVolume(z, R=R)
 
-
+      elif self.exp=='CONCERTO':
+         # From Dumitru+19, from Serra+16
+         lambdaCii = 158.e-6  # rest wavelength[m]
+         lambdaObsCii = lambdaCii * (1.+z)   # obs wavelength [m]
+         D = 12.  # telescope aperture diameter [m]
+         airyDiskRadius = 1.22 * lambdaObsCii / D  # [rad]; fwhm would be 1.00 lambda/D
+         beamSolidAngle = 2.*np.pi * (airyDiskRadius/2.355)**2 # [sr]
+         # pixel noise [Jy/sr*sqrt(s)]
+         sigmaPixel = 155.e-3 / beamSolidAngle # [Jy/sr*sqrt(s)]
+         # compute observing time per pixel
+         tSurvey = 1500.*3600.   # [s]
+         nPixel = 1500.
+         surveyAngularArea = self.fSkyExp * 4.*np.pi  # [sr]
+         # I don't understand the formula below (scaling with nPix...)
+         # but it is in Serra+16 and Dumitru+19
+         tPixel = tSurvey * nPixel * beamSolidAngle / surveyAngularArea   # [s]
+         # compute white noise power spectrum
+         result = sigmaPixel**2 / tPixel * self.voxelComovingVolume(z, R=R)
 
       return result
 
