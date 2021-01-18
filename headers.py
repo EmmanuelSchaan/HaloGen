@@ -14,6 +14,7 @@ import matplotlib.ticker as ticker
 from matplotlib.colors import LogNorm
 import matplotlib.colors as mc
 from matplotlib.mlab import bivariate_normal
+from matplotlib.patches import Rectangle
 import colorsys
 from timeit import timeit
 from time import time

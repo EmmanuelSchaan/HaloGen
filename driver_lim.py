@@ -292,12 +292,21 @@ key = 'Cochrane17'
 p = pRsdHa[key]
 
 
-#p.plotPMuDpdce(lfHa[key].Z[0])
 #p.plotP(lfHa[key].Z[0])
 #p.plotBEff()
 #p.save(z=p.Prof.Lf.Z[0])
 #p.load(z=p.Prof.Lf.Z[0])
 
+
+##################################################################################
+# Scales probed by the various experiments
+'''
+p.plotPMuDpdce(lfHa[key].Z[0], exp='SPHEREx')
+pRsdCO['Popping16'].plotPMuDpdce(2., exp='COMAP')
+pRsdCii['Popping16'].plotPMuDpdce(6., exp='CONCERTO')
+'''
+
+p.plotFourierModes()
 
 ##################################################################################
 # LIM vs galaxy surveys
@@ -364,18 +373,20 @@ for key in lfHa.keys():
 ##p.plotRequiredAreaToDetectBeta()
 #p.plotRequiredAreaToDetectA(2)
 #p.plotRequiredAreaToDetectA(0)
-p.plotRequiredAreaToDetectA(0, kMax=0.1, exp='SPHEREx')
-p.plotRequiredAreaToDetectA(2, kMax=0.1, exp='SPHEREx')
+#p.plotRequiredAreaToDetectAUnmarginalized(0, kMax=0.1, exp='SPHEREx')
+#p.plotRequiredAreaToDetectAUnmarginalized(2, kMax=0.1, exp='SPHEREx')
+p.plotRequiredAreaToDetectA(kMax=0.1, exp='SPHEREx', marg=False)
+p.plotRequiredAreaToDetectA(kMax=0.1, exp='SPHEREx', marg=True)
 '''
 '''
 # CO with COMAP
-pRsdCO['Popping16'].plotRequiredAreaToDetectA(0, kMax=0.1, exp='COMAP')
-pRsdCO['Popping16'].plotRequiredAreaToDetectA(2, kMax=0.1, exp='COMAP')
+pRsdCO['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='COMAP', marg=False)
+pRsdCO['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='COMAP', marg=True)
 '''
 '''
 # [CII] with CONCERTO
-pRsdCii['Popping16'].plotRequiredAreaToDetectA(0, kMax=0.1, exp='CONCERTO')
-pRsdCii['Popping16'].plotRequiredAreaToDetectA(2, kMax=0.1, exp='CONCERTO')
+pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=False)
+pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=True)
 '''
 
 
@@ -415,7 +426,7 @@ pLyaCO.plotCorrCoeff(Z=[3., 4.])
 ##################################################################################
 # Experimental specs
 
-
+'''
 import lim_specs
 reload(lim_specs)
 from lim_specs import *
@@ -428,7 +439,7 @@ print comapSpecs.whiteNoisePower(1.)
 
 concertoSpecs = LimSpecs(u, exp='CONCERTO')
 print concertoSpecs.whiteNoisePower(5.)
-
+'''
 
 
 

@@ -232,6 +232,7 @@ class P3dRsdAuto(object):
 
 
    ##################################################################################
+   # Old crappy RSD forecast
 
    def sBetaOverBetaFisher(self, z, R, fwhmPsf, fSky, dz):
       '''Relative uncertainty on RSD parameter beta = f/b
@@ -285,6 +286,53 @@ class P3dRsdAuto(object):
       # Unmarginalized uncertainty
       result = 1./np.sqrt(result)
       return result
+
+
+   def plotRequiredAreaToDetectBeta(self):
+      '''For a given spectral resolution R,
+      survey depth Delta z, what sky area is required
+      to give a $10\%$ measurement of the growth rate f?
+      '''
+      RR = np.array([40., 150., 300.])
+      #Z = np.linspace(0., 7., 11)
+      Z = self.Z.copy()
+
+      def fSkyReq(z, R, dz=1., fwhmPsf=6.*np.pi/(180.*3600.), target=0.1):
+         sBetaOverBeta = self.sBetaOverBetaFisher(z, R, fwhmPsf, 1., dz)
+         result = (sBetaOverBeta / target)**2
+         return result
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for R in RR:
+         f = lambda z: fSkyReq(z, R)
+         fSky = np.array(map(f, Z))
+         ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
+      #
+      # SPHEREx: 100 deg^2
+      ax.axhline(2.*100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.e-1))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Required sky fraction $f_\text{sky}$')
+      #
+      ax2=ax.twinx()
+      ylim = ax.get_ylim()
+      ax2.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
+      ax2.set_yscale('log', nonposy='clip')
+      ax2.set_ylabel(r'Required sky area [deg$^2$]')
+      #
+      fig.savefig('./figures/p3d_rsd/fsky_tradeoff_beta.pdf', bbox_inches='tight')
+      plt.show()
+
+
+   ##################################################################################
+   # old forecast for power spectrum monopole and quadrupole:
+   # only gives the unmarginalized constraints
 
 
    def sAOverAFisher(self, i, z, R, fwhmPsf, fSky, dz, kMax=np.inf):
@@ -354,6 +402,324 @@ class P3dRsdAuto(object):
       return result
 
 
+   def plotRequiredAreaToDetectAUnmarginalized(self, i, kMax=np.inf, exp='SPHEREx'):
+      '''For a given spectral resolution R,
+      survey depth Delta z, what sky area is required
+      to give a $10\%$ measurement of the power spectrum multipole amplitude A_i?
+      '''
+
+      if exp=='SPHEREx':
+         RR = np.array([40., 150., 300.])
+         fwhmPsf = 6.*np.pi/(180.*3600.)  # 6'' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2. * 100. * (np.pi/180.)**2 / (4.*np.pi) # 2 * 100 deg2 deep fields
+      elif exp=='COMAP':
+         RR = np.array([800.])
+         fwhmPsf = 3.*np.pi/(180.*60.) # 3' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2.5 * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+      elif exp=='CONCERTO':
+         RR = np.array([300.])
+         fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2. * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+
+
+      def fSkyReq(z, R, dz=dz, fwhmPsf=fwhmPsf, target=0.1):
+         sAOverA = self.sAOverAFisher(i, z, R, fwhmPsf, 1., dz, kMax=kMax)
+         result = (sAOverA / target)**2
+         return result
+
+      # Naive mode counting, to check the Fisher forecast
+      # for the monopole power spectrum
+      #def fSkyReqNaiveModeCounting(z, R, dz=0.5, nModes=200., kPerpMax=0.1):
+      def fSkyReqNaiveModeCounting(z, R, dz=dz, fwhmPsf=fwhmPsf, target=0.1):
+         nModes = 2. / target**2
+         kPerpMax = kMax   # here loosely equating these two
+         result = nModes / self.U.bg.comoving_distance(z)**2 / kPerpMax**2
+         result *= np.pi * (1.+z) / (dz * R)
+         return result
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      # Sky area of experiment considered
+      ax.axhline(fSkyExp, ls='--', label=exp)
+      #
+      for R in RR:
+         f = lambda z: fSkyReq(z, R)
+         fSky = np.array(map(f, Z))
+         plot=ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
+
+         # if power spectrum monopole, compare with
+         # naive Nmode forecast
+         if i==0:
+            f = lambda z: fSkyReqNaiveModeCounting(z, R)
+            fSky = np.array(map(f, Z))
+            ax.plot(Z, fSky, c=plot[0].get_color(), ls=':', alpha=0.5)
+      # add legend entry for the naive mode counting
+      if i==0:
+         ax.plot([], [], c='gray', ls=':', alpha=0.5, label=r'Na\"ive mode counting')
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.e-1))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Required sky fraction $f_\text{sky}$')
+      if i==0:
+         ax.set_title(r'Power spectrum monopole')
+      elif i==2:
+         ax.set_title(r'Power spectrum quadrupole')
+      #
+      ax2=ax.twinx()
+      ylim = ax.get_ylim()
+      ax2.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
+      ax2.set_yscale('log', nonposy='clip')
+      ax2.set_ylabel(r'Required sky area [deg$^2$]')
+      #
+      fig.savefig('./figures/p3d_rsd/fsky_tradeoff_a'+str(i)+'_'+self.name+'_'+exp+'_kmax'+str(kMax)+'.pdf', bbox_inches='tight')
+      #plt.show()
+      fig.clf()
+
+
+
+
+   ##################################################################################
+   # RSD forecast: unmarginalized and marginalized uncertainties
+   # on the power spectrum monopole and quadrupole
+
+   def fisherAij(self, i, j, z, R, fwhmPsf, fSky, dz, kMax=np.inf):
+      '''Fisher matrix F_{Ai, Aj} for the amplitudes A_i:
+      P(k, mu) = A_0 P_0(k) + A_2 P_2(k) 1/2*(3mu^2-1) + ...
+      Fiducial:
+      P_0(k) = (1 + 13*beta/15) * I^2 * b^2 * Plin(k)
+      P_2(k) = 4*beta/3 * I^2 * b^2 * Plin(k)
+      at redshift z
+      R spectral resolving power [dimless]
+      fwhmPsf [rad]
+      fSky [dimless]
+      dz width of redshift slice
+      '''
+      # precompute the RSD power spectrum at the requested redshift
+      try:
+         self.load(z=z)
+      except:
+         self.save(z=z)
+         self.load(z=z)
+
+      # survey volume
+      dChi = self.U.c_kms/self.U.hubble(z) * dz
+      volume = 4.*np.pi*fSky  # sky area in [srd]
+      volume *= self.U.bg.comoving_distance(z)**2 * dChi # volume [(Mpc/h)^3]
+      # k perp max, impose additional cut if requested
+      kPerpMax = min(kMax, self.U.kMaxPerpPsf(fwhmPsf, z))
+      # k para max
+      kParaMax = min(kMax, self.U.kMaxParaSpectroRes(R, z))
+      print "kPerpMax", kPerpMax
+      print "kParaMax", kParaMax
+
+      def integrand(lnKPara, lnKPerp):
+         kPerp = np.exp(lnKPerp)
+         kPara = np.exp(lnKPara)
+         k = np.sqrt(kPerp**2 + kPara**2)
+         if k>=kMax:
+            return 0.
+         mu = kPara / k
+         b = self.bEffInt[z](k, mu)
+         f = self.fEffInt[z](k, mu)
+         beta = f / b
+         pTot = self.pTotInt[z](k, mu)
+         #print k, mu, b, f, pTot
+
+         # integrand
+         result = b**2 * self.U.pLin(k, z)
+         result = result**2 / pTot**2
+         result *= kPerp / (2.*np.pi)**2
+         result *= kPerp * kPara   # because int wrt ln
+         result *= volume / 2.
+         result *= 2.   # symmetry factor, since we reduce the integration domain
+         #
+         if i==0:
+            result *= (1. + 2./3.*beta + beta**2/5.)
+         elif i==2:
+            result *= 4./3.*beta + 4./7.*beta**2
+            result *= 0.5 * (3 * mu**2 - 1.)
+         #
+         if j==0:
+            result *= (1. + 2./3.*beta + beta**2/5.)
+         elif j==2:
+            result *= 4./3.*beta + 4./7.*beta**2
+            result *= 0.5 * (3 * mu**2 - 1.)
+         return result
+
+      # Fisher matrix element
+      result = integrate.dblquad(integrand, np.log(self.kMin), np.log(kPerpMax), lambda x: np.log(self.kMin), lambda x: np.log(kParaMax), epsabs=0., epsrel=1.e-2)[0]
+      return result
+
+
+   def sAOverA(self, z, R, fwhmPsf, fSky, dz, kMax=np.inf, marg=True):
+      '''Compute marginalized/unmarginalized uncertainties 
+      on A0, A2, such that:
+      P(k, mu) = A_0 P_0(k) + A_2 P_2(k) 1/2*(3mu^2-1) + ...
+      Fiducial:
+      P_0(k) = (1 + 13*beta/15) * I^2 * b^2 * Plin(k)
+      P_2(k) = 4*beta/3 * I^2 * b^2 * Plin(k)
+      at redshift z
+      R spectral resolving power [dimless]
+      fwhmPsf [rad]
+      fSky [dimless]
+      dz width of redshift slice
+      '''
+      
+      # build Fisher matrix
+      F = np.zeros((2,2))
+      F[0,0] = self.fisherAij(0, 0, z, R, fwhmPsf, fSky, dz, kMax=kMax)
+      F[1,1] = self.fisherAij(2, 2, z, R, fwhmPsf, fSky, dz, kMax=kMax)
+      
+      # unmarginalized uncertainties
+      if not marg:
+         sA0 = 1. / np.sqrt(F[0,0])
+         sA2 = 1. / np.sqrt(F[1,1])
+         return sA0, sA2
+
+      # marginalized uncertainties
+      else:
+         F[0,1] = self.fisherAij(0, 2, z, R, fwhmPsf, fSky, dz, kMax=kMax)
+         F[1,0] = F[0,1]
+         # invert to get marginalized uncertainties
+         invF = np.linalg.inv(F)
+         sA0 = np.sqrt(invF[0,0])
+         sA2 = np.sqrt(invF[1,1])
+         return sA0, sA2
+
+
+   def plotRequiredAreaToDetectA(self, kMax=np.inf, exp='SPHEREx', marg=True):
+      '''For a given spectral resolution R,
+      survey depth Delta z, what sky area is required
+      to give a $10\%$ measurement of the power spectrum multipole amplitude A_i?
+      '''
+
+      if exp=='SPHEREx':
+         #RR = np.array([40.])
+         RR = np.array([40., 150., 300.])
+         fwhmPsf = 6.*np.pi/(180.*3600.)  # 6'' in [rad]
+         Z = self.Z.copy()
+         #Z = np.linspace(self.Z.min(), self.Z.max(), 2)
+         dz = 1.
+         fSkyExp = 2. * 100. * (np.pi/180.)**2 / (4.*np.pi) # 2 * 100 deg2 deep fields
+      elif exp=='COMAP':
+         RR = np.array([800.])
+         fwhmPsf = 3.*np.pi/(180.*60.) # 3' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2.5 * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+      elif exp=='CONCERTO':
+         RR = np.array([300.])
+         fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2. * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+
+
+      def fSkyReq(z, R, dz=dz, fwhmPsf=fwhmPsf, target=0.1):
+         # relative uncertainties on power spectrum monopole and quadrupole
+         s0, s2 = self.sAOverA(z, R, fwhmPsf, 1., dz, kMax=kMax, marg=marg)
+         result0 = (s0 / target)**2
+         result2 = (s2 / target)**2
+         return result0, result2
+
+      # Naive mode counting, to check the Fisher forecast
+      # for the monopole power spectrum
+      #def fSkyReqNaiveModeCounting(z, R, dz=0.5, nModes=200., kPerpMax=0.1):
+      def fSkyReqNaiveModeCounting(z, R, dz=dz, fwhmPsf=fwhmPsf, target=0.1):
+         nModes = 2. / target**2
+         kPerpMax = kMax   # here loosely equating these two
+         result = nModes / self.U.bg.comoving_distance(z)**2 / kPerpMax**2
+         result *= np.pi * (1.+z) / (dz * R)
+         return result
+      
+      # Monopole
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      # Sky area of experiment considered
+      ax.axhline(fSkyExp, ls='--', label=exp)
+
+
+      # Quadrupole
+      fig2=plt.figure(2)
+      ax2=fig2.add_subplot(111)
+      #
+      # Sky area of experiment considered
+      ax2.axhline(fSkyExp, ls='--', label=exp)
+
+
+      for R in RR:
+         f = lambda z: fSkyReq(z, R)
+         fSky = np.array(map(f, Z))
+         print fSky.shape
+
+         plot=ax.plot(Z, fSky[:,0], label=r'$\mathcal{R}=$'+str(np.int(R)))
+         plot2=ax2.plot(Z, fSky[:,1], label=r'$\mathcal{R}=$'+str(np.int(R)))
+
+         # if power spectrum monopole, compare with
+         # naive Nmode forecast
+         f = lambda z: fSkyReqNaiveModeCounting(z, R)
+         fSky = np.array(map(f, Z))
+         ax.plot(Z, fSky, c=plot[0].get_color(), ls=':', alpha=0.5)
+
+      # add legend entry for the naive mode counting
+      ax.plot([], [], c='gray', ls=':', alpha=0.5, label=r'Na\"ive mode counting')
+      
+
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Required sky fraction $f_\text{sky}$')
+      ax.set_title(r'Power spectrum monopole')
+      #
+      axr=ax.twinx()
+      ylim = ax.get_ylim()
+      axr.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
+      axr.set_yscale('log', nonposy='clip')
+      axr.set_ylabel(r'Required sky area [deg$^2$]')
+      #
+      if marg:
+         fig.savefig('./figures/p3d_rsd/fsky_tradeoff_a0_marg_'+self.name+'_'+exp+'_kmax'+str(kMax)+'.pdf', bbox_inches='tight')
+      else:
+         fig.savefig('./figures/p3d_rsd/fsky_tradeoff_a0_unmarg_'+self.name+'_'+exp+'_kmax'+str(kMax)+'.pdf', bbox_inches='tight')
+      #plt.show()
+      fig.clf()
+
+
+      ax2.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax2.set_yscale('log', nonposy='clip')
+      ax2.set_xlim((np.min(Z), np.max(Z)))
+      ax2.set_xlabel(r'$z$')
+      ax2.set_ylabel(r'Required sky fraction $f_\text{sky}$')
+      ax2.set_title(r'Power spectrum quadrupole')
+      #
+      ax2r=ax2.twinx()
+      ylim = ax2.get_ylim()
+      ax2r.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
+      ax2r.set_yscale('log', nonposy='clip')
+      ax2r.set_ylabel(r'Required sky area [deg$^2$]')
+      #
+      if marg:
+         fig2.savefig('./figures/p3d_rsd/fsky_tradeoff_a2_marg_'+self.name+'_'+exp+'_kmax'+str(kMax)+'.pdf', bbox_inches='tight')
+      else:
+         fig2.savefig('./figures/p3d_rsd/fsky_tradeoff_a2_unmarg_'+self.name+'_'+exp+'_kmax'+str(kMax)+'.pdf', bbox_inches='tight')
+      #plt.show()
+      fig2.clf()
+
+
+
+
 
    ##################################################################################
 
@@ -399,7 +765,146 @@ class P3dRsdAuto(object):
 
 
 
-   def plotPMuDpdce(self, z=None):
+
+   def plotFourierModes(self):
+      # width of redshift slice
+      dz = 1.
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      currentAxis = plt.gca()
+      #
+      # k_perp = k_para line
+      kk = np.logspace(np.log10(1.e-3), np.log10(1.e2), 101, 10.)
+      ax.plot(kk, kk, c='gray', alpha=0.3, label=r'$k_\perp = k_\parallel$')
+      #
+      # iso |k| contours
+      for k in [1.e-3, 1.e-2, 1.e-1, 1., 10., 100.]:
+         kk = np.logspace(np.log10(1.e-3), np.log10(k), 101, 10.)
+         ax.plot(kk, np.sqrt(k**2-kk**2), c='gray', alpha=0.2, lw=1.)
+      #
+      # iso-mu lines
+      kk = np.logspace(np.log10(1.e-3), np.log10(1.e2), 101, 10.)
+      #for theta in np.linspace(0., np.pi/2., 11):
+      #   ax.plot(kk * np.tan(theta), kk, c='gray', alpha=0.2, lw=1.)
+      for mu in np.linspace(0., 1., 11):
+         theta = np.arccos(mu)
+         ax.plot(kk * np.tan(theta), kk, c='gray', alpha=0.2, lw=1.)
+
+
+      # Specs
+      exp = 'SPHEREx'
+      z = 0.81
+      RR = np.array([40., 150., 300.])
+      R = RR[0]
+      fwhmPsf = 6.*np.pi/(180.*3600.)  # 6'' in [rad]
+      fSkyExp = 2. * 100. * (np.pi/180.)**2 / (4.*np.pi) # 2 * 100 deg2 deep fields
+      # scales probed
+      kFPerp = self.U.kFPerp(z, fSkyExp)
+      kMaxPerp = self.U.kMaxPerpPsf(fwhmPsf, z)
+      kFPara = self.U.kFPara(z, dz=dz)
+      kMaxPara = self.U.kMaxParaSpectroRes(R, z)
+      #
+      currentAxis.add_patch(Rectangle((kFPerp, kFPara), kMaxPerp-kFPerp, kMaxPara-kFPara,
+                      alpha=1., facecolor='none', edgecolor='r', linewidth=2,
+                      label=exp+r' $z=$'+str(round(z, 1))))
+
+
+      # Specs
+      exp = 'COMAP'
+      z = 2.
+      RR = np.array([800.])
+      R = RR[0]
+      fwhmPsf = 3.*np.pi/(180.*60.) # 3' in [rad]
+      dz = 1.
+      fSkyExp = 2.5 * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+      # scales probed
+      kFPerp = self.U.kFPerp(z, fSkyExp)
+      kMaxPerp = self.U.kMaxPerpPsf(fwhmPsf, z)
+      kFPara = self.U.kFPara(z, dz=dz)
+      kMaxPara = self.U.kMaxParaSpectroRes(R, z)
+      #
+      currentAxis.add_patch(Rectangle((kFPerp, kFPara), kMaxPerp-kFPerp, kMaxPara-kFPara,
+                      alpha=1., facecolor='none', edgecolor='b', linewidth=2,
+                      label=exp+r' $z=$'+str(round(z, 1))))
+
+      
+      # Specs
+      exp = 'CONCERTO'
+      z = 6.
+      RR = np.array([300.])
+      R = RR[0]
+      fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
+      dz = 1.
+      fSkyExp = 2. * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+      # scales probed
+      kFPerp = self.U.kFPerp(z, fSkyExp)
+      kMaxPerp = self.U.kMaxPerpPsf(fwhmPsf, z)
+      kFPara = self.U.kFPara(z, dz=dz)
+      kMaxPara = self.U.kMaxParaSpectroRes(R, z)
+      #
+      currentAxis.add_patch(Rectangle((kFPerp, kFPara), kMaxPerp-kFPerp, kMaxPara-kFPara,
+                      alpha=1., facecolor='none', edgecolor='g', linewidth=2,
+                      label=exp+r' $z=$'+str(round(z, 1))))
+
+
+      
+      ax.set_title('Fourier plane coverage')
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((1.e-3, 100.))
+      ax.set_ylim((1.e-3, 100.))
+      # to get more tick marks on the x axis
+      ax.xaxis.set_major_locator(LogLocator(numticks=15)) #(1)
+      ax.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10))) #(2)
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$k_\perp$ [$h$/Mpc]')
+      ax.set_ylabel(r'$k_\parallel$ [$h$/Mpc]')
+      path = "./figures/p3d_rsd/fourier_modes.pdf"
+      fig.savefig(path, bbox_inches='tight')
+
+      plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   def plotPMuDpdce(self, z=None, exp='SPHEREx'):
+
+      if exp=='SPHEREx':
+         #RR = np.array([40.])
+         RR = np.array([40., 150., 300.])
+         fwhmPsf = 6.*np.pi/(180.*3600.)  # 6'' in [rad]
+         Z = self.Z.copy()
+         #Z = np.linspace(self.Z.min(), self.Z.max(), 2)
+         dz = 1.
+         fSkyExp = 2. * 100. * (np.pi/180.)**2 / (4.*np.pi) # 2 * 100 deg2 deep fields
+      elif exp=='COMAP':
+         RR = np.array([800.])
+         fwhmPsf = 3.*np.pi/(180.*60.) # 3' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2.5 * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+      elif exp=='CONCERTO':
+         RR = np.array([300.])
+         fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
+         Z = self.Z.copy()
+         dz = 1.
+         fSkyExp = 2. * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
+
       if z is None:
          z = self.Z[0]
          print("z="+str(z))
@@ -418,31 +923,28 @@ class P3dRsdAuto(object):
          # Show the scales probed by SPHEREx
          if mu==0.:
             # k_perp
-            fSky = 2.*100.*(np.pi/180.)**2 / (4.*np.pi)  # SPHEREx deep fields
-            fwhmPsf = 6. * np.pi/(180.*3600.)   # [arcsec] to [rad]
-            kFPerp = self.U.kFPerp(z, fSky)
+            kFPerp = self.U.kFPerp(z, fSkyExp)
             kMaxPerp = self.U.kMaxPerpPsf(fwhmPsf, z)
             print "perp k_min, k_max =", kFPerp, kMaxPerp
             #ax.hlines(5.e3, xmin=kFPerp, xmax=kMaxPerp, colors=plot[0].get_color())
             ax.axvspan(kFPerp, kMaxPerp, fc=plot[0].get_color(), ec=None, alpha=0.1)
          if mu==1.:
             # k_para
-            R = 40.
-            dz = 0.5
+            R = RR[0]
             kFPara = self.U.kFPara(z, dz=dz)
             kMaxPara = self.U.kMaxParaSpectroRes(R, z)
             print "para k_min, k_max =", kFPara, kMaxPara
             #ax.hlines(5.e3, xmin=kFPara, xmax=kMaxPara, colors=plot[0].get_color())
             ax.axvspan(kFPara, kMaxPara, fc=plot[0].get_color(), ec=None, alpha=0.1)
       #
-      #
+      ax.set_title(self.Prof.Lf.lineNameLatex+' with '+exp+r' $(z=$'+str(round(z, 1))+r'$)$')
       # to get more tick marks on the x axis
       ax.xaxis.set_major_locator(LogLocator(numticks=15)) #(1)
       ax.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10))) #(2)
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$k$ [$h$/Mpc]')
       ax.set_ylabel(r'$P(k, \mu, z)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
-      path = "./figures/p3d_rsd/p_mudpdce_"+self.name+"z_"+str(z)+".pdf"
+      path = "./figures/p3d_rsd/p_mudpdce_"+self.name+"z_"+str(z)+"_"+exp+".pdf"
       fig.savefig(path, bbox_inches='tight')
 
       plt.show()
@@ -627,133 +1129,8 @@ class P3dRsdAuto(object):
       #plt.show()
 
 
-   def plotRequiredAreaToDetectBeta(self):
-      '''For a given spectral resolution R,
-      survey depth Delta z, what sky area is required
-      to give a $10\%$ measurement of the growth rate f?
-      '''
-      RR = np.array([40., 150., 300.])
-      #Z = np.linspace(0., 7., 11)
-      Z = self.Z.copy()
-
-      def fSkyReq(z, R, dz=1., fwhmPsf=6.*np.pi/(180.*3600.), target=0.1):
-         sBetaOverBeta = self.sBetaOverBetaFisher(z, R, fwhmPsf, 1., dz)
-         result = (sBetaOverBeta / target)**2
-         return result
-
-      fig=plt.figure(0)
-      ax=fig.add_subplot(111)
-      #
-      for R in RR:
-         f = lambda z: fSkyReq(z, R)
-         fSky = np.array(map(f, Z))
-         ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
-      #
-      # SPHEREx: 100 deg^2
-      ax.axhline(2.*100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')
-      #
-      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
-      ax.set_yscale('log', nonposy='clip')
-      ax.set_xlim((np.min(Z), np.max(Z)))
-      #ax.set_ylim((1.e-2, 1.e-1))
-      ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'Required sky fraction $f_\text{sky}$')
-      #
-      ax2=ax.twinx()
-      ylim = ax.get_ylim()
-      ax2.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
-      ax2.set_yscale('log', nonposy='clip')
-      ax2.set_ylabel(r'Required sky area [deg$^2$]')
-      #
-      fig.savefig('./figures/p3d_rsd/fsky_tradeoff_beta.pdf', bbox_inches='tight')
-      plt.show()
 
 
-
-   def plotRequiredAreaToDetectA(self, i, kMax=np.inf, exp='SPHEREx'):
-      '''For a given spectral resolution R,
-      survey depth Delta z, what sky area is required
-      to give a $10\%$ measurement of the power spectrum multipole amplitude A_i?
-      '''
-
-      if exp=='SPHEREx':
-         RR = np.array([40., 150., 300.])
-         fwhmPsf = 6.*np.pi/(180.*3600.)  # 6'' in [rad]
-         Z = self.Z.copy()
-         dz = 1.
-         fSkyExp = 2. * 100. * (np.pi/180.)**2 / (4.*np.pi) # 2 * 100 deg2 deep fields
-      elif exp=='COMAP':
-         RR = np.array([800.])
-         fwhmPsf = 3.*np.pi/(180.*60.) # 3' in [rad]
-         Z = self.Z.copy()
-         dz = 1.
-         fSkyExp = 2.5 * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
-      elif exp=='CONCERTO':
-         RR = np.array([300.])
-         fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
-         Z = self.Z.copy()
-         dz = 1.
-         fSkyExp = 2. * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
-         
-
-         
-
-      def fSkyReq(z, R, dz=dz, fwhmPsf=fwhmPsf, target=0.1):
-         sAOverA = self.sAOverAFisher(i, z, R, fwhmPsf, 1., dz, kMax=kMax)
-         result = (sAOverA / target)**2
-         return result
-
-      # Naive mode counting, to check the Fisher forecast
-      # for the monopole power spectrum
-      #def fSkyReqNaiveModeCounting(z, R, dz=0.5, nModes=200., kPerpMax=0.1):
-      def fSkyReqNaiveModeCounting(z, R, dz=dz, fwhmPsf=fwhmPsf, target=0.1):
-         nModes = 2. / target**2
-         kPerpMax = kMax   # here loosely equating these two
-         result = nModes / self.U.bg.comoving_distance(z)**2 / kPerpMax**2
-         result *= np.pi * (1.+z) / (dz * R) 
-         return result
-
-      fig=plt.figure(0)
-      ax=fig.add_subplot(111)
-      #
-      # Sky area of experiment considered
-      ax.axhline(fSkyExp, ls='--', label=exp)
-      #
-      for R in RR:
-         f = lambda z: fSkyReq(z, R)
-         fSky = np.array(map(f, Z))
-         plot=ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
-
-         # if power spectrum monopole, compare with
-         # naive Nmode forecast
-         if i==0:
-            f = lambda z: fSkyReqNaiveModeCounting(z, R)
-            fSky = np.array(map(f, Z))
-            ax.plot(Z, fSky, c=plot[0].get_color(), ls=':', alpha=0.5)
-      # add legend entry for the naive mode counting   
-      if i==0:
-         ax.plot([], [], c='gray', ls=':', alpha=0.5, label=r'Na\"ive mode counting')
-      #
-      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
-      ax.set_yscale('log', nonposy='clip')
-      ax.set_xlim((np.min(Z), np.max(Z)))
-      #ax.set_ylim((1.e-2, 1.e-1))
-      ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'Required sky fraction $f_\text{sky}$')
-      if i==0:
-         ax.set_title(r'Power spectrum monopole')
-      elif i==2:
-         ax.set_title(r'Power spectrum quadrupole')
-      #
-      ax2=ax.twinx()
-      ylim = ax.get_ylim()
-      ax2.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
-      ax2.set_yscale('log', nonposy='clip')
-      ax2.set_ylabel(r'Required sky area [deg$^2$]')
-      #
-      fig.savefig('./figures/p3d_rsd/fsky_tradeoff_a'+str(i)+'_'+self.name+'_'+exp+'_kmax'+str(kMax)+'.pdf', bbox_inches='tight')
-      #plt.show()
-      fig.clf()
 
 
 
