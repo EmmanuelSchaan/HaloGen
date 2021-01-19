@@ -1137,6 +1137,7 @@ class P3dRsdAuto(object):
 
 
    ##################################################################################
+   # 3d matched filter for point sources in redshift-space
 
    def sigmaFluxMatchedFilter(self, detNoisePower, R, fwhmPsf, z):
       '''Computes the uncertainty on the flux [Lsun / (Mpc/h)^2]
@@ -1173,7 +1174,7 @@ class P3dRsdAuto(object):
          w = psf * spsf
 
          result = w**2   # [dimless]
-         result /= w**2 * pTot + detNoisePower   # [Lsun^-2 * (Mpc/h) * sr^2 * Hz^2]
+         result /= 2. * (w**2 * pTot + detNoisePower)   # [Lsun^-2 * (Mpc/h) * sr^2 * Hz^2]
          result *= kPerp / (2.*np.pi)**2  # [Lsun^-2 * sr^2 * Hz^2]
          result *= kPerp * kPara   # [Lsun^-2 * sr^2 * Hz^2 / (Mpc/h)^2] because int wrt ln
          result *= 2.   # symmetry factor, since we reduce the integration domain
@@ -1185,7 +1186,7 @@ class P3dRsdAuto(object):
       # if det noise is zero. --> avoid this!
       result = integrate.dblquad(integrand, np.log(self.kMin), np.log(self.kMax/np.sqrt(2.)), lambda x: np.log(self.kMin), lambda x: np.log(self.kMax/np.sqrt(2.)), epsabs=0., epsrel=1.e-2)[0]
       result = 1. / np.sqrt(result) # [Lsun / sr / Hz * (Mpc/h)]
-      result *= self.U.hubble(z) * self.Prof.Lf.nuHz / (1.+z) / self.U.c_kms / self.U.bg.comoving_distance(z)**2  # * [Hz * sr / (Mpc/h)^3] = [Lsun / (Mpc/h)^2]
+      result *= self.U.hubble(z) * self.Prof.Lf.nuHz / (1.+z)**2 / self.U.c_kms / self.U.bg.comoving_distance(z)**2  # * [Hz * sr / (Mpc/h)^3] = [Lsun / (Mpc/h)^2]
       return result
 
 
@@ -1195,30 +1196,33 @@ class P3dRsdAuto(object):
       # get the flux
       result = self.sigmaFluxMatchedFilter(detNoisePower, R, fwhmPsf, z)   # [Lsun / (Mpc/h)^2]
       # convert to luminosity
-      result *= 4.*np.pi * (1.+z)**2 * self.U.bg.comoving_distance(z)   # [Lsun]
+      result *= 4.*np.pi * (1.+z)**2 * self.U.bg.comoving_distance(z)**2   # [Lsun]
       return result
 
 
 
-   def plotSigmaLumMatchedFilter(self, exp='spherex'):
+   def plotSigmaLumMatchedFilter(self, exp='SPHEREx'):
       #if z is None:
       #   z = self.Z[0]
 
-      for z in self.Z[2:]:
+      for z in self.Z:
 
          # default power units, converted later when plotting
          DetNoisePower = np.logspace(np.log10(1.e-12), np.log10(1.e-4), 11, 10.)
 
-         if exp=='spherex':
+         if exp=='SPHEREx':
             # SPHEREx specs
             R = 40.
             fwhmPsf = 6. * np.pi / (180.*3600.)
-         elif exp=='ccatprime':
+         elif exp=='CCAT-P':
             R = 1.
             fwhmPsf = 1. * np.pi / (180. * 60.)
-         elif exp=='comap':
+         elif exp=='COMAP':
             R = 800.
             fwhmPsf = 3. * np.pi / (180. * 60.)
+         elif exp=='CONCERTO':
+            R = 300.
+            fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
 
          # min luminosity detectable [Lsun]: 5 sigma
          f = lambda detNoisePower: 5. * self.sigmaLumMatchedFilter(detNoisePower, R, fwhmPsf, z)
@@ -1660,6 +1664,593 @@ class P3dRsdAuto(object):
    #      ax.set_yscale('log', nonposy='clip')
    #      ax.set_xlim((np.min(x), np.max(x)))
    #      ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
+   #      ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}\ b^2 P_\text{lin}$')
+   #      #
+   #      plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   ##################################################################################
+   # 2d matched filter for point sources in projected 2d maps
+
+   def sigmaFluxMatchedFilter2d(self, detNoisePower, R, fwhmPsf, z, dz):
+      '''Computes the uncertainty on the flux [Lsun / (Mpc/h)^2]
+      of a point source in the projected 2d map,
+      given the 3d detector noise power spectrum detNoisePower.
+      detNoisePower: default unit [(Lsun/(Mpc/h)^2/sr/Hz)^2 (Mpc/h)^3],
+      ie [Lsun^2/(Mpc/h)/sr^2/Hz^2].
+      This assumes a matched filter is used, with the point source profile
+      determined by the PSF of the instrument.
+      R: spectral resolving power [dimless]
+      fwhmPsf: [rad]
+      dz: width of the redshift slice
+      '''
+      # precompute the RSD power spectrum at the requested redshift
+      try:
+         self.load(z=z)
+      except:
+         self.save(z=z)
+         self.load(z=z)
+
+      # volume conversion from p3d to p2d
+      # in the thin redshift slice
+      chi = self.U.comoving_distance(z)   # [Mpc/h]
+      dchi = dz * self.U.c_kms/self.U.hubble(z) # [Mpc/h]
+      dVdOmega = chi**2 * dchi   # [(Mpc/h)^3/sr]
+
+      # frequency range corresponding to the depth
+      # of the thin redshift slice
+      dnu = self.Prof.Lf.nuHz * dz / (1.+z)**2  # [Hz]
+
+
+      def integrand(lnL):
+         l = np.exp(lnL)
+         kPerp = (l + 0.5) / chi
+         mu = 0.
+
+         # keep default unit [(Lsun/(Mpc/h)^2/sr/Hz)^2 (Mpc/h)^3]
+         # ie [Lsun^2/(Mpc/h)/sr^2/Hz^2]
+         pTot = self.pTotInt[z](k, mu)
+         if pTot==0.:
+            print "watch out ", k, mu, pTot
+
+         psf = self.U.psfF(kPerp, fwhmPsf, z)   # [dimless]
+
+         result = (psf/dnu)**2   # [1/Hz^2]
+         result /= 2. * (psf**2 * pTot + detNoisePower) / dVdOmega   # [(Lsun/(Mpc/h)^2/sr)^-2 / sr]
+         result *= l / (2.*np.pi)
+         result *= l # because we integrate wrt lnL [(Lsun/(Mpc/h)^2)^-2]
+         result *= 2.   # symmetry factor, since we reduce the integration domain
+         return result
+
+      # compute 2d integral
+      # integration bounds: if modulus of k goes above self.kMax,
+      # pTot will be zero, and sigmaMatchedFilter will be zero
+      # if det noise is zero. --> avoid this!
+      result = integrate.quad(integrand, np.log(self.kMin/chi), np.log(self.kMax/chi/np.sqrt(2.)), epsabs=0., epsrel=1.e-2)[0]
+      result = 1. / np.sqrt(result) # [Lsun/(Mpc/h)^2]
+      return result
+
+
+   def sigmaLumMatchedFilter2d(self, detNoisePower, R, fwhmPsf, z, dz):
+      '''Return the matched filter uncertainty in terms of luminosity [Lsun]
+      '''
+      # get the flux
+      result = self.sigmaFluxMatchedFilter(detNoisePower, R, fwhmPsf, z, dz)   # [Lsun / (Mpc/h)^2]
+      # convert to luminosity
+      result *= 4.*np.pi * (1.+z)**2 * self.U.bg.comoving_distance(z)**2   # [Lsun]
+      return result
+
+
+
+   def plotSigmaLumMatchedFilter2d(self, exp='SPHEREx'):
+      #if z is None:
+      #   z = self.Z[0]
+
+      # width of the redshift slice
+      dz = 1.
+
+      # volume conversion from p3d to p2d
+      # in the thin redshift slice
+      chi = self.U.comoving_distance(z)   # [Mpc/h]
+      dchi = dz * self.U.c_kms/self.U.hubble(z) # [Mpc/h]
+      dVdOmega = chi**2 * dchi   # [(Mpc/h)^3/sr]
+
+
+      for z in self.Z:
+
+         # default power units, converted later when plotting
+         DetNoisePower = np.logspace(np.log10(1.e-12), np.log10(1.e-4), 11, 10.)
+
+         if exp=='SPHEREx':
+            # SPHEREx specs
+            R = 40.
+            fwhmPsf = 6. * np.pi / (180.*3600.)
+         elif exp=='CCAT-P':
+            R = 1.
+            fwhmPsf = 1. * np.pi / (180. * 60.)
+         elif exp=='COMAP':
+            R = 800.
+            fwhmPsf = 3. * np.pi / (180. * 60.)
+         elif exp=='CONCERTO':
+            R = 300.
+            fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
+
+         # min luminosity detectable [Lsun]: 5 sigma
+         f = lambda detNoisePower: 5. * self.sigmaLumMatchedFilter(detNoisePower, R, fwhmPsf, z, dz)
+         LMin = np.array(map(f, DetNoisePower))
+         print "LMin", LMin
+
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         ax.plot(x, LMin*self.Prof.Lf.convertLumUnit('cgs'))
+         #
+         ax.set_xscale('log', nonposx='clip')
+         ax.set_yscale('log', nonposy='clip')
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         ax.set_ylabel(r'$L_\text{min}$ [erg/s]')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_lmin_detnoise_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+         # Convert the minimum detected luminosity lMin
+         # into a minimum detected halo mass
+         # get the Kennicutt-Schmidt constant
+         K = self.Prof.Sfr.kennicuttSchmidtConstant(z, self.Prof.Lf, alpha=1.)
+         print "KS constant", K
+         # use it to convert lMin to mMin
+         f = lambda l: self.Prof.Sfr.massFromLum(l, z, K, alpha=1.)
+         MMin = np.array(map(f, LMin))
+
+         # Plot minimum halo mass detected
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         ax.plot(x, MMin)
+         #
+         ax.set_xscale('log', nonposx='clip')
+         ax.set_yscale('log', nonposy='clip')
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         ax.set_ylabel(r'$M_\text{min}$ [$M_\odot/h$]')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_mmin_detnoise_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+         ###################################
+
+
+         # fraction of mean intensity from undetected sources
+         def f(lMin):
+            result = self.Prof.Lf.meanIntensity(z, lMin=0., lMax=lMin)
+            result /= self.Prof.Lf.meanIntensityInterp(z)
+            return result
+         fracMeanIntensity = np.array(map(f, LMin))
+         #
+         # fraction of shot noise from undetected sources
+         def f(lMin):
+            result = self.Prof.Lf.pShot(z, lMin=0., lMax=lMin)
+            result /= self.Prof.Lf.pShotInterp(z)
+            return result
+         fracShotNoise = np.array(map(f, LMin))
+
+
+         # fraction of 2h from undetected sources
+         # at a fiducial k
+         def f(mMin):
+            k = 0.01
+            result = self.p2h(k, z, mu=0., mMin=0., mMax=mMin)
+            result /= self.p2h(k, z, mu=0., mMin=0., mMax=np.inf)
+            return result
+         frac2h = np.array(map(f, MMin))
+         #
+         # fraction of 1h from undetected sources
+         # at a fiducial k
+         def f(mMin):
+            k = 0.1
+            result = self.p1h(k, z, mu=0., mMin=0., mMax=mMin)
+            result /= self.p1h(k, z, mu=0., mMin=0., mMax=np.inf)
+            return result
+         frac1h = np.array(map(f, MMin))
+
+
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         ax.plot(x, fracMeanIntensity, label=r'Mean intensity')
+         ax.plot(x, fracShotNoise, label=r'Shot noise')
+         ax.plot(x, frac2h, label=r'2h ($k=0.01h/$Mpc)')
+         ax.plot(x, frac1h, label=r'1h ($k=0.1h/$Mpc)')
+         #
+         #ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+         ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         #ax.set_yscale('log', nonposy='clip')
+         ax.set_ylim((0., 1.))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         ax.set_ylabel(r'Fraction from undetected sources')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_fracundetected_detnoise_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+         ###################################
+
+         # Bias of LIM
+         # full LIM
+         bLimFull = self.Prof.Sfr.bEff(z, alpha=1.)
+         # masked LIM
+         f = lambda mMin: self.Prof.Sfr.bEff(z, alpha=1, mMin=0., mMax=mMin)
+         bLimLowM = np.array(map(f, MMin))
+         # detected galaxies, weighted by luminosity
+         f = lambda mMin: self.Prof.Sfr.bEff(z, alpha=1, mMin=mMin, mMax=np.inf)
+         bLimHighM = np.array(map(f, MMin))
+
+         # Bias of detected galaxies
+         # assume Ngal propto SFR, as for LIM
+         f = lambda mMin: self.Prof.Sfr.bEff(z, alpha=1, mMin=mMin, mMax=np.inf)
+         bGalM = np.array(map(f, MMin))
+
+
+
+         # Compare bias: unmasked LIM vs bright galaxies
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         #
+         ax.axhline(bLimFull, c='k', ls='--', label=r'LIM')
+         ax.plot(x, bGalM, label=r'Galaxies $(M>M_\text{min})$')
+         #
+         ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         #ax.set_yscale('log', nonposy='clip')
+         ax.set_xlim((np.min(x), np.max(x)))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         ax.set_ylabel(r'Effective bias $b$')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_bias_detnoise_lim_vs_brightgal_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+         # Compare bias: unmasked vs masked LIM
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         #
+         ax.axhline(bLimFull, c='k', ls='--', label=r'LIM')
+         ax.plot(x, bLimLowM, label=r'Masked LIM $(M<M_\text{min})$')
+         #
+         ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         #ax.set_yscale('log', nonposy='clip')
+         ax.set_xlim((np.min(x), np.max(x)))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         ax.set_ylabel(r'Effective bias $b$')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_bias_detnoise_masked_vs_unmasked_lim_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+         # Compare bias: bright gal, number or luminosity weighted
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         #
+         ax.plot(x, bGalM, label=r'Number weighted galaxies $(M>M_\text{min})$')
+         ax.plot(x, bLimHighM, '--', label=r'Luminosity-weighted galaxies $(M>M_\text{min})$')
+         #
+         ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         #ax.set_yscale('log', nonposy='clip')
+         ax.set_xlim((np.min(x), np.max(x)))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         ax.set_ylabel(r'Effective bias $b$')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_bias_detnoise_brightgal_weighting_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+   #      # Compare bias
+   #      fig=plt.figure(0)
+   #      ax=fig.add_subplot(111)
+   #      #
+   #      x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+   #      x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+   #      #
+   #      ax.axhline(bLimFull, c='k', ls='--', label=r'LIM')
+   #      ax.plot(x, bLimLowM, label=r'Masked LIM $(M<M_\text{min})$')
+   #      ax.plot(x, bGalM, label=r'Galaxies $(M>M_\text{min})$')
+   #      ax.plot(x, bLimHighM, label=r'LIM-weighted galaxies $(M>M_\text{min})$')
+   #      #
+   #      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+   #      ax.set_xscale('log', nonposx='clip')
+   #      #ax.set_yscale('log', nonposy='clip')
+   #      ax.set_xlim((np.min(x), np.max(x)))
+   #      ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+   #      ax.set_ylabel(r'Effective bias $b$')
+   #      #
+   #      plt.show()
+
+
+         ###################################
+
+         # nGalEff of LIM
+         # full LIM
+         nGalEffLimFull = self.Prof.Lf.nGalEff(z)
+         # masked LIM
+         def f(lMin): return self.Prof.Lf.nGalEff(z, lMin=0., lMax=lMin)
+         nGalEffLimLowL = np.array(map(f, LMin))
+         # detected galaxies, weighted by luminosity
+         def f(lMin): return self.Prof.Lf.nGalEff(z, lMin=lMin, lMax=np.inf)
+         nGalEffLimHighL = np.array(map(f, LMin))
+
+
+         # nGalEff of detected galaxies = nGal
+         # from luminosity cut
+         def f(lMin):
+            return self.Prof.Lf.nGal(z, lMin=lMin, lMax=np.inf)
+         nGalEffGalL = np.array(map(f, LMin))
+
+
+         # Compare nGalEff: unmasked LIM vs bright galaxies
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         #
+         ax.axhline(nGalEffLimFull, c='k', ls='--', label=r'LIM')
+         ax.plot(x, nGalEffGalL, label=r'Galaxies $(L>L_\text{min})$')
+         #
+         ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         ax.set_yscale('log', nonposy='clip')
+         ax.set_xlim((np.min(x), np.max(x)))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}$ [(Mpc/$h$)$^{-3}$]')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_neff_detnoise_lim_vs_brightgal_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+         # Compare nGalEff: unmasked vs masked LIM
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         #
+         ax.axhline(nGalEffLimFull, c='k', ls='--', label=r'LIM')
+         ax.plot(x, nGalEffLimLowL, label=r'Masked LIM $(L<L_\text{min})$')
+         #
+         ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         ax.set_yscale('log', nonposy='clip')
+         ax.set_xlim((np.min(x), np.max(x)))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}$ [(Mpc/$h$)$^{-3}$]')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_neff_detnoise_masked_vs_unmasked_lim_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+         # Compare nGalEff: bright gal, number or luminosity weighted
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         #
+         ax.plot(x, nGalEffGalL, label=r'Number weighted galaxies $(L>L_\text{min})$')
+         ax.plot(x, nGalEffLimHighL, label=r'Luminosity weighted galaxies $(L>L_\text{min})$')
+         #
+         ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         ax.set_yscale('log', nonposy='clip')
+         ax.set_xlim((np.min(x), np.max(x)))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}$ [(Mpc/$h$)$^{-3}$]')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_neff_detnoise_brightgal_weighting_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+
+   #      # Compare nGalEff
+   #      fig=plt.figure(0)
+   #      ax=fig.add_subplot(111)
+   #      #
+   #      x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+   #      x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+   #      #
+   #      ax.axhline(nGalEffLimFull, c='k', ls='--', label=r'LIM')
+   #      ax.plot(x, nGalEffLimLowL, label=r'Masked LIM $(L<L_\text{min})$')
+   #      ax.plot(x, nGalEffGalL, label=r'Galaxies $(L>L_\text{min})$')
+   #      ax.plot(x, nGalEffLimHighL, label=r'LIM-weighted galaxies $(L>L_\text{min})$')
+   #      #
+   #      ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+   #      ax.set_xscale('log', nonposx='clip')
+   #      ax.set_yscale('log', nonposy='clip')
+   #      ax.set_xlim((np.min(x), np.max(x)))
+   #      ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+   #      ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}$ [(Mpc/$h$)$^{-3}$]')
+   #      #
+   #      plt.show()
+
+         ###################################
+
+         # Compare nP with 1 for detected galaxies
+         # at k = 0.1 h/Mpc, where we are clearly 2-halo dominated
+         k = 0.1  # [h/Mpc]
+         pLin = self.U.pLin(k, z)   # [(Mpc/h)^3]
+         snrGal = bGalM**2 * pLin / (bGalM**2 * pLin + 1./nGalEffGalL)
+
+         # compare p2h/(pShot+Ndet) with 1 for LIM
+         # at k = 0.1 h/Mpc, where we are clearly 2-halo dominated
+         # Get the beam value at that k
+         psf = self.U.psfF(k, fwhmPsf, z)   # [dimless]
+         # assume the Fourier mode is radial
+         spsf = 1.   #self.U.spectralPsfF(kPara, R, z)   # [dimless]
+         w = psf * spsf
+
+         # LIM full
+         snrLimFull = self.p2h(k,z) / (self.p2h(k,z) + self.pShot(z) + DetNoisePower / w**2)
+         # masked LIM
+         def f(mMin):
+            return self.p2h(k, z, mMin=0., mMax=mMin)
+         p2hLimLowM = np.array(map(f, MMin))
+         def f(mMin):
+            return self.pShot(z, mMin=0., mMax=mMin)
+         pShotLimLowM = np.array(map(f, MMin))
+         snrLimLowM = p2hLimLowM / (p2hLimLowM + pShotLimLowM + DetNoisePower / w**2)
+         # detected galaxies, weighted by luminosity,
+         # hence no detector noise
+         def f(mMin):
+            return self.p2h(k, z, mMin=mMin, mMax=np.inf)
+         p2hLimHighM = np.array(map(f, MMin))
+         def f(mMin):
+            return self.pShot(z, mMin=mMin, mMax=np.inf)
+         pShotLimHighM = np.array(map(f, MMin))
+         # For the bright galaxies, one would generate the LIM
+         # from the individually measured luminosities,
+         # so there is no detector noise
+         #snrLimHighM = p2hLimHighM / (p2hLimHighM + pShotLimHighM)
+         snrLimHighM = bLimHighM**2 * pLin / (bLimHighM**2 * pLin + 1. / nGalEffLimHighL)
+
+         # Compare nP: unmasked LIM vs bright galaxies
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         #
+         ax.plot(x, snrLimFull, c='k', ls='--', label=r'LIM')
+         ax.plot(x, snrGal, label=r'Galaxies $(L>L_\text{min})$')
+         #
+         ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         #ax.set_yscale('log', nonposy='clip')
+         ax.set_ylim((0., 1.1))
+         ax.set_xlim((np.min(x), np.max(x)))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         #ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}\ b^2 P_\text{lin}$')
+         ax.set_ylabel(r'$\text{SNR}_{P_\text{lin}}(k=0.1 h/\text{Mpc})$')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_snr_detnoise_lim_vs_brightgal_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+         # Compare nP: unmasked vs masked LIM
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         #
+         ax.plot(x, snrLimFull, c='k', ls='--', label=r'LIM')
+         ax.plot(x, snrLimLowM, label=r'Masked LIM $(M<M_\text{min})$')
+         #
+         ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         #ax.set_yscale('log', nonposy='clip')
+         ax.set_ylim((0., 1.1))
+         ax.set_xlim((np.min(x), np.max(x)))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         #ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}\ b^2 P_\text{lin}$')
+         ax.set_ylabel(r'$\text{SNR}_{P_\text{lin}}(k=0.1 h/\text{Mpc})$')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_snr_detnoise_masked_vs_unmasked_lim_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+         # Compare nP: bright gal, number or luminosity weighted
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+         #
+         ax.plot(x, snrGal, label=r'Number weighted galaxies $(L>L_\text{min})$')
+         ax.plot(x, snrLimHighM, label=r'Luminosity weighted galaxies $(L>L_\text{min})$')
+         #
+         ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         #ax.set_yscale('log', nonposy='clip')
+         ax.set_ylim((0., 1.1))
+         ax.set_xlim((np.min(x), np.max(x)))
+         ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
+         #ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}\ b^2 P_\text{lin}$')
+         ax.set_ylabel(r'$\text{SNR}_{P_\text{lin}}(k=0.1 h/\text{Mpc})$')
+         #
+         fig.savefig('./figures/p3d_rsd/2d_'+exp+'_snr_detnoise_brightgal_weighting_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+
+
+   #      fig=plt.figure(0)
+   #      ax=fig.add_subplot(111)
+   #      #
+   #      x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+   #      x /= dVdOmega  # convert 3d power to 2d power [(Jy/sr)^2 * sr]
+   #      #
+   #      ax.plot(x, nPLimFull, c='k', ls='--', label=r'LIM')
+   #      ax.plot(x, nPLimLowM, label=r'Masked LIM $(M<M_\text{min})$')
+   #      #ax.plot(x, p2hLimM / pShotLimM, 'k--')
+   #      #ax.plot(x, p2hLimM / DetNoisePower, 'ko')
+   #      ax.plot(x, nPLimHighM, label=r'LIM-weighted galaxies $(M>M_\text{min})$')
+   #      #
+   #      ax.plot(x, nPGal, label=r'Galaxies $(L>L_\text{min})$')
+   #      #
+   #      ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+   #      ax.set_xscale('log', nonposx='clip')
+   #      ax.set_yscale('log', nonposy='clip')
+   #      ax.set_xlim((np.min(x), np.max(x)))
+   #      ax.set_xlabel(r'Detector noise power [Jy$^2$/sr]')
    #      ax.set_ylabel(r'$\bar{n}_\text{gal}^\text{eff}\ b^2 P_\text{lin}$')
    #      #
    #      plt.show()

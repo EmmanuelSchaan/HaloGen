@@ -304,26 +304,27 @@ p = pRsdHa[key]
 p.plotPMuDpdce(lfHa[key].Z[0], exp='SPHEREx')
 pRsdCO['Popping16'].plotPMuDpdce(2., exp='COMAP')
 pRsdCii['Popping16'].plotPMuDpdce(6., exp='CONCERTO')
-'''
 
 p.plotFourierModes()
+'''
+
 
 ##################################################################################
 # LIM vs galaxy surveys
 '''
-pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(exp='spherex')
-pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter(exp='spherex')
-#pRsdCii['Popping16'].plotSigmaLumMatchedFilter(exp='spherex')
-#pRsdCO['Popping16'].plotSigmaLumMatchedFilter(exp='spherex')
-#pRsdLya['Cassata11'].plotSigmaLumMatchedFilter(exp='spherex')
+# in 3d RSD
+pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(exp='SPHEREx')
+pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter(exp='SPHEREx')
+pRsdCO['Popping16'].plotSigmaLumMatchedFilter(exp='COMAP')
+pRsdCii['Popping16'].plotSigmaLumMatchedFilter(exp='CONCERTO')
 '''
+# in 2d
+pRsdCii['Popping16'].plotSigmaLumMatchedFilter(exp='CCAT-P')
 
-#pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(exp='spherex')
-#pRsdCii['Popping16'].plotSigmaLumMatchedFilter(exp='ccatprime')
-#pRsdCO['Popping16'].plotSigmaLumMatchedFilter(exp='comap')
 
 ##################################################################################
 # Compare references
+
 '''
 pRsdHa['Cochrane17'].compareP(ps=[pRsdHa[key] for key in pRsdHa.keys()])
 pRsdOiii['Colbert13'].compareP(ps=[pRsdOiii[key] for key in pRsdOiii.keys()])
@@ -331,6 +332,7 @@ pRsdCii['Popping16'].compareP()
 pRsdCO['Popping16'].compareP()
 pRsdLya['Cassata11'].compareP()
 '''
+
 
 ##################################################################################
 # Compute the mass build up of the power spectrum

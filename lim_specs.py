@@ -15,7 +15,6 @@ class LimSpecs(object):
          self.fSkyExp = 2. * 100. * (np.pi/180.)**2 / (4.*np.pi) # 2 * 100 deg2 deep fields
          self.pixelAngularArea = (6.*np.pi/(180.*3600.))**2  # 6''*6'' in [sr]
 
-
       elif exp=='COMAPPathfinder':
          self.RR = np.array([800.])
          self.fwhmPsf = 3.*np.pi/(180.*60.) # 3' in [rad]
@@ -27,8 +26,6 @@ class LimSpecs(object):
          self.fwhmPsf = 3.*np.pi/(180.*60.) # 3' in [rad]
          self.fSkyExp = 6.25 * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
          self.pixelAngularArea = (self.fwhmPsf / 2.)**2 # assume two pixels per PSF FWHM
-
-
 
       elif exp=='CONCERTO':
          self.RR = np.array([300.])

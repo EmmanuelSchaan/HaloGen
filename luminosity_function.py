@@ -739,10 +739,12 @@ class LF(object):
       ax.plot(Z, n, label=r'CONCERTO: [C{\sc ii}]')
 
 
+      ax.axhline(1., c='gray', alpha=0.5)
+      #
       ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
       #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
       ax.set_xlim((0., 6.))
-      ax.set_ylim((1.e-4, 1.))
+      ax.set_ylim((1.e-4, 20.))
       ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{N}^\text{gal eff}$ per voxel')
