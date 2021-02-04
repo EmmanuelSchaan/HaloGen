@@ -43,8 +43,10 @@ u = UnivPlanck15()
 #u.plotSigma2V1d()
 #u.plotSigma2DispFog()
 #u.plotKMaxParaSpectroRes()
-#u.plotKMaxPerpPsf()
-#u.plotKFPerp()
+'''
+u.plotKMaxPerpPsf()
+u.plotKFPerp()
+'''
 #u.plotTradeOffNModes()
 
 
@@ -55,6 +57,45 @@ u = UnivPlanck15()
 #massFunc = MassFuncPS(u, save=True)
 massFunc = MassFuncST(u, save=False)
 #massFunc = MassFuncTinker(u, save=True)
+
+
+##################################################################################
+# Experimental specs
+
+
+#import lim_specs
+#reload(lim_specs)
+#from lim_specs import *
+
+spherexSpecs = LimSpecs(u, exp='SPHEREx')
+'''
+print floatExpForm(spherexSpecs.whiteNoisePower(0.8))
+print floatExpForm(spherexSpecs.whiteNoisePower(1.))
+print floatExpForm(spherexSpecs.whiteNoisePower(2.))
+'''
+comapSpecs = LimSpecs(u, exp='COMAP')
+'''
+print floatExpForm(comapSpecs.whiteNoisePower(1.))
+print floatExpForm(comapSpecs.whiteNoisePower(2.))
+print floatExpForm(comapSpecs.whiteNoisePower(4.))
+print floatExpForm(comapSpecs.whiteNoisePower(6.))
+'''
+concertoSpecs = LimSpecs(u, exp='CONCERTO')
+'''
+print floatExpForm(concertoSpecs.whiteNoisePower(1.))
+print floatExpForm(concertoSpecs.whiteNoisePower(2.))
+print floatExpForm(concertoSpecs.whiteNoisePower(3.))
+print floatExpForm(concertoSpecs.whiteNoisePower(4.))
+print floatExpForm(concertoSpecs.whiteNoisePower(6.))
+'''
+hetdexSpecs = LimSpecs(u, exp='HETDEX')
+'''
+print floatExpForm(hetdexSpecs.whiteNoisePower(2.475))
+print floatExpForm(hetdexSpecs.whiteNoisePower(3.775))
+print floatExpForm(hetdexSpecs.whiteNoisePower(5.575))
+'''
+cdimSpecs = LimSpecs(u, exp='CDIM')
+
 
 
 ##################################################################################
@@ -78,6 +119,7 @@ sfr.plotdlnAlldlnm()
 #sfr.plotdlnbEff2dlnm()
 #sfr.plotdlnP1hdlnm()
 '''
+
 
 ##################################################################################
 ##################################################################################
@@ -120,17 +162,24 @@ lfCO['Popping16'] = LFCOPopping16(u, 1)   # CO 1-0 transition
 lfLya = {}
 lfLya['Cassata11'] = LFLyaCassata11(u)
 
-# lf = lfHaSobral12
+#lf = lfHa['Cochrane17']
 #lf.plotnGal()
 #lf.plotMeanIntensity()
 #lf.plotLf()
 #lf.plotnGalEff()
 #lf.plotShotNoise()
 #lf.plotS2()
+#lf.plotSchechterProperties()
 
 #print lfOiiiMehta15.computeCorrCoeffHaOIII()
 #lfOiiiMehta15.plotBivariateLf()
 
+##################################################################################
+# General properties of Schechter functions
+'''
+lf = LFHaCochrane17(u)
+lf.plotSchechterProperties()
+'''
 
 ##################################################################################
 # Plot: luminosity functions
@@ -186,13 +235,13 @@ lfLya['Cassata11'].plotnGalEff()
 # Plot: NGalEff
 
 '''
-lfHa['Sobral12'].plotNGalEffSparsitySummary()
-#lfHa['Sobral12'].plotNGalEffSparsity(lfs=[lfHa[key] for key in lfHa.keys()], exp='SPHEREx')
-#lfOiii['Colbert13'].plotNGalEffSparsity(lfs=[lfOiii[key] for key in lfOiii.keys()], exp='SPHEREx')
-#lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO')
-#lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP')
-#lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx')
+lfHa['Sobral12'].plotNGalEffSparsity(lfs=[lfHa[key] for key in lfHa.keys()], exp='SPHEREx', sfr=sfr)
+lfOiii['Colbert13'].plotNGalEffSparsity(lfs=[lfOiii[key] for key in lfOiii.keys()], exp='SPHEREx', sfr=sfr)
+lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO', sfr=sfr)
+lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP', sfr=sfr)
+lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx', sfr=sfr)
 '''
+#lfHa['Sobral12'].plotNGalEffSparsitySummary()
 
 ##################################################################################
 # Plot: shot noise
@@ -252,6 +301,23 @@ for key in lfLya.keys():
 
 
 ##################################################################################
+# Plot the halo mass-luminosity relation
+
+#import profile
+#reload(profile)
+#from profile import *
+#
+#profLimLfHa['Cochrane17'] = ProfLIMLF(u, sfr, lfHa['Cochrane17'], trunc=4., a=1.)
+
+'''
+profLimLfHa['Cochrane17'].plotLuminosityMassRelation()
+profLimLfOiii['Colbert13'].plotLuminosityMassRelation()
+profLimLfCii['Popping16'].plotLuminosityMassRelation()
+profLimLfCO['Popping16'].plotLuminosityMassRelation()
+profLimLfLya['Cassata11'].plotLuminosityMassRelation()
+'''
+
+##################################################################################
 ##################################################################################
 
 # halo model integrals
@@ -304,23 +370,42 @@ p = pRsdHa[key]
 p.plotPMuDpdce(lfHa[key].Z[0], exp='SPHEREx')
 pRsdCO['Popping16'].plotPMuDpdce(2., exp='COMAP')
 pRsdCii['Popping16'].plotPMuDpdce(6., exp='CONCERTO')
-
+'''
+'''
 p.plotFourierModes()
 '''
 
-
 ##################################################################################
 # LIM vs galaxy surveys
-'''
+
 # in 3d RSD
-pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(exp='SPHEREx')
-pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter(exp='SPHEREx')
-pRsdCO['Popping16'].plotSigmaLumMatchedFilter(exp='COMAP')
-pRsdCii['Popping16'].plotSigmaLumMatchedFilter(exp='CONCERTO')
+'''
+pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(specs=cdimSpecs)
+pRsdLya['Cassata11'].plotSigmaLumMatchedFilter(specs=hetdexSpecs)
+'''
+'''
+pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
+pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
+
+pRsdCO['Popping16'].plotSigmaLumMatchedFilter(specs=comapSpecs)
+pRsdCii['Popping16'].plotSigmaLumMatchedFilter(specs=concertoSpecs)
+'''
+'''
+# summary plots
+pList = [pRsdHa['Cochrane17'], pRsdHa['Cochrane17'], pRsdOiii['Colbert13'], pRsdLya['Cassata11'],  pRsdCO['Popping16'], pRsdCii['Popping16']]
+specsList = [spherexSpecs, cdimSpecs, spherexSpecs, hetdexSpecs, comapSpecs, concertoSpecs]
+pRsdHa['Cochrane17'].plotLimVsGalDet(pList, specsList)
+'''
+
+#pList = [pRsdLya['Cassata11']]
+#specsList = [hetdexSpecs]
+#pRsdLya['Cassata11'].plotLimVsGalDet(pList, specsList)
+
+
 '''
 # in 2d
-pRsdCii['Popping16'].plotSigmaLumMatchedFilter(exp='CCAT-P')
-
+pRsdCii['Popping16'].plotSigmaLumMatchedFilter2d(exp='CCAT-P')
+'''
 
 ##################################################################################
 # Compare references
@@ -339,13 +424,15 @@ pRsdLya['Cassata11'].compareP()
 '''
 p.plotCumulMassContributionP(mu=0)
 p.plotMassContributionP(mu=0)
-
+'''
+'''
 p.plotCumulMassContributionP(mu=0.5)
 p.plotMassContributionP(mu=0.5)
 '''
 
 ##################################################################################
 # Show the 2h/1h/shot noise terms
+
 '''
 p.plotPTermsZ(mu=0.)
 p.plotPTermsZ(mu=0.5)
@@ -379,13 +466,13 @@ for key in lfHa.keys():
 #p.plotRequiredAreaToDetectAUnmarginalized(2, kMax=0.1, exp='SPHEREx')
 p.plotRequiredAreaToDetectA(kMax=0.1, exp='SPHEREx', marg=False)
 p.plotRequiredAreaToDetectA(kMax=0.1, exp='SPHEREx', marg=True)
-'''
-'''
+
+
 # CO with COMAP
 pRsdCO['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='COMAP', marg=False)
 pRsdCO['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='COMAP', marg=True)
-'''
-'''
+
+
 # [CII] with CONCERTO
 pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=False)
 pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=True)
@@ -396,52 +483,29 @@ pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=Tr
 ##################################################################################
 # RSD cross power spectrum
 
-'''
-key = 'Cochrane17'
-profHa = ProfLIMLF(u, sfr, lfHa[key], trunc=4., a=1.1)
-key = 'Mehta15'
-profOiii = ProfLIMLF(u, sfr, lfOiii[key], trunc=4., a=0.8)
 
+#key = 'Cochrane17'
+#profHa = ProfLIMLF(u, sfr, lfHa[key], trunc=4., a=1.1)
+#key = 'Mehta15'
+#profOiii = ProfLIMLF(u, sfr, lfOiii[key], trunc=4., a=0.8)
+#
+#pHaOiii = P3dRsdCross(u, profHa, profOiii, massFunc, r=0.65, nProc=3)
+#pHaOiii.plotCorrCoeff(Z=[1., 2.])
 
-pHaOiii = P3dRsdCross(u, profHa, profOiii, massFunc, r=0.65, nProc=3)
-
-
-pHaOiii.plotCorrCoeff(Z=[1., 2.])
-'''
 
 '''
 # Example with high correlation coefficients: Ha - Oiii
 # line correlation coefficient from Mehta+15
 pHaOiii = P3dRsdCross(u, profLimLfHa['Cochrane17'], profLimLfOiii['Mehta15'], massFunc, r=0.65, nProc=3)
-
 pHaOiii.plotCorrCoeff(Z=[1., 2.])
-'''
-'''
+
 # Example with low correlation coefficient: Lya - CO
 # line correlation coefficient from EGG
-pLyaCO = P3dRsdCross(u, profLimLfLya['Cassata11'], profLimLfCO['Popping16'], massFunc, r=0.087, nProc=3)
-
+pLyaCO = P3dRsdCross(u, profLimLfLya['Cassata11'], profLimLfCO['Popping16'], massFunc, r=0.088, nProc=3)
 pLyaCO.plotCorrCoeff(Z=[3., 4.])
 '''
 
 
-##################################################################################
-# Experimental specs
-
-'''
-import lim_specs
-reload(lim_specs)
-from lim_specs import *
-
-spherexSpecs = LimSpecs(u, exp='SPHEREx')
-print spherexSpecs.whiteNoisePower(1.)
-
-comapSpecs = LimSpecs(u, exp='COMAP')
-print comapSpecs.whiteNoisePower(1.)
-
-concertoSpecs = LimSpecs(u, exp='CONCERTO')
-print concertoSpecs.whiteNoisePower(5.)
-'''
 
 
 

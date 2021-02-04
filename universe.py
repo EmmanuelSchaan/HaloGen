@@ -377,6 +377,12 @@ class Universe(object):
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$k_{\perp\text{max}} \equiv 1/ \left(\chi\ \sigma_\text{PSF} \right)$ [$h$/Mpc]')
       #
+      # have the ticks in scientific format 
+      ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      # to get more tick marks on the y axis
+      ax.yaxis.set_major_locator(LogLocator(numticks=15))
+      ax.yaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
       plt.show()
 
 

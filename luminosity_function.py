@@ -284,6 +284,22 @@ class LF(object):
       plt.setp(axb1.get_yticklabels(), visible=False)
       #fig.subplots_adjust(wspace=0)
 
+      # More x-ticks, and in scientific notation
+      ax0.xaxis.set_major_locator(LogLocator(numticks=15))
+      ax0.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      ax1.xaxis.set_major_locator(LogLocator(numticks=15))
+      ax1.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      #
+      axb0.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      axb0.xaxis.set_major_locator(LogLocator(numticks=15))
+      axb0.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      axb1.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      axb1.xaxis.set_major_locator(LogLocator(numticks=15))
+      axb1.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+
       path = './figures/lf/dlnalldlnl_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
@@ -404,9 +420,23 @@ class LF(object):
          ax.set_xlabel(r'$L$ [Jy.m$^2$.Hz]')
       elif unit=='Jy*km/s*Mpc^2':
          ax.set_xlabel(r'$L$ [Jy.(km/s).Mpc$^2$]')
-      #ax.set_ylabel(r'$\Phi \times \text{Mpc}^3$')
-      ax.set_ylabel(r'$\frac{dN}{d\text{log}_{10}L\ dV}\ [\text{Mpc}^{-3}]$')
+      #
+      # full y-axis label
+      #ax.set_ylabel(r'$\frac{dN}{d\text{log}_{10}L\ dV}\ [\text{Mpc}^{-3} / \text{dex}]$')
+      # concise version
+      ax.set_ylabel(r'$\Psi\ [\text{Mpc}^{-3} / \text{dex}]$')
+      #
       ax.set_title(self.lineNameLatex+' Luminosity function')
+      #
+      # have the ticks in scientific format 
+      ax.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      # to get more tick marks on the x axis
+      ax.xaxis.set_major_locator(LogLocator(numticks=15))
+      ax.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      # to get more tick marks on the y axis
+      ax.yaxis.set_major_locator(LogLocator(numticks=15))
+      ax.yaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
       #
       path = './figures/lf/lf_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -579,30 +609,34 @@ class LF(object):
 #      #plt.show()
 
 
-   def plotNGalEffSparsity(self, lfs=None, exp='SPHEREx'):
+   def plotNGalEffSparsity(self, lfs=None, exp='SPHEREx', sfr=None):
       if lfs is None:
          lfs = [self]
-
-      # spectral resolution and angular pixel size
-      # for the requested experiment
-      if exp=='SPHEREx':
-         # the spectral resolution power is R=40 for the lower z, and 150 for the high z
-         R = 40.
-         thetaPix = 6.2 * np.pi/(180.*3600.)
-      elif exp=='COMAP':
-         R = 800.
-         # choose half the PSF FWHM
-         thetaPix = 0.5 * 3. * np.pi/(180.*60.)
-      elif exp=='CONCERTO':
-         R = 300.
-         # choose half the PSF FWHM
-         thetaPix = 0.5 * 0.24 * np.pi/(180.*60.)
-         
 
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
+      # Number of galaxies per voxel
       for lf in lfs:
+
+         # spectral resolution and angular pixel size
+         # for the requested experiment
+         if exp=='SPHEREx':
+            # the spectral resolution power is R=40 for the lower z, and 150 for the high z
+            R = 40.
+            if lf.lineName=='lya':
+               R = 150.
+            thetaPix = 6.2 * np.pi/(180.*3600.)
+         elif exp=='COMAP':
+            R = 800.
+            # choose half the PSF FWHM
+            thetaPix = 0.5 * 3. * np.pi/(180.*60.)
+         elif exp=='CONCERTO':
+            R = 300.
+            # choose half the PSF FWHM
+            thetaPix = 0.5 * 0.24 * np.pi/(180.*60.)
+            
+
          if hasattr(lf, 'Z'):
             Z = lf.Z
          else:
@@ -610,7 +644,6 @@ class LF(object):
 
          # compute voxel size
          # avoid z=0
-         Z = self.Z.copy()
          if Z[0]==0.:
             Z[0] = 1.e-2
          # hence the redshift size of the voxel
@@ -622,16 +655,48 @@ class LF(object):
          print "vVox=", vVox, "(Mpc/h)^3"
          # effective number of galaxies
          n = np.array(map(lf.nGalEff, Z))
+         print lf.name, n, vVox
          n *= vVox
          ax.plot(Z, n, label=lf.refLatex)
       #
-      ax.legend(loc='center right', fontsize='x-small', labelspacing=0.1)
+      # Number of halos per voxel
+      if sfr is not None:
+         # compute voxel volume
+         Z = np.linspace(0.01, 6., 51)
+         # hence the redshift size of the voxel
+         dz = (1. + Z) / R
+         # and the comoving depth of the voxel
+         dChi = dz * 3.e5 / self.U.hubble(Z)   # [Mpc/h]
+         # hence the voxel comoving volume
+         vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
+         #print "vVox=", vVox, "(Mpc/h)^3"
+         Ls = ['--', '-.']
+         Alpha = [0.6, 1.]
+         for iAlpha in range(len(Alpha)):
+            alpha = Alpha[iAlpha]
+            ls = Ls[iAlpha]
+            f = lambda z: sfr.nHEff(z, alpha1=alpha, alpha2=alpha) 
+            n = np.array(map(f, Z))
+            n *= vVox
+            ax.plot(Z, n, ls=ls, c='gray', lw=1, alpha=0.3, label=r'halos, $\gamma=$'+str(alpha))
+
+      #
+      ax.axhline(1., c='gray', alpha=0.5)
+      #
+      ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
       #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
       #ax.set_xlim((0., 7.))
+      ax.set_ylim((1.e-4, 20.))
       ax.set_yscale('log', nonposy='clip')
       ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'$\bar{N}^\text{gal eff}$ per '+exp+' voxel')
-      ax.set_title(self.lineNameLatex)
+      ax.set_ylabel(r'$\bar{N}^\text{gal eff}$ per voxel')
+      ax.set_title(self.lineNameLatex+' with '+exp)
+      #
+      # have the ticks in scientific format 
+      ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      # to get more tick marks on the y axis
+      ax.yaxis.set_major_locator(LogLocator(numticks=15))
+      ax.yaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
       #
       path = './figures/lf/galaxy_sparsity_'+exp+'_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -811,6 +876,116 @@ class LF(object):
 
       plt.show()
 
+
+   def plotSchechterProperties(self):
+
+      # Schechter power law index alpha
+      Alpha = np.array([-1.8, -1.5, -1.2])
+      Ls = np.array(['-', '--', ':'])
+
+      # Llim / Lstar
+      X = np.linspace(0., 7., 101)
+
+      def fracMomentUndetected(x, n, alpha):
+         '''fraction of the n-th moment 
+         from sources fainter than x = Llim / Lstar
+         '''
+         return special.gammainc(alpha+n+1, x)
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      # 0th moment is infinite
+      #
+      # first moment
+      plot = ax.plot([], [], c='b')
+      for iAlpha in range(len(Alpha)):
+         alpha = Alpha[iAlpha]
+         ls = Ls[iAlpha]
+         f = lambda x: fracMomentUndetected(x, 1, alpha)
+         fracM1 = np.array(map(f, X))
+         plot=ax.plot(X, fracM1, ls=ls, c=plot[0].get_color())
+      ax.fill_between(X, fracMomentUndetected(X, 1, np.min(Alpha)),
+                        fracMomentUndetected(X, 1, np.max(Alpha)),
+                        edgecolor='none', facecolor=plot[0].get_color(), 
+                        alpha=0.3, label=r'Mean intensity')
+      #
+      # second moment
+      plot = ax.plot([], [], c='g')
+      for iAlpha in range(len(Alpha)):
+         alpha = Alpha[iAlpha]
+         ls = Ls[iAlpha]
+         f = lambda x: fracMomentUndetected(x, 2, alpha)
+         fracM2 = np.array(map(f, X))
+         plot=ax.plot(X, fracM2, ls=ls, c=plot[0].get_color())
+      ax.fill_between(X, fracMomentUndetected(X, 2, np.min(Alpha)),
+                        fracMomentUndetected(X, 2, np.max(Alpha)),
+                        edgecolor='none', facecolor=plot[0].get_color(),
+                        alpha=0.3, label=r'Shot noise')
+      #
+      # add legend entries for the alpha values
+      for iAlpha in range(len(Alpha)):
+         alpha = Alpha[iAlpha]
+         ls = Ls[iAlpha]
+         ax.plot([], [], c='k', ls=ls, alpha=0.5, label=r'$\alpha='+str(alpha)+r'$')
+      #
+      ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$L_\text{lim}/L^\star$')
+      ax.set_ylabel(r'Fraction from undetected sources')
+      ax.set_xlim((np.min(X), np.max(X)))
+      ax.set_ylim((0., 1.1))
+      #
+      fig.savefig('./figures/lf/schechter_fracundet.pdf')
+
+      plt.show()
+
+
+      # Llim / Lstar
+      X = np.linspace(0.1, 7., 101)
+
+      def nGalDetOverPhiStar(x, n, alpha):
+         '''fraction of the n-th moment 
+         from sources fainter than x = Llim / Lstar
+         '''
+         def integrand(t):
+            result = t**(alpha+n) * np.exp(-t)
+            return result
+         result = integrate.quad(integrand, x, np.inf, epsabs=0., epsrel=1.e-3)[0]
+         return result
+
+         #return special.gammaincc(alpha+n+1, x)
+      
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      # 0th moment is infinite
+      plot = ax.plot([], [], c='b')
+      for iAlpha in range(len(Alpha)):
+         alpha = Alpha[iAlpha]
+         ls = Ls[iAlpha]
+         f = lambda x: nGalDetOverPhiStar(x, 0, alpha)
+         nGal = np.array(map(f, X))
+         plot=ax.plot(X, nGal, ls=ls, c=plot[0].get_color(), label=r'$\alpha='+str(alpha)+r'$')
+      #
+      f = lambda x: nGalDetOverPhiStar(x, 0, np.min(Alpha))
+      nGalMin = np.array(map(f, X))
+      f = lambda x: nGalDetOverPhiStar(x, 0, np.max(Alpha))
+      nGalMax = np.array(map(f, X))
+      ax.fill_between(X, nGalMin,
+                        nGalMax,
+                        edgecolor='none', facecolor=plot[0].get_color(), 
+                        alpha=0.3)
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$L_\text{lim}/L^\star$')
+      ax.set_ylabel(r'$\bar{n}_\text{gal} / \Phi^\star$')
+      ax.set_xlim((np.min(X), np.max(X)))
+      ax.set_yscale('log', nonposy='clip')
+      #
+      fig.savefig('./figures/lf/schechter_ngal.pdf')
+
+      plt.show()
 
 
 

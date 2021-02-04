@@ -86,6 +86,8 @@ class Sfr(object):
 
    def plotnHEff(self):
 
+      Z = np.linspace(0., 7., 101)
+
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
@@ -93,21 +95,25 @@ class Sfr(object):
       A = [0.6, 0.8, 1.0, 1.1]
       for a in A:
          f = lambda z: self.nHEff(z, alpha1=a, alpha2=a)
-         n = np.array(map(f, self.Z))
-         ax.plot(self.Z, n, label=r'$\alpha=$'+str(round(a, 1)))
+         n = np.array(map(f, Z))
+         ax.plot(Z, n, label=r'$\gamma=$'+str(round(a, 1)))
       #
       ax.set_yscale('log', nonposy='clip')
       #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
       ax.set_xlim((0., 7.))
-      ax.set_ylim((5.e-4, 1.e-1))
+      ax.set_ylim((4.e-3, 1.))
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{n}^\text{h eff}$ [(Mpc/$h$)$^{-3}$]')
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      # keep all ticks in scientific format 
+      ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+      ax.xaxis.get_major_formatter().set_scientific(True)
       #
       path = './figures/sfr/nheff_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
+
 
       fig=plt.figure(1)
       ax=fig.add_subplot(111)
@@ -116,8 +122,8 @@ class Sfr(object):
       A = [0.6, 0.8, 1.0, 1.1]
       for a in A:
          f = lambda z: self.nHEff(z, alpha1=a, alpha2=a)
-         n = np.array(map(f, self.Z))
-         ax.plot(self.Z, 1./n, label=r'$\alpha=$'+str(round(a, 1)))
+         n = np.array(map(f, Z))
+         ax.plot(Z, 1./n, label=r'$\alpha=$'+str(round(a, 1)))
       #
       ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
       ax.set_yscale('log', nonposy='clip')
@@ -208,7 +214,7 @@ class Sfr(object):
       f = lambda z: self.nHEff(z, alpha1=1., alpha2=1.) 
       n = np.array(map(f, Z))
       n *= vVox
-      ax.plot(Z, n, label=r'SPHEREx: H$\alpha$, O{\sc iii} ($\alpha=1$)')
+      ax.plot(Z, n, label=r'SPHEREx: H$\alpha$, O{\sc iii} ($\gamma=1$)')
       # get the color palette moving
       ax.plot([], [])
 
@@ -227,7 +233,7 @@ class Sfr(object):
       f = lambda z: self.nHEff(z, alpha1=0.6, alpha2=0.6) 
       n = np.array(map(f, Z))
       n *= vVox
-      ax.plot(Z, n, label=r'COMAP: CO ($\alpha=0.6$)')
+      ax.plot(Z, n, label=r'COMAP: CO ($\gamma=0.6$)')
 
       # CONCERTO: CII
       R = 300.
@@ -244,7 +250,7 @@ class Sfr(object):
       f = lambda z: self.nHEff(z, alpha1=0.6, alpha2=0.6) 
       n = np.array(map(f, Z))
       n *= vVox
-      ax.plot(Z, n, label=r'CONCERTO: [C{\sc ii}] ($\alpha=1$)')
+      ax.plot(Z, n, label=r'CONCERTO: [C{\sc ii}] ($\gamma=1$)')
 
       ax.axhline(1., c='gray', alpha=0.5)
       #
@@ -256,6 +262,12 @@ class Sfr(object):
       ax.set_xlabel(r'$z$')
       ax.set_ylabel(r'$\bar{N}^h_\text{eff}$ per voxel')
       ax.set_title(r'Halo sparsity')
+      #
+      # have the ticks in scientific format 
+      ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      # to get more tick marks on the y axis
+      ax.yaxis.set_major_locator(LogLocator(numticks=15))
+      ax.yaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
       #
       path = './figures/sfr/halo_sparsity_summary_'+self.name+'.pdf'
       fig.savefig(path, bbox_inches='tight')
@@ -280,6 +292,8 @@ class Sfr(object):
 
 
    def plotBEff(self):
+      Z = np.linspace(0., 7., 101)
+
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
@@ -287,12 +301,12 @@ class Sfr(object):
       A = [0.6, 0.8, 1.0, 1.1]
       for a in A:
          f = lambda z: self.bEff(z, alpha=a) 
-         b = np.array(map(f, self.Z))
-         ax.plot(self.Z, b, label=r'$\alpha$='+str(round(a, 1)))
+         b = np.array(map(f, Z))
+         ax.plot(Z, b, label=r'$\gamma$='+str(round(a, 1)))
       #
       # compare with growth rate, to see the impact of Kaiser
-      f = self.U.bg.scale_independent_growth_rate(self.Z)
-      ax.plot(self.Z, f, 'r--', label=r'Growth rate $f$')
+      f = self.U.bg.scale_independent_growth_rate(Z)
+      ax.plot(Z, f, 'r--', label=r'Growth rate $f$')
       #
       #ax.set_xlim((np.min(self.Z), np.max(self.Z)))
       ax.set_xlim((0., 7.))
@@ -434,7 +448,7 @@ class Sfr(object):
       in the same figure.
       '''
       #M = np.logspace(np.log10(1.e6), np.log10(1.e16), 5, 10.) # [Msun/h]
-      M = np.logspace(np.log10(1.e6), np.log10(1.e16), 101, 10.) # [Msun/h]
+      M = np.logspace(np.log10(1.e7), np.log10(1.e15), 101, 10.) # [Msun/h]
       Z = np.array([0.001, 1., 2., 3., 4.])
 
 #      fig=plt.figure(0)
@@ -482,6 +496,7 @@ class Sfr(object):
       axb0.set_ylim((0., 1.))
       axb0.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
       axb0.set_ylabel(r'Cumulative')
+      axb0.tick_params(axis='x', which='major', labelsize=16)
 
       # Bias squared
       #ax1=plt.subplot(gs[1], sharey=ax0)
@@ -506,6 +521,7 @@ class Sfr(object):
       axb1.set_xlim((M.min(), M.max()))
       axb1.set_ylim((0., 1.))
       axb1.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+      axb1.tick_params(axis='x', which='major', labelsize=16)
       
       # 1-halo term
       #ax2=plt.subplot(gs[2], sharey=ax1)
@@ -530,6 +546,7 @@ class Sfr(object):
       axb2.set_xlim((M.min(), M.max()))
       axb2.set_ylim((0., 1.))
       axb2.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+      axb2.tick_params(axis='x', which='major', labelsize=16)
 
       # remove vertical gap between subplots
       #plt.subplots_adjust(wspace=0.)
@@ -539,6 +556,30 @@ class Sfr(object):
       plt.setp(axb1.get_yticklabels(), visible=False)
       plt.setp(axb2.get_yticklabels(), visible=False)
       #fig.subplots_adjust(wspace=0)
+
+      # More x-ticks, and in scientific notation
+      ax0.xaxis.set_major_locator(LogLocator(numticks=15))
+      ax0.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      ax1.xaxis.set_major_locator(LogLocator(numticks=15))
+      ax1.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      ax2.xaxis.set_major_locator(LogLocator(numticks=15))
+      ax2.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      #
+      axb0.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      axb0.xaxis.set_major_locator(LogLocator(numticks=15))
+      axb0.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      axb1.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      axb1.xaxis.set_major_locator(LogLocator(numticks=15))
+      axb1.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      axb2.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      axb2.xaxis.set_major_locator(LogLocator(numticks=15))
+      axb2.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+
 
       # Save to file
       path = './figures/sfr/dlnalldlnm_'+self.name+'.pdf'
@@ -582,12 +623,26 @@ class Sfr(object):
       relation L = K * SFR(m,z)**alpha
       K [Lsun / (Msun/yr)^alpha]
       '''
-      print "massFromLum", L, z
-      print self.luminosity(1.e3, z, K, alpha=alpha), self.luminosity(1.e30, z, K, alpha=alpha)
-      f = lambda m: self.luminosity(m, z, K, alpha=alpha) - L
       mMin = 1.e3 # [Msun/h]
-      mMax = 1.e30 # [Msun/h]
-      return optimize.brentq(f, mMin, mMax)
+      mMax = 1.e45 # [Msun/h]
+      
+      # convert masses to luminosities to check bounds
+      lMin = self.luminosity(mMin, z, K, alpha=alpha)
+      lMax = self.luminosity(mMax, z, K, alpha=alpha)
+      #print "massFromLum", floatExpForm(L), z
+      #print floatExpForm(lMin), floatExpForm(lMax)
+      
+      # if input L is out of bounds,
+      # return the bound
+      if L<lMin:
+         return mMin
+      elif L>lMax:
+         return mMax
+      else:
+         f = lambda m: self.luminosity(m, z, K, alpha=alpha) - L
+         return optimize.brentq(f, mMin, mMax)
+
+
 
 
 ##################################################################################

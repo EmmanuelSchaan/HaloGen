@@ -1926,8 +1926,52 @@ class ProfLIMLF(Profile):
 
 
 
+   def plotLuminosityMassRelation(self):
+      '''Plot halo luminosity as a function of halo mass,
+      given the line LF and the SFR-luminosity relation.
+      '''
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
 
+      for iZ in range(len(self.Lf.Z)):
+         z = self.Lf.Z[iZ]
 
+         # get the Kennicutt-Schmidt constant
+         K = self.Sfr.kennicuttSchmidtConstant(z, self.Lf, alpha=self.a)
+         print "KS constant", K
+
+         # halo masses to be plotted
+         M = np.logspace(np.log10(1.e10), np.log10(1.e16), 101, 10.) # [Msun/h]
+
+         # convert to luminosities
+         f = lambda m: self.Sfr.luminosity(m, z, K, alpha=self.a) 
+         L_Lsun = np.array(map(f, M))  # [Lsun]
+         # convert to [erg/s]
+         L_cgs = L_Lsun * self.Lf.convertLumUnit('cgs')
+
+         # plot it
+         ax.plot(M, L_cgs, label=r'$z=$'+str(round(z, 1)))
+
+      ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlabel(r'Halo mass $m$ [$M_\odot/h$]')
+      ax.set_ylabel(r'Halo luminosity $L_h$ [erg/s]')
+      ax.set_title(self.Lf.lineNameLatex)
+      #
+      # have the ticks in scientific format 
+      ax.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      # to get more tick marks on the x axis
+      ax.xaxis.set_major_locator(LogLocator(numticks=15))
+      ax.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      # to get more tick marks on the y axis
+      ax.yaxis.set_major_locator(LogLocator(numticks=15))
+      ax.yaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      fig.savefig('./figures/profile/halo_luminosity_'+str(self)+'.pdf')
+      fig.clf()
+      #plt.show()
 
 
 

@@ -32,6 +32,19 @@ class LimSpecs(object):
          self.fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
          self.fSkyExp = 2. * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
          self.pixelAngularArea = (self.fwhmPsf / 2.)**2 # assume two pixels per PSF FWHM
+      
+      elif exp=='HETDEX':
+         self.RR = np.array([800.])
+         self.fSkyExp = 300. * (np.pi/180.)**2 / (4.*np.pi) # convert from [deg^2]
+         self.pixelAngularArea = (3. * np.pi/180./3600.)**2 # [sr]
+         self.fwhmPsf = 3. * np.pi/180./3600.   # assume one pixel per PSF FWHM for HETDEX
+
+      elif exp=='CDIM':
+         self.RR = np.array([300.])
+         self.fSkyExp = 100. * (np.pi/180.)**2 / (4.*np.pi) # convert from [deg^2]
+         self.pixelAngularArea = (1. * np.pi/180./3600.)**2 # [sr]
+         self.fwhmPsf = 2. * np.pi/180./3600.   # assume two pixels per PSF FWHM
+
 
 
       self.R = self.RR[0]
@@ -82,6 +95,9 @@ class LimSpecs(object):
    def whiteNoisePower(self, z, R=None):
       '''White noise power spectrum [(Jy/sr)^2 * (Mpc/h)^3]
       '''
+      if R is None:
+         R = self.R
+
       if self.exp=='SPHEREx':
          # Inferred from SPHEREx science book
          mAB5Sigma = 22 # 5sigma lim mag for point source (Cheng+18)
@@ -139,6 +155,34 @@ class LimSpecs(object):
          tPixel = tSurvey * nPixel * beamSolidAngle / surveyAngularArea   # [s]
          # compute white noise power spectrum
          result = sigmaPixel**2 / tPixel * self.voxelComovingVolume(z, R=R)
+
+      elif self.exp=='HETDEX':
+         # focus on Lyman-alpha
+         lambdaMicrons = 121.567e-3  # [mu]
+         nuHz = 299792458. / lambdaMicrons * 1.e6 # [Hz]
+         nuHz /= (1.+z) # convert from rest to observed freq
+         # flux noise from Hill+08, Cheng+18 (similar to Hill+16)
+         # they quote the 5-sigma uncertainty --> divide by 5
+         sigmaFPixel = 5.5e-17 / 5.   # [erg/s/cm^2]
+         # convert from flux to intensity
+         sigmaIPixel = sigmaFPixel / self.pixelAngularArea * R/nuHz   # [erg/s/cm^2/sr/Hz]
+         sigmaIPixel /= 1.e-23  # [Jy/sr]
+         # convert to noise power spectrum
+         result = sigmaIPixel**2 * self.voxelComovingVolume(z, R=R)
+
+      elif self.exp=='CDIM':
+         # focus on H-alpha
+         lambdaMicrons = 656.28e-3   # [mu]
+         nuHz = 299792458. / lambdaMicrons * 1.e6 # [Hz]
+         nuHz /= (1.+z) # convert from rest to observed freq
+         # flux noise from Cooray+16
+         # they quote the 5-sigma uncertainty --> divide by 5
+         sigmaFPixel = 1.e-18 / 5.   # [erg/s/cm^2]
+         # convert from flux to intensity
+         sigmaIPixel = sigmaFPixel / self.pixelAngularArea * R/nuHz   # [erg/s/cm^2/sr/Hz]
+         sigmaIPixel /= 1.e-23  # [Jy/sr]
+         # convert to noise power spectrum
+         result = sigmaIPixel**2 * self.voxelComovingVolume(z, R=R)
 
       return result
 
