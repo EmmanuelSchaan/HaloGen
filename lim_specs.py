@@ -51,6 +51,8 @@ class LimSpecs(object):
       self.surveyAngularArea = self.fSkyExp * 4.*np.pi
 
 
+   ########################################################
+
    def voxelComovingDepth(self, z, R=None):
       '''Compute dchi [Mpc/h]
       the comoving depth of the voxel
@@ -78,18 +80,53 @@ class LimSpecs(object):
       result *= self.pixelComovingArea(z)
       return result
 
+   def nAngularPixels(self, fSky=None):
+      '''Total number of angular pixels
+      in the survey area
+      '''
+      if fSky is None:
+         fSky = self.fSkyExp
+      result = 4. * np.pi * fSky
+      result /= self.pixelAngularArea
+      return result
 
-#   def dBdT(self, nu, T):
-#      '''d(blackbody)/dT, such that
-#      dI = d(blackbody)/dT * dT
-#      input: nu [Hz], T thermo temperature of the black body [K]
-#      output in SI: [W / Hz / m^2 / sr / K]
-#      '''
-#      x = self.h*nu/(self.kB*T)
-#      result = 2.*self.h**2*nu**4
-#      result /= self.kB*T**2*self.c**2
-#      result *= np.exp(x) / (np.exp(x) - 1.)**2
-#      return result
+   def nSpectralElements(self, z, Dz):
+      '''Computes the number of spectral elements [dimless]
+      in a redshift slice with width Dz
+      centered around redshift z
+      '''
+      result = self.R * Dz
+      result /= 1. + z
+      return result
+
+   def nVoxels(self, z, Dz, fSky=None):
+      '''Computes the number of voxels [dimless]
+      in the survey slice at redshift z
+      with depth Dz,
+      with area given by the full survey area
+      '''
+      result = self.nAngularPixels(fSky=fSky)
+      result *= self.nSpectralElements(z, Dz)
+      return result
+      
+
+   ########################################################
+
+   def nModes(self, z, Dz, kPerpMax, kParaMax, fSky=None, kPerpMin=0., kParaMin=0.):
+      '''Compute the number of Fourier modes
+      with kPerp<kPerpMax and kPara<kParaMax
+      for a slice with width Dz around z
+      '''
+      if fSky is None:
+         fSky = self.fSkyExp
+      chi = self.U.bg.comoving_distance(z)
+      Dchi =  Dz / (self.U.hubble(z) / self.U.c_kms)
+      result = fSky * chi**2 * (kPerpMax**2 - kPerpMin**2)
+      result *= Dchi / np.pi * (kParaMax - kParaMin)
+      return result
+
+
+   ########################################################
 
 
    def whiteNoisePower(self, z, R=None):
@@ -185,4 +222,30 @@ class LimSpecs(object):
          result = sigmaIPixel**2 * self.voxelComovingVolume(z, R=R)
 
       return result
+
+
+   ########################################################
+
+   def uncertaintyMeanIntensity(self, z, Dz, fSky=None, whiteNoisePower=None):
+      '''Uncertainty on the overall amplitude of I_nu [Jy/sr],
+      averaged over angular pixel and frequencies
+      '''
+      if whiteNoisePower is None:
+         whiteNoisePower = self.whiteNoisePower(z, R=None)
+      nVox = self.nVoxels(z, Dz, fSky=fSky)
+      result = np.sqrt(whiteNoisePower / self.voxelComovingVolume(z, R=None))   # sigmaIPixel
+      result /= np.sqrt(nVox)
+      return result
+
+
+   def uncertaintyPowerAmplitude(self, z, Dz, kPerpMax, kParaMax, fSky=None, kPerpMin=0., kParaMin=0., whiteNoisePower=None):
+      '''Uncertainty on the power spectrum amplitude [(Jy/sr)^2 * (Mpc/h)^3]
+      due to the white noise alone, given the number of Fourier modes
+      '''
+      if whiteNoisePower is None:
+         whiteNoisePower = self.whiteNoisePower(z, R=None)  # [(Jy/sr)^2 * (Mpc/h)^3]
+      result = whiteNoisePower
+      result *= np.sqrt(2. / self.nModes(z, Dz, kPerpMax, kParaMax, fSky=fSky, kPerpMin=kPerpMin, kParaMin=kParaMin))
+      return result
+
 

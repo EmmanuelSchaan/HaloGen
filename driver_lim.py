@@ -114,7 +114,9 @@ sfr.plotNHEffSparsitySummary()
 #sfr.plotNHEffSparsity(exp='COMAP')
 #sfr.plotNHEffSparsity(exp='CONCERTO')
 sfr.plotBEff()
-sfr.plotdlnAlldlnm()
+sfr.plotdlnAlldlnm(alpha=1.)
+sfr.plotdlnAlldlnm(alpha=0.6)
+sfr.plotdlnAlldlnm(alpha=1.1)
 #sfr.plotdlnMeanIntensitydlnm()
 #sfr.plotdlnbEff2dlnm()
 #sfr.plotdlnP1hdlnm()
@@ -241,7 +243,9 @@ lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO', sfr=sfr)
 lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP', sfr=sfr)
 lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx', sfr=sfr)
 '''
-#lfHa['Sobral12'].plotNGalEffSparsitySummary()
+'''
+lfHa['Sobral12'].plotNGalEffSparsitySummary()
+'''
 
 ##################################################################################
 # Plot: shot noise
@@ -383,6 +387,7 @@ p.plotFourierModes()
 pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(specs=cdimSpecs)
 pRsdLya['Cassata11'].plotSigmaLumMatchedFilter(specs=hetdexSpecs)
 '''
+
 '''
 pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
 pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
@@ -457,7 +462,7 @@ for key in lfHa.keys():
 #print p.sFOverFFisher(z, R, fwhmPsf, fSky, dz)
 
 
-'''
+
 # Halpha with SPHEREx
 ##p.plotRequiredAreaToDetectBeta()
 #p.plotRequiredAreaToDetectA(2)
@@ -476,7 +481,7 @@ pRsdCO['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='COMAP', marg=True)
 # [CII] with CONCERTO
 pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=False)
 pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=True)
-'''
+
 
 
 ##################################################################################

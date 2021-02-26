@@ -607,23 +607,24 @@ class P3dRsdAuto(object):
          #RR = np.array([40.])
          RR = np.array([40., 150., 300.])
          fwhmPsf = 6.*np.pi/(180.*3600.)  # 6'' in [rad]
-         Z = self.Z.copy()
          #Z = np.linspace(self.Z.min(), self.Z.max(), 2)
          dz = 1.
          fSkyExp = 2. * 100. * (np.pi/180.)**2 / (4.*np.pi) # 2 * 100 deg2 deep fields
       elif exp=='COMAP':
          RR = np.array([800.])
          fwhmPsf = 3.*np.pi/(180.*60.) # 3' in [rad]
-         Z = self.Z.copy()
          dz = 1.
          fSkyExp = 2.5 * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
       elif exp=='CONCERTO':
          RR = np.array([300.])
          fwhmPsf = 0.24 * np.pi/(180.*60.) # 3' in [rad]
-         Z = self.Z.copy()
          dz = 1.
          fSkyExp = 2. * (np.pi/180.)**2 / (4.*np.pi) # 2.5 deg^2
 
+      Z = self.Z.copy()
+      # avoid z=0
+      if Z[0]<0.01:
+         Z = Z[1:]
 
       def fSkyReq(z, R, dz=dz, fwhmPsf=fwhmPsf, target=0.1):
          # relative uncertainties on power spectrum monopole and quadrupole
@@ -670,7 +671,7 @@ class P3dRsdAuto(object):
          # naive Nmode forecast
          f = lambda z: fSkyReqNaiveModeCounting(z, R)
          fSky = np.array(map(f, Z))
-         ax.plot(Z, fSky, c=plot[0].get_color(), ls=':', alpha=0.5)
+         ax.plot(Z, fSky, c=plot[0].get_color(), ls=':', alpha=0.2)
 
       # add legend entry for the naive mode counting
       ax.plot([], [], c='gray', ls=':', alpha=0.5, label=r'Na\"ive mode counting')
@@ -1288,21 +1289,27 @@ class P3dRsdAuto(object):
          R = specs.R
          fwhmPsf = specs.fwhmPsf
          detNoiseFid = specs.whiteNoisePower(z)
+         fSkyExp = specs.fSkyExp
+
+         # shot noise level
+         pShot = self.pShot(z)   # default units involving [Lsun]
+         pShot *= self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')  # [(Jy/sr)^2 (Mpc/h)^3]
+         
 
          # detector noise values to explore
          # in default power units, converted later when plotting
          if exp=='SPHEREx':
-            DetNoisePower = np.logspace(np.log10(1.e-16), np.log10(1.e-7), 11, 10.)
+            DetNoisePower = np.logspace(np.log10(1.e-16), np.log10(1.e-7), 21, 10.)
          elif exp=='COMAPPathfinder':
-            DetNoisePower = np.logspace(np.log10(1.e-17), np.log10(1.e-9), 11, 10.)
+            DetNoisePower = np.logspace(np.log10(1.e-17), np.log10(1.e-9), 21, 10.)
          elif exp=='COMAP':
-            DetNoisePower = np.logspace(np.log10(1.e-17), np.log10(1.e-8), 11, 10.)
+            DetNoisePower = np.logspace(np.log10(1.e-17), np.log10(1.e-8), 21, 10.)
          elif exp=='CONCERTO':
-            DetNoisePower = np.logspace(np.log10(1.e-16), np.log10(1.e-6), 11, 10.)
+            DetNoisePower = np.logspace(np.log10(1.e-16), np.log10(1.e-6), 21, 10.)
          if exp=='CDIM':
-            DetNoisePower = np.logspace(np.log10(1.e-16), np.log10(1.e-7), 11, 10.)
+            DetNoisePower = np.logspace(np.log10(1.e-16), np.log10(1.e-7), 21, 10.)
          if exp=='HETDEX':
-            DetNoisePower = np.logspace(np.log10(1.e-16), np.log10(1.e-7), 11, 10.)
+            DetNoisePower = np.logspace(np.log10(1.e-16), np.log10(1.e-7), 21, 10.)
 
 
 
@@ -1320,12 +1327,17 @@ class P3dRsdAuto(object):
          f = lambda l: self.Prof.Sfr.massFromLum(l, z, K, alpha=self.Prof.a)
          MMin = np.array(map(f, LMin))
 
+         
 
+         # Plot minimum luminosity detectable
          fig=plt.figure(0)
          ax=fig.add_subplot(111)
          #
          # fiducial detector noise
          ax.axvline(detNoiseFid, c='gray', alpha=0.5, label=r'Fid. detector noise')
+         #
+         # compare with shot noise
+         ax.axvline(pShot, c='gray', ls=':', alpha=0.5, label=r'Shot noise')
          #
          # lStar of the LF, to compare
          lStar = self.Prof.Lf.lStar(z) # [Lsun]
@@ -1335,7 +1347,7 @@ class P3dRsdAuto(object):
          x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
          ax.plot(x, LMin*self.Prof.Lf.convertLumUnit('cgs'))
          #
-         ax.legend(loc=2)
+         ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
          ax.set_xscale('log', nonposx='clip')
          ax.set_yscale('log', nonposy='clip')
          ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
@@ -1415,6 +1427,14 @@ class P3dRsdAuto(object):
          fracShotNoise = np.array(map(f, LMin))
 
 
+#         # Check: fraction of mean intensity from undetected sources
+#         # from mass cut instead of luminosity cut
+#         def f(mMin):
+#            result = self.Prof.Sfr.sfrdForInterp(z, alpha=1, bias=False, mMin=0., mMax=mMin)
+#            result /= self.Prof.Sfr.sfrdForInterp(z, alpha=1, bias=False, mMin=0., mMax=np.inf)
+#            return result
+#         fracMeanIntensityM = np.array(map(f, MMin))
+         
          # fraction of 2h from undetected sources
          # at a fiducial k
          def f(mMin):
@@ -1433,17 +1453,29 @@ class P3dRsdAuto(object):
             return result
          frac1h = np.array(map(f, MMin))
 
+#         # Check: fraction of 2h from undetected sources,
+#         # quick independent estimate
+#         def f(mMin):
+#            result = self.Prof.Sfr.sfrdForInterp(z, alpha=1, bias=True, mMin=0., mMax=mMin)**2
+#            result /= self.Prof.Sfr.sfrdForInterp(z, alpha=1, bias=True, mMin=0., mMax=np.inf)**2
+#            return result
+#         frac2hApprox = np.array(map(f, MMin))
 
+
+
+         # fraction of LIM from undetected sources
          fig=plt.figure(0)
          ax=fig.add_subplot(111)
          #
-         ax.axvline(detNoiseFid, c='gray', alpha=0.5, label=r'Fid. detector noise')
+         ax.axvline(detNoiseFid, c='gray', alpha=0.5, label=r'Fid.')
          #
          x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
-         ax.plot(x, fracMeanIntensity, label=r'Mean intensity')
-         ax.plot(x, fracShotNoise, label=r'Shot noise')
-         ax.plot(x, frac2h, label=r'2h ($k=0.01h/$Mpc)')
-         ax.plot(x, frac1h, label=r'1h ($k=0.1h/$Mpc)')
+         ax.plot(x, fracMeanIntensity, label=r'Mean')
+#         ax.plot(x, fracMeanIntensityM, label=r'Mean intensity M')
+         ax.plot(x, fracShotNoise, label=r'Shot')
+         ax.plot(x, frac2h, label=r'2h')
+#         ax.plot(x, frac2hApprox, label=r'2h ($k=0.01h/$Mpc) Approx')
+         ax.plot(x, frac1h, label=r'1h')
          #
          #ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
          ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
@@ -1464,6 +1496,172 @@ class P3dRsdAuto(object):
          plt.clf()
          #plt.show()
          
+
+         ###################################
+         # SNR on fraction of LIM from undetected sources
+         
+         
+         # Width of the redshift slice
+         Dz = 0.5
+         fSky = 1. * fSkyExp
+         DetNoisePowerJy = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+
+         print "SNR on observables"
+         print "fsky =", fSky
+
+         # Mean intensity
+         # uncertainty
+         f = lambda whiteNoisePower: specs.uncertaintyMeanIntensity(z, Dz, fSky, whiteNoisePower)
+         uncertaintyMeanIntensity = np.array(map(f, DetNoisePowerJy))   # [Jy/sr]
+         uncertaintyMeanIntensity /= self.Prof.Lf.convertIntensityUnit('Jy/sr')  # default intensity units
+         # signal
+         meanIntensity = self.Prof.Lf.meanIntensityInterp(z)
+         # SNR on undetected fraction
+         snrFracMeanIntensity = fracMeanIntensity * meanIntensity / uncertaintyMeanIntensity
+
+
+         # 2h term
+         k = 0.01
+         # uncertainty
+         kPerpMin = k / 2.
+         kPerpMax = k * 2.
+         kParaMin = 0.
+         kParaMax = self.U.kMaxParaSpectroRes(R, z)
+         f = lambda whiteNoisePower: specs.uncertaintyPowerAmplitude(z, Dz, kPerpMax, kParaMax, fSky, kPerpMin, kParaMin, whiteNoisePower)
+         uncertaintyP2h = np.array(map(f, DetNoisePowerJy))   # [(Jy/sr)^2 * (Mpc/h)^3]
+         uncertaintyP2h /= self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')  # default power units
+         print "Test uncertainty p2h"
+         print uncertaintyP2h
+         # signal
+         p2h = self.p2h(k, z, mu=0., mMin=0., mMax=np.inf)
+         # SNR on undetected fraction
+         snrFrac2h = frac2h * p2h / uncertaintyP2h
+
+
+         # 1h term
+         k = 0.1
+         # uncertainty
+         kPerpMin = k / 2.
+         kPerpMax = k * 2.
+         kParaMin = 0.
+         kParaMax = self.U.kMaxParaSpectroRes(R, z)
+         f = lambda whiteNoisePower: specs.uncertaintyPowerAmplitude(z, Dz, kPerpMax, kParaMax, fSky, kPerpMin, kParaMin, whiteNoisePower=whiteNoisePower)
+         uncertaintyP1h = np.array(map(f, DetNoisePowerJy))
+         uncertaintyP1h /= self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')  # default power units
+         # signal
+         p1h = self.p1h(k, z, mu=0., mMin=0., mMax=np.inf)
+         # SNR on undetected fraction
+         snrFrac1h = frac1h * p1h / uncertaintyP1h
+
+
+         # Shot noise
+         # uncertainty
+         kPerpMin = self.U.kMaxPerpPsf(fwhmPsf, z) / 2.
+         kPerpMax = self.U.kMaxPerpPsf(fwhmPsf, z) * 2.
+         kParaMin = 0.
+         kParaMax = self.U.kMaxParaSpectroRes(R, z)
+         f = lambda whiteNoisePower: specs.uncertaintyPowerAmplitude(z, Dz, kPerpMax, kParaMax, fSky, kPerpMin, kParaMin, whiteNoisePower=whiteNoisePower)
+         uncertaintyShotNoise = np.array(map(f, DetNoisePowerJy))
+         uncertaintyShotNoise /= self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')  # default power units
+         # signal
+         shotNoise = self.Prof.Lf.pShotInterp(z)
+         # SNR on undetected fraction
+         snrFracShotNoise = fracShotNoise * shotNoise / uncertaintyShotNoise
+
+
+         # SNR on fraction of LIM from undetected sources
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         ax.axvline(detNoiseFid, c='gray', alpha=0.5, label=r'Fid.')
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         ax.plot(x, snrFracMeanIntensity, label=r'Mean')
+         ax.plot(x, snrFracShotNoise, label=r'Shot')
+         ax.plot(x, snrFrac2h, label=r'2h')
+         ax.plot(x, snrFrac1h, label=r'1h')
+         #
+         #ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+         ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         ax.set_yscale('log', nonposy='clip')
+         #ax.set_ylim((0., 1.))
+         ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
+         ax.set_ylabel(r'SNR on fraction from undetected sources')
+         ax.set_title(exp+' '+self.Prof.Lf.lineNameLatex+r' $z=$'+str(round(z,1)))
+         #
+         # have the ticks in scientific format 
+         ax.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+         # to get more tick marks on the x axis
+         ax.xaxis.set_major_locator(LogLocator(numticks=15))
+         ax.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+         #
+         fig.savefig('./figures/p3d_rsd/'+exp+'_snr_fracundetected_detnoise_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+         
+
+
+         # fraction of LIM from undetected sources
+         fig=plt.figure(0)
+         ax=fig.add_subplot(111)
+         #
+         ax.axvline(detNoiseFid, c='gray', alpha=0.5, label=r'Fid.')
+         #
+         x = DetNoisePower * self.Prof.Lf.convertPowerSpectrumUnit('Jy/sr')
+         #
+         # Mean intensity
+         I = np.where(snrFracMeanIntensity>=1.)[0]
+         J = np.where(snrFracMeanIntensity<1.)[0]
+         plot=ax.plot(x[I], fracMeanIntensity[I], label=r'Mean')
+         ax.plot(x[J], fracMeanIntensity[J], ls='--', c=plot[0].get_color())
+         #
+         # Shot noise
+         I = np.where(snrFracShotNoise>=1.)[0]
+         J = np.where(snrFracShotNoise<1.)[0]
+         plot=ax.plot(x[I], fracShotNoise[I] - 0.005, label=r'Shot')
+         ax.plot(x[J], fracShotNoise[J] - 0.005, ls='--', c=plot[0].get_color())
+         #
+         # 2-halo
+         I = np.where(snrFrac2h>=1.)[0]
+         J = np.where(snrFrac2h<1.)[0]
+         plot=ax.plot(x[I], frac2h[I] - 0.01, label=r'2h')
+         ax.plot(x[J], frac2h[J] - 0.01, ls='--', c=plot[0].get_color())
+         #
+         # 1-halo
+         I = np.where(snrFrac1h>=1.)[0]
+         J = np.where(snrFrac1h<1.)[0]
+         plot=ax.plot(x[I], frac1h[I] - 0.015, label=r'1h')
+         ax.plot(x[J], frac1h[J] - 0.015, ls='--', c=plot[0].get_color())
+         #
+         #ax.legend(loc='center left', fontsize='x-small', labelspacing=0.1)
+         ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+         ax.set_xscale('log', nonposx='clip')
+         #ax.set_yscale('log', nonposy='clip')
+         ax.set_ylim((0., 1.1))
+         ax.set_xlabel(r'Detector noise power [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
+         ax.set_ylabel('Fraction of observable \n from undetected sources')
+         ax.set_title(exp+' '+self.Prof.Lf.lineNameLatex+r' $z=$'+str(round(z,1)))
+         #
+         # have the ticks in scientific format 
+         ax.xaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+         # to get more tick marks on the x axis
+         ax.xaxis.set_major_locator(LogLocator(numticks=15))
+         ax.xaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+         #
+         fig.savefig('./figures/p3d_rsd/'+exp+'_fracundetected_snr_detnoise_'+self.name+'_z'+str(z)+'.pdf')
+         plt.clf()
+         #plt.show()
+         
+
+
+
+
+
+
+
+
+
 
          ###################################
          

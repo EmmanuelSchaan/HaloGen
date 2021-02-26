@@ -443,7 +443,7 @@ class Sfr(object):
       #plt.show()
 
 
-   def plotdlnAlldlnm(self):
+   def plotdlnAlldlnm(self, alpha=1.):
       '''Plot dlnI/dlnm, dlnb^2/dlnm and dlnP1h/dlnm
       in the same figure.
       '''
@@ -477,7 +477,7 @@ class Sfr(object):
       #ax0=plt.subplot(gs[0])
       for iZ in range(len(Z)):
          z = Z[iZ]
-         f = lambda m: self.dlnMeanIntensitydlnm(m, z)
+         f = lambda m: self.dlnMeanIntensitydlnm(m, z, alpha)
          y = np.array(map(f, M))
          plot=ax0.plot(M, 2. * y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
          #
@@ -502,7 +502,7 @@ class Sfr(object):
       #ax1=plt.subplot(gs[1], sharey=ax0)
       for iZ in range(len(Z)):
          z = Z[iZ]
-         f = lambda m: self.dbEff2dlnm(m, z)
+         f = lambda m: self.dbEff2dlnm(m, z, alpha)
          y = np.array(map(f, M))
          y /= self.bEff(z)**2
          plot=ax1.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
@@ -527,7 +527,7 @@ class Sfr(object):
       #ax2=plt.subplot(gs[2], sharey=ax1)
       for iZ in range(len(Z)):
          z = Z[iZ]
-         f = lambda m: self.dP1hdlnm(m, z)
+         f = lambda m: self.dP1hdlnm(m, z, alpha, alpha)
          y = np.array(map(f, M))
          y /= self.p1h(z)
          plot=ax2.plot(M, y, c=plt.cm.cool(iZ/(len(Z)-1.)), label=r'$z=$'+str(int(z)))
@@ -582,7 +582,8 @@ class Sfr(object):
 
 
       # Save to file
-      path = './figures/sfr/dlnalldlnm_'+self.name+'.pdf'
+      #path = './figures/sfr/dlnalldlnm_'+self.name+'.pdf'
+      path = './figures/sfr/dlnalldlnm_'+self.name+'_alpha'+str(alpha)+'.pdf'
       fig.savefig(path, bbox_inches='tight')
       fig.clf()
       #plt.show()
