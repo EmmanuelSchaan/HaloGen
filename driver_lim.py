@@ -18,9 +18,9 @@ import profile
 reload(profile)
 from profile import *
 
-import i_halo_model
-reload(i_halo_model)
-from i_halo_model import *
+#import i_halo_model
+#reload(i_halo_model)
+#from i_halo_model import *
 
 #import pn_3d
 #reload(pn_3d)
@@ -325,7 +325,7 @@ profLimLfLya['Cassata11'].plotLuminosityMassRelation()
 ##################################################################################
 
 # halo model integrals
-iHaloModel = IHaloModel(u, massFunc)
+#iHaloModel = IHaloModel(u, massFunc)
 
 
 ##################################################################################
