@@ -1042,7 +1042,7 @@ class P3dRsdAuto(object):
       legendItems.sort()
       ax.legend([x[1] for x in legendItems], [x[2] for x in legendItems], loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$k$ [$h$/Mpc]')
-      ax.set_ylabel(r'$P(k,z, \mu=0.5)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
+      ax.set_ylabel(r'$P(k,z, \mu=0)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
       #ax.set_ylim((1.e3, 1.e8))
       ax.set_title(self.Prof.Lf.lineNameLatex+' Power spectrum')
       #
