@@ -157,6 +157,17 @@ class LF(object):
       return result
 
 
+   def tShot(self, z, lMin=0., lMax=np.inf):
+      '''Shot noise trispectrum
+      [(intensity unit)^4 (Mpc/h)^9] = [Lsun^4 * (Mpc/h) / sr^4 / Hz^4]
+      '''
+      result = self.lumMoment(z, 4, lMin=lMin, lMax=lMax)  # [Lsun^4 / (Mpc/h)^3]
+      result *= (3.e5 / self.U.hubble(z))**4   # *[(Mpc/h)^4]
+      result /= (4. * np.pi * self.nuHz)**4 # *[1/sr^4/Hz^4]
+      return result
+
+
+
    ##################################################################################
 
    def plotdlnMeanIntensitydlnL(self):
