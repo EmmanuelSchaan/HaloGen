@@ -57,7 +57,7 @@ class P3dRsdAuto(object):
       '''
       def integrand(lnm):
          m = np.exp(lnm)
-         result = self.MassFunc.massfunc(m, 1./(1.+z))
+         result = self.MassFunc.massfunc(m, z)
          result *= self.Prof.u(k, m, z, mu)**2
          result *= m # because integrating in lnm and not m
          return result

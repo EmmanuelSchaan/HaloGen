@@ -105,7 +105,7 @@ cdimSpecs = LimSpecs(u, exp='CDIM')
 
 sfr = SfrMoster13Speagle14(u, massFunc, scatter=False, nProc=3, save=False)
 
-'''
+
 sfr.plotSfr()
 sfr.plotSfrd()
 sfr.plotnHEff()
@@ -120,7 +120,7 @@ sfr.plotdlnAlldlnm(alpha=1.1)
 #sfr.plotdlnMeanIntensitydlnm()
 #sfr.plotdlnbEff2dlnm()
 #sfr.plotdlnP1hdlnm()
-'''
+
 
 
 ##################################################################################
@@ -259,11 +259,11 @@ lfLya['Cassata11'].plotShotNoise()
 
 ##################################################################################
 # Contributions from each luminosity
-'''
+
 lfHa['Sobral12'].plotdlnAlldlnL()
 #lfHa['Sobral12'].plotdlnMeanIntensitydlnL()
 #lfHa['Sobral12'].plotdlnPshotdlnL()
-'''
+
 
 ##################################################################################
 ##################################################################################
@@ -370,83 +370,83 @@ p = pRsdHa[key]
 
 ##################################################################################
 # Scales probed by the various experiments
-'''
+
 p.plotPMuDpdce(lfHa[key].Z[0], exp='SPHEREx')
 pRsdCO['Popping16'].plotPMuDpdce(2., exp='COMAP')
 pRsdCii['Popping16'].plotPMuDpdce(6., exp='CONCERTO')
-'''
-'''
+
+
 p.plotFourierModes()
-'''
+
 
 ##################################################################################
 # LIM vs galaxy surveys
 
 # in 3d RSD
-'''
+
 pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(specs=cdimSpecs)
 pRsdLya['Cassata11'].plotSigmaLumMatchedFilter(specs=hetdexSpecs)
-'''
 
-'''
+
+
 pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
 pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
 
 pRsdCO['Popping16'].plotSigmaLumMatchedFilter(specs=comapSpecs)
 pRsdCii['Popping16'].plotSigmaLumMatchedFilter(specs=concertoSpecs)
-'''
-'''
+
+
 # summary plots
 pList = [pRsdHa['Cochrane17'], pRsdHa['Cochrane17'], pRsdOiii['Colbert13'], pRsdLya['Cassata11'],  pRsdCO['Popping16'], pRsdCii['Popping16']]
 specsList = [spherexSpecs, cdimSpecs, spherexSpecs, hetdexSpecs, comapSpecs, concertoSpecs]
 pRsdHa['Cochrane17'].plotLimVsGalDet(pList, specsList)
-'''
+
 
 #pList = [pRsdLya['Cassata11']]
 #specsList = [hetdexSpecs]
 #pRsdLya['Cassata11'].plotLimVsGalDet(pList, specsList)
 
 
-'''
+
 # in 2d
 pRsdCii['Popping16'].plotSigmaLumMatchedFilter2d(exp='CCAT-P')
-'''
+
 
 ##################################################################################
 # Compare references
 
-'''
+
 pRsdHa['Cochrane17'].compareP(ps=[pRsdHa[key] for key in pRsdHa.keys()])
 pRsdOiii['Colbert13'].compareP(ps=[pRsdOiii[key] for key in pRsdOiii.keys()])
 pRsdCii['Popping16'].compareP()
 pRsdCO['Popping16'].compareP()
 pRsdLya['Cassata11'].compareP()
-'''
+
 
 
 ##################################################################################
 # Compute the mass build up of the power spectrum
-'''
+
 p.plotCumulMassContributionP(mu=0)
 p.plotMassContributionP(mu=0)
-'''
-'''
+
+
 p.plotCumulMassContributionP(mu=0.5)
 p.plotMassContributionP(mu=0.5)
-'''
+
 
 ##################################################################################
 # Show the 2h/1h/shot noise terms
 
-'''
+
 p.plotPTermsZ(mu=0.)
 p.plotPTermsZ(mu=0.5)
-'''
-'''
+
+
 for key in lfHa.keys():
    pRsdHa[key].plotPTermsZ(mu=0.)
    pRsdHa[key].plotPTermsZ(mu=0.5)
-'''
+
 
 
 ##################################################################################
@@ -498,7 +498,7 @@ pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=Tr
 #pHaOiii.plotCorrCoeff(Z=[1., 2.])
 
 
-'''
+
 # Example with high correlation coefficients: Ha - Oiii
 # line correlation coefficient from Mehta+15
 pHaOiii = P3dRsdCross(u, profLimLfHa['Cochrane17'], profLimLfOiii['Mehta15'], massFunc, r=0.65, nProc=3)
@@ -508,7 +508,7 @@ pHaOiii.plotCorrCoeff(Z=[1., 2.])
 # line correlation coefficient from EGG
 pLyaCO = P3dRsdCross(u, profLimLfLya['Cassata11'], profLimLfCO['Popping16'], massFunc, r=0.088, nProc=3)
 pLyaCO.plotCorrCoeff(Z=[3., 4.])
-'''
+
 
 
 
