@@ -298,28 +298,39 @@ class MassFunction(object):
 
 
    def saveMassCounterTerms(self):
-      # mass function and biases
+      # Counter terms for mass function and biases
       print "Computing mass counter terms"
-      NMin = np.zeros(self.Na)
-      B1Min = np.zeros(self.Na)
-      B2Min = np.zeros(self.Na)
+#      NMin = np.zeros(self.Na)
+#      B1Min = np.zeros(self.Na)
+#      B2Min = np.zeros(self.Na)
+#      # Correction factor for mass function
+#      # (this is an alternative, probably less correct,
+#      # approach to fixing the non-convergence at low masses)
+#      CorrectionFactor = np.zeros(self.Na)
 
       # compute the integral constraints
       ic = {}
       for i in range(3):
          f = lambda z: self.integralConstraint(i, z)
          ic[i] = np.array(map(f, self.Z))
-      # mass
+      # mass counter term
       NMin = (1. - ic[0]) * self.U.rho_m(self.Z) / self.mMin**2 
-      # linear bias
+      # linear bias counter term
       B1Min = (1. - ic[1]) * self.U.rho_m(self.Z) / self.mMin**2 / NMin
-      # quadratic bias
+      # quadratic bias counter term
       B2Min = (0. - ic[2]) * self.U.rho_m(self.Z) / self.mMin**2 / NMin
+      # correction factor for mass integral
+      CorrectionFactorMass = 1. / ic[0]
+      # correction factor for bias integral
+      CorrectionFactorBias = 1. / ic[1]
 
       np.savetxt(self.pathOut + "_nMin.txt", NMin)
       np.savetxt(self.pathOut + "_b1Min.txt", B1Min)
       np.savetxt(self.pathOut + "_b2Min.txt", B2Min)
+      np.savetxt(self.pathOut + "_correctionFactorMass.txt", CorrectionFactorMass)
+      np.savetxt(self.pathOut + "_correctionFactorBias.txt", CorrectionFactorBias)
       return
+
    
    def loadMassCounterTerms(self):
       # load sigma, nu, mass function and biases
@@ -328,6 +339,8 @@ class MassFunction(object):
       self.NMin = np.genfromtxt(self.pathOut + "_nMin.txt")
       self.B1Min = np.genfromtxt(self.pathOut + "_b1Min.txt")
       self.B2Min = np.genfromtxt(self.pathOut + "_b2Min.txt")
+      self.CorrectionFactorMass = np.genfromtxt(self.pathOut + "_correctionFactorMass.txt")
+      self.CorrectionFactorBias = np.genfromtxt(self.pathOut + "_correctionFactorBias.txt")
       
       # interpolate
       interp_nMin = interp1d(A, self.NMin, kind='linear', bounds_error=False, fill_value=0.)
@@ -338,6 +351,12 @@ class MassFunction(object):
       #
       interp_b2Min = interp1d(A, self.B2Min, kind='linear', bounds_error=False, fill_value=0.)
       self.b2Min = lambda z: (z>=self.zMin and z<=self.zMax) * interp_b2Min(1./(1.+z))
+      #
+      interp_correctionFactorMass = interp1d(A, self.CorrectionFactorMass, kind='linear', bounds_error=False, fill_value=0.)
+      self.correctionFactorMass = lambda z: (z>=self.zMin and z<=self.zMax) * interp_correctionFactorMass(1./(1.+z))
+      #
+      interp_correctionFactorBias = interp1d(A, self.CorrectionFactorBias, kind='linear', bounds_error=False, fill_value=0.)
+      self.correctionFactorBias = lambda z: (z>=self.zMin and z<=self.zMax) * interp_correctionFactorBias(1./(1.+z))
 
 
    def plotMassCounterTerms(self):

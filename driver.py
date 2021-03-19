@@ -76,18 +76,22 @@ p3d_dy = P3dCross(u, massFunc, profNFW, profY, save=False)
 p3d_galPenin12_353 = P3dAuto(u, massFunc, profHODPenin12_353, pNoise=profHODPenin12_353.fPshotNoise, name="galpenin353", save=False)
 
 '''
+p3d_d.plotP2hCorrections()
 p3d_d.plotPInt(z=0.)
 p3d_d.plotP1hMMinDependence(k=0.01)
 p3d_d.plotP2hMMinDependence(k=0.01)
 
+p3d_y.plotP2hCorrections()
 p3d_y.plotPInt(z=0.)
 p3d_y.plotP1hMMinDependence(k=0.01)
 p3d_y.plotP2hMMinDependence(k=0.01)
 
+p3d_dy.plotP2hCorrections()
 p3d_dy.plotPInt(z=0.)
 p3d_dy.plotP1hMMinDependence(k=0.01)
 p3d_dy.plotP2hMMinDependence(k=0.01)
 
+p3d_galPenin12_353.plotP2hCorrections()
 p3d_galPenin12_353.plotPInt(z=0.)
 p3d_galPenin12_353.plotP1hMMinDependence(k=0.01)
 p3d_galPenin12_353.plotP2hMMinDependence(k=0.01)
@@ -126,7 +130,6 @@ from p2d import *
 # auto
 p2d_cmblens = P2dAuto(u, p3d_d, w_cmblens, nProc=3, save=False)
 p2d_y = P2dAuto(u, p3d_y, w_y, nProc=3, save=False)
-p2d_cmblens = P2dAuto(u, p3d_d, w_cmblens, nProc=3, save=False)
 p2d_gallens = P2dAuto(u, p3d_d, w_gallens, nProc=3, save=False)
 p2d_cmass = P2dAuto(u, p3d_d, w_cmass, pNoise=lambda l:1./w_cmass.ngal, nProc=3, save=False)
 p2d_wise = P2dAuto(u, p3d_d, w_wise, pNoise=lambda l:1./w_wise.ngal, nProc=3, save=False)
@@ -141,13 +144,16 @@ p2d_wisegallens = P2dCross(u, p3d_d, w_wise, w_gallens, nProc=3, save=False)
 p2d_wisecmblens = P2dCross(u, p3d_d, w_wise, w_cmblens, nProc=3, save=False)
 p2d_lsstgoldcmblens = P2dCross(u, p3d_d, w_lsstgold, w_cmblens, nProc=3, save=False)
 
-
-# plot any 2d power spectrum:
-# here, the CMB lensing power spectrum
+'''
 p2d_cmblens.plotP()
-# here, the CIB power spectrum at 353GHz
+p2d_y.plotP()
 p2d_cib353.plotP()
 
+p2d_cmblens.plotPCounterTerms()
+p2d_y.plotPCounterTerms()
+p2d_cmass.plotPCounterTerms()
+p2d_cib353.plotPCounterTerms()
+'''
 
 
 

@@ -18,6 +18,7 @@ class P3dAuto(object):
       # mass bounds for integrals
       self.mMin = max(self.Prof.mMin, self.MassFunc.mMin)
       self.mMax = min(self.Prof.mMax, self.MassFunc.mMax)
+      self.nM = 101  # for mass integrals
 
 #      # k moduli, to precompute
 #      self.K = np.logspace(np.log10(1.e-3), np.log10(1.e2), 101, 10.)
@@ -32,6 +33,7 @@ class P3dAuto(object):
 
       # redshifts to evaluate
       self.Z = np.linspace(0., 10., 51)
+      #self.Z = np.linspace(0., 10., 5)
       #self.Z = np.linspace(0., 10., 3)
    
       # create folders if needed
@@ -59,7 +61,7 @@ class P3dAuto(object):
       at the z requested
       for all k in self.K
       '''
-      m = np.logspace(np.log10(self.mMin), np.log10(self.mMax), 51, 10.)
+      m = np.logspace(np.log10(self.mMin), np.log10(self.mMax), self.nM, 10.)
 
       fVect = np.vectorize(self.MassFunc.massfunc)
       integrand = fVect(m, z)
@@ -96,6 +98,11 @@ class P3dAuto(object):
       result *= np.array(map(f, self.K))
       return result
       
+   def computeBEffCorrected(self, z):
+      result = self.computeBEffBare(z)
+      result *= self.MassFunc.correctionFactorBias(z)
+      return result
+
 
    ##################################################################################
 
@@ -115,6 +122,7 @@ class P3dAuto(object):
       P1hCounterTerm = np.zeros((nK, nZ))
       BEffBare = np.zeros((nK, nZ))
       BEffCounterTerm = np.zeros((nK, nZ))
+      BEffCorrected = np.zeros((nK, nZ))
 
 
       for iZ in range(nZ):
@@ -124,6 +132,7 @@ class P3dAuto(object):
          #
          BEffBare[:,iZ] = self.computeBEffBare(z)
          BEffCounterTerm[:,iZ] = self.computeBEffCounterTerm(z)
+         BEffCorrected[:,iZ] = self.computeBEffCorrected(z)
          print "done z "+str(iZ)+" of "+str(nZ)
 
       P1h = P1hBare + P1hCounterTerm
@@ -136,6 +145,7 @@ class P3dAuto(object):
       P2hBare = BEffBare**2 * PLin
       P2hCounterTerm = BEffCounterTerm**2 * PLin
       P2h = BEff**2 * PLin
+      P2hCorrected = BEffCorrected**2 * PLin
 
       pNoiseVect = np.vectorize(self.pNoise)
       f = lambda k: pNoiseVect(k, self.Z)
@@ -153,67 +163,11 @@ class P3dAuto(object):
       np.savetxt(path+"_1hcounterterm.txt", P1hCounterTerm)
       np.savetxt(path+"_2hbare.txt", P2hBare)
       np.savetxt(path+"_2hcounterterm.txt", P2hCounterTerm)
+      np.savetxt(path+"_2hcorrected.txt", P2hCorrected)
 
       tStop = time()
       print "took ", (tStop-tStart)/60., "min"
       return
-
-
-
-#   def saveP(self):
-#      print "SLOW VERSION"
-#      tStart = time()
-#
-#      nZ = len(self.Z)
-#      nK = len(self.K)
-#      
-#      # power spectra
-#      P1h = np.zeros((nK, nZ))
-#      P2h = np.zeros((nK, nZ))
-#      PNoise = np.zeros((nK, nZ))
-#      #dP = np.zeros((nK, nZ))
-#      P1hBare = np.zeros((nK, nZ))
-#      P1hCounterTerm = np.zeros((nK, nZ))
-#      P2hBare = np.zeros((nK, nZ))
-#      P2hCounterTerm = np.zeros((nK, nZ))
-#
-#   
-#      # precompute the polyspectra
-#      print "precomputing p3d "+self.name
-#      for iZ in range(nZ):
-#         z = self.Z[iZ]
-#         for iK in range(nK):
-#            k = self.K[iK]
-#            # power spectra
-#            P1h[iK, iZ] = self.p1h(k, z)
-#            P2h[iK, iZ] = self.p2h(k, z)
-#            PNoise[iK, iZ] = self.pNoise(k, z)
-#            #dP[iK, iZ] = self.fdP(k, z)
-#            #print "done k "+str(iK)+" of "+str(nK)
-#
-#            P1hBare[iK,iZ] = self.p1hBare(k, z)
-#            P1hCounterTerm[iK,iZ] = self.p1hCounterTerm(k, z)
-#            P2hBare[iK,iZ] = self.p1hBare(k, z)
-#            P2hCounterTerm[iK,iZ] = self.p1hCounterTerm(k, z)
-#
-#         print "done z "+str(iZ)+" of "+str(nZ)
-#   
-#      # save power spectra
-#      path = self.pathOut+"p3d_"+self.name
-#      np.savetxt(path+"_z.txt", self.Z)
-#      np.savetxt(path+"_k.txt", self.K)
-#      np.savetxt(path+"_1h.txt", P1h)
-#      np.savetxt(path+"_2h.txt", P2h)
-#      np.savetxt(path+"_noise.txt", PNoise)
-#      #np.savetxt(path+"_dPdd.txt", dP)
-#      np.savetxt(path+"_1hbare.txt", P1hBare)
-#      np.savetxt(path+"_1hcounterterm.txt", P1hCounterTerm)
-#      np.savetxt(path+"_2hbare.txt", P2hBare)
-#      np.savetxt(path+"_2hcounterterm.txt", P2hCounterTerm)
-#
-#      tStop = time()
-#      print "took ", (tStop-tStart)/60., "min"
-#      return
 
 
    def loadP(self):
@@ -231,6 +185,7 @@ class P3dAuto(object):
       self.P1hCounterTerm = np.genfromtxt(path+"_1hcounterterm.txt")
       self.P2hBare = np.genfromtxt(path+"_2hbare.txt")
       self.P2hCounterTerm = np.genfromtxt(path+"_2hcounterterm.txt")
+      self.P2hCorrected = np.genfromtxt(path+"_2hcorrected.txt")
       
       # interpolate them
       self.p1hInt = interp2d(K, Z, self.P1h.transpose(), kind='linear', bounds_error=False, fill_value=0.)
@@ -243,6 +198,7 @@ class P3dAuto(object):
       self.p1hCounterTermInt = interp2d(K, Z, self.P1hCounterTerm.transpose(), kind='linear', bounds_error=False, fill_value=0.)
       self.p2hBareInt = interp2d(K, Z, self.P2hBare.transpose(), kind='linear', bounds_error=False, fill_value=0.)
       self.p2hCounterTermInt = interp2d(K, Z, self.P2hCounterTerm.transpose(), kind='linear', bounds_error=False, fill_value=0.)
+      self.p2hCorrectedInt = interp2d(K, Z, self.P2hCorrected.transpose(), kind='linear', bounds_error=False, fill_value=0.)
    
 
    ##################################################################################
@@ -321,7 +277,7 @@ class P3dAuto(object):
       ax.set_xscale('log', nonposx='clip')
       ax.set_yscale('log', nonposy='clip')
       ax.set_xlim((MMin.min(), MMin.max()))
-      ax.set_ylim((1.e-5, 1.e5))
+      #ax.set_ylim((1.e-5, 1.e5))
       ax.set_xlabel(r'Minimum halo mass $m_\text{min}$ [$M_\odot/h$]')
       ax.set_ylabel(r'$P^{1-\text{halo}}(k='+str(round(k, 3))+r' h/\text{Mpc})$')
       #
@@ -371,6 +327,14 @@ class P3dAuto(object):
       result = self.bEffBare(k, z, mMin, mMax)
       result += self.bEffCounterTerm(k, z, mMin, mMax)
       return result
+
+   def bEffCorrected(self, k, z, mMin=0., mMax=np.inf):
+      '''With the correction factor
+      '''
+      result = self.bEffBare(k, z, mMin, mMax)
+      result *= self.MassFunc.correctionFactorBias(z)
+      return result
+
 
    def p2hBare(self, k, z, mMin=0., mMax=np.inf):
       '''Sum of bare and counter term
@@ -427,7 +391,7 @@ class P3dAuto(object):
       ax.set_xscale('log', nonposx='clip')
       ax.set_yscale('log', nonposy='clip')
       ax.set_xlim((MMin.min(), MMin.max()))
-      ax.set_ylim((1.e1, 1.e5))
+      #ax.set_ylim((1.e1, 1.e5))
       ax.set_xlabel(r'Minimum halo mass $m_\text{min}$ [$M_\odot/h$]')
       ax.set_ylabel(r'$P^{2-\text{halo}}(k='+str(round(k, 3))+r' h/\text{Mpc})$')
       #
@@ -435,6 +399,47 @@ class P3dAuto(object):
       fig.clf()
       #plt.show()
 
+
+   def plotP2hCorrections(self):
+      '''2-halo term: compare the bare, counter term and corrected values
+      as a function of k.
+      '''
+      Z = np.array([0., 1., 3., 5.])
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      ax.plot([], [], '-', c='gray', label=r'Bare + Counter term')
+      ax.plot([], [], '--', c='gray', label=r'Bare')
+      ax.plot([], [], '-.', c='gray', label=r'Counter term')
+      ax.plot([], [], ':', c='gray', label=r'Corrected')
+      #
+      for iZ in range(len(Z)):
+         z = Z[iZ]
+
+         yBare = self.p2hBareInt(self.K, z)
+         yCounterTerm = self.p2hCounterTermInt(self.K, z)
+         yFull = self.p2hInt(self.K, z)
+         yCorrected = self.p2hCorrectedInt(self.K, z)
+         
+         plot=ax.plot([], [], c=plt.cm.cool(iZ/(len(Z)-1.)), ls='-', label=r'$z=$'+str(int(z)))
+         ax.plot(self.K, yBare / yFull, c=plot[0].get_color(), ls='--')
+         ax.plot(self.K, yCounterTerm / yFull, c=plot[0].get_color(), ls='-.')
+         ax.plot(self.K, yCorrected / yFull, c=plot[0].get_color(), ls=':')
+      #
+      ax.axhline(1., c='gray', ls='-')
+      #
+      ax.legend(loc=3, fontsize='x-small', labelspacing=0.2)
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      #ax.set_xlim((MMin.min(), MMin.max()))
+      #ax.set_ylim((1.e-3, 1.2))
+      ax.set_xlabel(r'$k$ [$h$/Mpc]')
+      ax.set_ylabel(r'Fraction of $P^\text{2-halo}(k, z)$')
+      #
+      fig.savefig(self.pathFig + "counterterms_2halo_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
 
    ##################################################################################
 
@@ -596,6 +601,7 @@ class P3dCross(P3dAuto):
       # mass bounds for integrals
       self.mMin = np.max([self.Prof1.mMin, self.Prof2.mMin, self.MassFunc.mMin])
       self.mMax = np.min([self.Prof1.mMax, self.Prof2.mMax, self.MassFunc.mMax])
+      self.nM = 101  # for mass integrals
 
 #      # k moduli, to precompute
 #      self.K = np.logspace(np.log10(1.e-3), np.log10(1.e2), 101, 10.)
@@ -665,6 +671,16 @@ class P3dCross(P3dAuto):
       result *= np.array(map(f, self.K))
       return result
       
+   def computeBEffCorrected1(self, z):
+      result = self.computeBEffBare1(z)
+      result *= self.MassFunc.correctionFactorBias(z)
+      return result
+
+   def computeBEffCorrected2(self, z):
+      result = self.computeBEffBare2(z)
+      result *= self.MassFunc.correctionFactorBias(z)
+      return result
+
 
    def saveP(self):
       print "Precomputing p3d "+self.name
@@ -682,8 +698,10 @@ class P3dCross(P3dAuto):
       P1hCounterTerm = np.zeros((nK, nZ))
       BEffBare1 = np.zeros((nK, nZ))
       BEffCounterTerm1 = np.zeros((nK, nZ))
+      BEffCorrected1 = np.zeros((nK, nZ))
       BEffBare2 = np.zeros((nK, nZ))
       BEffCounterTerm2 = np.zeros((nK, nZ))
+      BEffCorrected2 = np.zeros((nK, nZ))
 
 
       for iZ in range(nZ):
@@ -693,8 +711,10 @@ class P3dCross(P3dAuto):
          #
          BEffBare1[:,iZ] = self.computeBEffBare1(z)
          BEffCounterTerm1[:,iZ] = self.computeBEffCounterTerm1(z)
+         BEffCorrected1[:,iZ] = self.computeBEffCorrected1(z)
          BEffBare2[:,iZ] = self.computeBEffBare2(z)
          BEffCounterTerm2[:,iZ] = self.computeBEffCounterTerm2(z)
+         BEffCorrected2[:,iZ] = self.computeBEffCorrected2(z)
          print "done z "+str(iZ)+" of "+str(nZ)
 
       P1h = P1hBare + P1hCounterTerm
@@ -708,6 +728,7 @@ class P3dCross(P3dAuto):
       P2hBare = BEffBare1 * BEffBare2 * PLin
       P2hCounterTerm = BEffCounterTerm1 * BEffCounterTerm2 * PLin
       P2h = BEff1 * BEff2 * PLin
+      P2hCorrected = BEffCorrected1 * BEffCorrected2 * PLin
 
       pNoiseVect = np.vectorize(self.pNoise)
       f = lambda k: pNoiseVect(k, self.Z)
@@ -725,6 +746,7 @@ class P3dCross(P3dAuto):
       np.savetxt(path+"_1hcounterterm.txt", P1hCounterTerm)
       np.savetxt(path+"_2hbare.txt", P2hBare)
       np.savetxt(path+"_2hcounterterm.txt", P2hCounterTerm)
+      np.savetxt(path+"_2hcorrected.txt", P2hCorrected)
 
       tStop = time()
       print "took ", (tStop-tStart)/60., "min"

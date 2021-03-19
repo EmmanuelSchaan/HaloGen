@@ -36,38 +36,6 @@ class P2dAuto(object):
       
    ##################################################################################
       
-#   def saveP(self):
-#      print "precomputing p2d "+self.name
-#      data = np.zeros((len(self.L), 4))
-#      data[:,0] = self.L.copy()
-#      pool = Pool(ncpus=self.nProc)
-#      data[:,1] = np.array(map(self.fP_1h, self.L))
-#      data[:,2] = np.array(map(self.fP_2h, self.L))
-#      data[:,3] = np.array(map(self.fPnoise, self.L))
-#      np.savetxt(self.pathOut+"p2d_"+self.name+".txt", data)
-#
-#   def loadP(self):
-#      data = np.genfromtxt(self.pathOut+"p2d_"+self.name+".txt")
-#      self.L = data[:,0]
-#      self.P1h = data[:,1]
-#      self.P2h = data[:,2]
-#      self.Pnoise = data[:,3]
-#      self.P = self.P1h + self.P2h
-#      self.Ptot = self.P1h + self.P2h + self.Pnoise
-#      #
-#      # interpolate power spectra
-#      forP1h = UnivariateSpline(self.L,self.P1h,k=1,s=0)
-#      self.fP1hinterp = lambda l: forP1h(l)*(l>=min(self.L))*(l<=max(self.L))
-#      forP2h = UnivariateSpline(self.L,self.P2h,k=1,s=0)
-#      self.fP2hinterp = lambda l: forP2h(l)*(l>=min(self.L))*(l<=max(self.L))
-#      forP = UnivariateSpline(self.L,self.P,k=1,s=0)
-#      self.fPinterp = lambda l: forP(l)*(l>=min(self.L))*(l<=max(self.L))
-#      forPtot = UnivariateSpline(self.L,self.Ptot,k=1,s=0)
-#      self.fPtotinterp = lambda l: forPtot(l)*(l>=min(self.L))*(l<=max(self.L))
-   
-
-   ##################################################################################
-
    def computeP(self, fp3d):
       '''Compute P2d for all self.L at once,
       given the 3d power spectrum fp3d.
@@ -92,7 +60,7 @@ class P2dAuto(object):
    
    def saveP(self):
       print "precomputing p2d "+self.name
-      data = np.zeros((len(self.L), 8))
+      data = np.zeros((len(self.L), 9))
       data[:,0] = self.L.copy()
       #pool = Pool(ncpus=self.nProc)
       data[:,1] = self.computeP(self.Pn.p1hInt)
@@ -104,6 +72,7 @@ class P2dAuto(object):
       data[:,5] = self.computeP(self.Pn.p1hCounterTermInt)
       data[:,6] = self.computeP(self.Pn.p2hBareInt)
       data[:,7] = self.computeP(self.Pn.p2hCounterTermInt)
+      data[:,8] = self.computeP(self.Pn.p2hCorrectedInt)
 
       np.savetxt(self.pathOut+"p2d_"+self.name+".txt", data)
 
@@ -117,15 +86,34 @@ class P2dAuto(object):
       self.P = self.P1h + self.P2h
       self.Ptot = self.P1h + self.P2h + self.Pnoise
       #
+      self.P1hBare = data[:,4]
+      self.P1hCounterTerm = data[:,5]
+      self.P2hBare = data[:,6]
+      self.P2hCounterTerm = data[:,7]
+      self.P2hCorrected = data[:,8]
+      
       # interpolate power spectra
       forP1h = UnivariateSpline(self.L,self.P1h,k=1,s=0)
-      self.fP1hinterp = lambda l: forP1h(l)*(l>=min(self.L))*(l<=max(self.L))
+      self.fP1hInt = lambda l: forP1h(l)*(l>=min(self.L))*(l<=max(self.L))
       forP2h = UnivariateSpline(self.L,self.P2h,k=1,s=0)
-      self.fP2hinterp = lambda l: forP2h(l)*(l>=min(self.L))*(l<=max(self.L))
+      self.fP2hInt = lambda l: forP2h(l)*(l>=min(self.L))*(l<=max(self.L))
       forP = UnivariateSpline(self.L,self.P,k=1,s=0)
-      self.fPinterp = lambda l: forP(l)*(l>=min(self.L))*(l<=max(self.L))
+      self.fPInt = lambda l: forP(l)*(l>=min(self.L))*(l<=max(self.L))
       forPtot = UnivariateSpline(self.L,self.Ptot,k=1,s=0)
-      self.fPtotinterp = lambda l: forPtot(l)*(l>=min(self.L))*(l<=max(self.L))
+      self.fPtotInt = lambda l: forPtot(l)*(l>=min(self.L))*(l<=max(self.L))
+      #
+      forP1hBare = UnivariateSpline(self.L,self.P1hBare,k=1,s=0)
+      self.fP1hBareInt = lambda l: forP1hBare(l)*(l>=min(self.L))*(l<=max(self.L))
+      forP1hCounterTerm = UnivariateSpline(self.L,self.P1hCounterTerm,k=1,s=0)
+      self.fP1hCounterTermInt = lambda l: forP1hCounterTerm(l)*(l>=min(self.L))*(l<=max(self.L))
+      forP2hBare = UnivariateSpline(self.L,self.P2hBare,k=1,s=0)
+      self.fP2hBareInt = lambda l: forP2hBare(l)*(l>=min(self.L))*(l<=max(self.L))
+      forP2hCounterTerm = UnivariateSpline(self.L,self.P2hCounterTerm,k=1,s=0)
+      self.fP2hCounterTermInt = lambda l: forP2hCounterTerm(l)*(l>=min(self.L))*(l<=max(self.L))
+      forP2hCorrected = UnivariateSpline(self.L,self.P2hCorrected,k=1,s=0)
+      self.fP2hCorrectedInt = lambda l: forP2hCorrected(l)*(l>=min(self.L))*(l<=max(self.L))
+
+
 
 
 
@@ -144,42 +132,46 @@ class P2dAuto(object):
       result *= fP(l/chi, z)
       return result
    
-   def fP_1h(self, l):
+   def p1h(self, l):
       f = lambda a: self.integrandP(a, self.Pn.p1hInt, l)
       result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
       print "done ell=",l
       return result
 
-   def fP_2h(self, l):
+   def p2h(self, l):
       f = lambda a: self.integrandP(a, self.Pn.p2hInt, l)
       result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
       print "done ell=",l
       return result
 
-   def fP(self, l):
-      result = self.fP_1h(l) + self.fP_2h(l)
+   def p(self, l):
+      result = self.p1h(l) + self.p2h(l)
+      return result
+
+   def pTot(self, l):
+      result = self.p1h(l) + self.p2h(l) + self.pNoise(l) 
       return result
 
    ##################################################################################
    
 
-   def fdPdz_1h(self, l, z):
+   def dPdz1h(self, l, z):
       a = 1./(1.+z)
-      result = self.integrandP(a, self.Pn.fP1hinterp, l)
+      result = self.integrandP(a, self.Pn.p1hInt, l)
       result *= a**2
       return result
 
-   def fdPdz_2h(self, l, z):
+   def dPdz2h(self, l, z):
       a = 1./(1.+z)
-      result = self.integrandP(a, self.Pn.fP2hinterp, l)
+      result = self.integrandP(a, self.Pn.p2hInt, l)
       result *= a**2
       return result
 
-   def fdPdz(self, l, z):
-      result = self.fdPdz_1h(l, z) + self.fdPdz_2h(l, z)
+   def dPdz(self, l, z):
+      result = self.dPdz1h(l, z) + self.dPdz2h(l, z)
       return result
 
-   def fdPnoisedz(self, l, z):
+   def dPnoisedz(self, l, z):
       a = 1./(1.+z)
       result = self.Weight.fdPshotNoise_da(a, l)
       result *= a**2
@@ -190,71 +182,71 @@ class P2dAuto(object):
    ##################################################################################
    # trispectrum
 
-   def integrandT(self, a, fP, l):
-      z = 1./a-1.
-      chi = self.U.ComovDist(a, self.U.a_obs)
-      #
-      result = 3.e5/( self.U.Hubble(a) * a**2 )
-      result *= self.Weight.f(a)**4
-      result /= chi**6
-      result *= fP(l/chi, z)
-      return result
-
-   def fT_1h(self, l):
-      f = lambda a: self.integrandT(a, self.Pn.fT1hinterp, l)
-      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
-      print "done ell=",l
-      return result
-
-   def fT_2h(self, l):
-      f = lambda a: self.integrandT(a, self.Pn.fT2hinterp, l)
-      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
-      print "done ell=",l
-      return result
-
-   def fT_4h(self, l):
-      f = lambda a: self.integrandT(a, self.Pn.fT4hinterp, l)
-      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
-      print "done ell=",l
-      return result
-
-   def fT(self, l):
-      result = self.fT_1h(l)
-      return result
-
-
-   def fT_ssv(self, l, L=1.e2):
-      """This is the difference between the almost-squeezed
-      and the exactly squeezed trispectra:
-      T(l, -l+L, l, -l-L) = T(l,-l,l,-l) + T_ssv,
-      where L << l.
-      """
-      g = lambda k,z: self.Pn.fT_ssv(k, k, k*L/l, z)
-      f = lambda a: self.integrandT(a, g, l)
-      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
-      print "done ell=",l
-      return result
-
-
-
-   ##################################################################################
-   # trispectrum non-diagonal
-
-   def integrandTNonDiag(self, a, fP, l1, l2):
-      z = 1./a-1.
-      chi = self.U.ComovDist(a, self.U.a_obs)
-      #
-      result = 3.e5/( self.U.Hubble(a) * a**2 )
-      result *= self.Weight.f(a)**4
-      result /= chi**6
-      result *= fP(l1/chi, l2/chi, z)
-      return result
-
-   def fTnondiag(self, l1, l2):
-      f = lambda a: self.integrandTNonDiag(a, self.Pn.fTnondiag, l1, l2)
-      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
-      print "done ell=",l1, l2
-      return result
+#   def integrandT(self, a, fP, l):
+#      z = 1./a-1.
+#      chi = self.U.ComovDist(a, self.U.a_obs)
+#      #
+#      result = 3.e5/( self.U.Hubble(a) * a**2 )
+#      result *= self.Weight.f(a)**4
+#      result /= chi**6
+#      result *= fP(l/chi, z)
+#      return result
+#
+#   def fT_1h(self, l):
+#      f = lambda a: self.integrandT(a, self.Pn.fT1hinterp, l)
+#      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
+#      print "done ell=",l
+#      return result
+#
+#   def fT_2h(self, l):
+#      f = lambda a: self.integrandT(a, self.Pn.fT2hinterp, l)
+#      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
+#      print "done ell=",l
+#      return result
+#
+#   def fT_4h(self, l):
+#      f = lambda a: self.integrandT(a, self.Pn.fT4hinterp, l)
+#      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
+#      print "done ell=",l
+#      return result
+#
+#   def fT(self, l):
+#      result = self.fT_1h(l)
+#      return result
+#
+#
+#   def fT_ssv(self, l, L=1.e2):
+#      """This is the difference between the almost-squeezed
+#      and the exactly squeezed trispectra:
+#      T(l, -l+L, l, -l-L) = T(l,-l,l,-l) + T_ssv,
+#      where L << l.
+#      """
+#      g = lambda k,z: self.Pn.fT_ssv(k, k, k*L/l, z)
+#      f = lambda a: self.integrandT(a, g, l)
+#      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
+#      print "done ell=",l
+#      return result
+#
+#
+#
+#   ##################################################################################
+#   # trispectrum non-diagonal
+#
+#   def integrandTNonDiag(self, a, fP, l1, l2):
+#      z = 1./a-1.
+#      chi = self.U.ComovDist(a, self.U.a_obs)
+#      #
+#      result = 3.e5/( self.U.Hubble(a) * a**2 )
+#      result *= self.Weight.f(a)**4
+#      result /= chi**6
+#      result *= fP(l1/chi, l2/chi, z)
+#      return result
+#
+#   def fTnondiag(self, l1, l2):
+#      f = lambda a: self.integrandTNonDiag(a, self.Pn.fTnondiag, l1, l2)
+#      result = integrate.quad(f, self.aMin, self.aMax, epsabs=0, epsrel=1.e-2)[0]
+#      print "done ell=",l1, l2
+#      return result
 
 
    ##################################################################################
@@ -274,8 +266,10 @@ class P2dAuto(object):
       ax.legend(loc=3)
       ax.set_xlabel(r'$\ell$')
       ax.set_ylabel(r'$P(\ell)$')
-      path = "./figures/pn2d/p_"+self.name+".pdf"
-      #fig.savefig(path)
+      #
+      path = self.pathFig+"p_"+self.name+".pdf"
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
       
       # l*(l+1)*P
       fig = plt.figure(1)
@@ -290,158 +284,196 @@ class P2dAuto(object):
       ax.legend(loc=3)
       ax.set_xlabel(r'$\ell$')
       ax.set_ylabel(r'$\ell(\ell+1)P(\ell) / (2\pi)$')
-      path = "./figures/pn2d/l2p_"+self.name+".pdf"
-      #fig.savefig(path, bbox_inches='tight')
-      
-      plt.show()
+      #
+      path = self.pathFig+"l2p_"+self.name+".pdf"
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
+
+      #plt.show()
    
    
-   def plotdP(self):
-      
-      # P
-      fig = plt.figure(0)
-      ax = plt.subplot(111)
-      #
-      factor = self.L*(self.L+1.)/(2.*np.pi)
-      ax.loglog(L, factor*self.dP1h, '--', label=r'1h')
-      ax.loglog(L, factor*self.dP2h, '--', label=r'2h')
-      ax.loglog(L, factor*(self.dP1h+self.dP2h), 'k', label=r'tot')
-      ax.grid()
-      ax.legend(loc=3)
-      ax.set_xlabel(r'l')
-      ax.set_ylabel(r'$\ell(\ell+1)\frac{dP}{d\delta}(\ell)$')
-      ax.set_title(r'Power spectrum response')
-      path = "./figures/pn2d/dp_"+self.name+".pdf"
-      #      fig.savefig(path, bbox_inches='tight')
-      
-      # P
-      fig = plt.figure(1)
-      ax = plt.subplot(111)
-      #
-      ax.semilogx(self.L, self.dP / self.P, 'b-')
-      ax.grid()
-      ax.set_xlabel(r'l')
-      ax.set_ylabel(r'$\frac{dlnP}{d\delta}(\ell)$')
-      ax.set_title(r'Power spectrum response')
-      
-      plt.show()
+   def plotPCounterTerms(self):
 
-
-
-   def plotdPdz(self, l=1.e3):
-      A = np.linspace(self.aMin, self.aMax, 201)
-      Z = 1./A-1.
-      print Z
-      Chi = np.array(map(lambda a: self.U.ComovDist(a, 1.), A))
-      H = np.array(map(lambda a: self.U.Hubble(a), A))
-      W = np.array(map(self.Weight.f, A))
-      dChidA = 3.e5 / (H*A**2)
-      dChidZ = 3.e5 / H
-      
-      # redshift contributions for P1h and P2h
-      f = lambda a: self.integrandP(a, self.Pn.fP_1h, l)
-      dP1h_da = np.array(map(f, A))
-      f = lambda a: self.integrandP(a, self.Pn.fP_2h, l)
-      dP2h_da = np.array(map(f, A))
-      #
-      dP1h_dz = dP1h_da * A**2
-      dP2h_dz = dP2h_da * A**2
-      
-      # redshift contributions for Pshot
-      if hasattr(self.Weight, 'fdPshotNoise_da'):
-         f = lambda a: self.Weight.fdPshotNoise_da(a, l)
-         dPshot_da = np.array(map(f, A))
-         dPshot_dz = dPshot_da * A**2
-      
-      '''
-      def f(a):
-         z = 1./a-1.
-         chi = self.U.ComovDist(a, 1.)
-         return self.Pn.fP_1h(l/chi, z)
-      P3d_1h = np.array(map(f, A))
-      
-      def f(a):
-         z = 1./a-1.
-         chi = self.U.ComovDist(a, 1.)
-         return self.Pn.fP_2h(l/chi, z)
-      P3d_2h = np.array(map(f, A))
-      
-      
+      # fraction of total signal from bare vs counter term
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
-      ax.plot(A, A* dChidA * W**2/Chi**2 / np.max(A* dChidA * W**2/Chi**2), 'k', lw=2, label=r'kernel')
+      ax.axhline(1., c='gray', label=r'Bare+ Counter term')
+      ax.plot([], [], c='gray', ls='--', label=r'Bare')
+      ax.plot([], [], c='gray', ls='-.', label=r'Counter term')
+      ax.plot([], [], c='gray', ls=':', label=r'Corrected')
       #
-      ax.plot(A, P3d_1h / np.max(P3d_1h), 'b--', lw=2, label=r'$P_\text{3d}^\text{1h}$')
-      ax.plot(A, A*dP1h_da/np.max(A*dP1h_da), 'b', lw=2, label=r'integrand 1h')
+      # 1-halo term
+      plot=ax.plot(self.L, self.P1hBare / self.P1h, 'b', ls='--')
+      ax.plot(self.L, self.P1hCounterTerm / self.P1h, c=plot[0].get_color(), ls='-.')
+      ax.plot([], [], c=plot[0].get_color(), ls='-', label=r'1-halo')
       #
-      ax.plot(A, P3d_2h / np.max(P3d_2h), 'g--', lw=2, label=r'$P_\text{3d}^\text{2h}$')
-      ax.plot(A, A*dP2h_da/np.max(A*dP2h_da), 'g', lw=2, label=r'integrand 2h')
+      # 2-halo term
+      plot=ax.plot(self.L, self.P2hBare / self.P2h, 'r', ls='--')
+      ax.plot(self.L, self.P2hCounterTerm / self.P2h, c=plot[0].get_color(), ls='-.')
+      ax.plot(self.L, self.P2hCorrected / self.P2h, c=plot[0].get_color(), ls=':')
+      ax.plot([], [], c=plot[0].get_color(), ls='-', label=r'2-halo')
       #
-      ax.legend(loc=3)
+      ax.legend(loc=4, fontsize='x-small', labelspacing=0.1)
       ax.set_xscale('log', nonposx='clip')
       #ax.set_yscale('log', nonposy='clip')
-      ax.set_xlabel(r'scale factor $a$')
-      ax.set_ylabel(r'$d C_{\ell='+str(int(l))+'} / d\ln a$')
+      ax.set_xlabel(r'$\ell$')
+      ax.set_ylabel(r'Fraction')
       #
-      path = "./figures/pn2d/dp2d_dlna_"+self.name+".pdf"
-      #fig.savefig(path, bbox_inches='tight')
-      '''
+      path = self.pathFig+"fraction_counterterms_p2d_"+self.name+".pdf"
+      fig.savefig(path, bbox_inches='tight')
+      fig.clf()
 
-      fig=plt.figure(1)
-      ax=fig.add_subplot(111)
-      #
-      # factors in the integrands
-      #ax.plot(Z, dChidZ * W**2/Chi**2 / np.max(dChidZ * W**2/Chi**2), 'k', lw=2, label=r'kernel')
-      #ax.plot(Z, P3d_1h / np.max(P3d_1h), 'b--', lw=2, label=r'$P_\text{3d}^\text{1h}$')
-      #ax.plot(Z, P3d_2h / np.max(P3d_2h), 'g--', lw=2, label=r'$P_\text{3d}^\text{2h}$')
-      #
-      # normalized integrands
-#      ax.plot(Z, dP1h_dz / np.max(dP1h_dz), 'b', lw=2, label=r'1h')
-#      ax.plot(Z, dP2h_dz / np.max(dP2h_dz), 'g', lw=2, label=r'2h')
-#      if hasattr(self.Weight, 'fdPshotNoise_da'):
-#         ax.plot(Z, dPshot_dz / np.max(dPshot_dz), 'r', lw=2, label=r'shot')
-#         ax.plot(Z, (dP1h_dz+dP2h_dz+dPshot_dz) / np.max(dP1h_dz+dP2h_dz+dPshot_dz), 'k', lw=2, label=r'1h+2h+shot')
-#      else:
-#         ax.plot(Z, (dP1h_dz+dP2h_dz) / np.max(dP1h_dz+dP2h_dz), 'k', lw=2, label=r'1h+2h')
-      #
-      # non-normalized ingredients
-      ax.plot(Z, dP1h_dz, 'b', lw=2, label=r'1h')
-      ax.plot(Z, dP2h_dz, 'g', lw=2, label=r'2h')
-      if hasattr(self.Weight, 'fdPshotNoise_da'):
-         ax.plot(Z, dPshot_dz, 'r', lw=2, label=r'shot')
-         ax.plot(Z, dP1h_dz+dP2h_dz+dPshot_dz, 'k', lw=2, label=r'1h+2h+shot')
-      else:
-         ax.plot(Z, dP1h_dz+dP2h_dz, 'k', lw=2, label=r'1h+2h')
-      #
-      ax.legend(loc=4)
-      #ax.set_xscale('log', nonposx='clip')
-      ax.set_yscale('log', nonposy='clip')
-      ax.set_xlabel(r'redshift $z$')
-      ax.set_ylabel(r'$d C_{\ell='+str(int(l))+'} / dz$')
-      #
-      path = "./figures/pn2d/dp2d_dz"+self.name+".pdf"
-      #fig.savefig(path, bbox_inches='tight')
+      #plt.show()
+
+
    
-      '''
-      fig=plt.figure(2)
-      ax=fig.add_subplot(111)
-      #
-      ax.plot(Z, dP1h_dz / np.max(dP1h_dz), 'b', lw=2, label=r'1h')
-      #
-      ax.plot(Z, dP2h_dz / np.max(dP2h_dz), 'g', lw=2, label=r'2h')
-      #
-      ax.legend(loc=4)
-      #ax.set_xscale('log', nonposx='clip')
-      #ax.set_yscale('log', nonposy='clip')
-      ax.set_xlabel(r'redshift $z$')
-      ax.set_ylabel(r'$d C_{\ell='+str(int(l))+'} / dz$ [arbitrary unit]')
-      #
-      path = "./figures/pn2d/dp2d_dz_summary"+self.name+".pdf"
-      #fig.savefig(path, bbox_inches='tight')
-      '''
+#   def plotdP(self):
+#      
+#      # P
+#      fig = plt.figure(0)
+#      ax = plt.subplot(111)
+#      #
+#      factor = self.L*(self.L+1.)/(2.*np.pi)
+#      ax.loglog(L, factor*self.dP1h, '--', label=r'1h')
+#      ax.loglog(L, factor*self.dP2h, '--', label=r'2h')
+#      ax.loglog(L, factor*(self.dP1h+self.dP2h), 'k', label=r'tot')
+#      ax.grid()
+#      ax.legend(loc=3)
+#      ax.set_xlabel(r'l')
+#      ax.set_ylabel(r'$\ell(\ell+1)\frac{dP}{d\delta}(\ell)$')
+#      ax.set_title(r'Power spectrum response')
+#      path = "./figures/pn2d/dp_"+self.name+".pdf"
+#      #      fig.savefig(path, bbox_inches='tight')
+#      
+#      # P
+#      fig = plt.figure(1)
+#      ax = plt.subplot(111)
+#      #
+#      ax.semilogx(self.L, self.dP / self.P, 'b-')
+#      ax.grid()
+#      ax.set_xlabel(r'l')
+#      ax.set_ylabel(r'$\frac{dlnP}{d\delta}(\ell)$')
+#      ax.set_title(r'Power spectrum response')
+#      
+#      plt.show()
 
-      plt.show()
+
+
+#   def plotdPdz(self, l=1.e3):
+#      A = np.linspace(self.aMin, self.aMax, 201)
+#      Z = 1./A-1.
+#      print Z
+#      Chi = np.array(map(lambda a: self.U.ComovDist(a, 1.), A))
+#      H = np.array(map(lambda a: self.U.Hubble(a), A))
+#      W = np.array(map(self.Weight.f, A))
+#      dChidA = 3.e5 / (H*A**2)
+#      dChidZ = 3.e5 / H
+#      
+#      # redshift contributions for P1h and P2h
+#      f = lambda a: self.integrandP(a, self.Pn.fP_1h, l)
+#      dP1h_da = np.array(map(f, A))
+#      f = lambda a: self.integrandP(a, self.Pn.fP_2h, l)
+#      dP2h_da = np.array(map(f, A))
+#      #
+#      dP1h_dz = dP1h_da * A**2
+#      dP2h_dz = dP2h_da * A**2
+#      
+#      # redshift contributions for Pshot
+#      if hasattr(self.Weight, 'fdPshotNoise_da'):
+#         f = lambda a: self.Weight.fdPshotNoise_da(a, l)
+#         dPshot_da = np.array(map(f, A))
+#         dPshot_dz = dPshot_da * A**2
+#      
+#      '''
+#      def f(a):
+#         z = 1./a-1.
+#         chi = self.U.ComovDist(a, 1.)
+#         return self.Pn.fP_1h(l/chi, z)
+#      P3d_1h = np.array(map(f, A))
+#      
+#      def f(a):
+#         z = 1./a-1.
+#         chi = self.U.ComovDist(a, 1.)
+#         return self.Pn.fP_2h(l/chi, z)
+#      P3d_2h = np.array(map(f, A))
+#      
+#      
+#      fig=plt.figure(0)
+#      ax=fig.add_subplot(111)
+#      #
+#      ax.plot(A, A* dChidA * W**2/Chi**2 / np.max(A* dChidA * W**2/Chi**2), 'k', lw=2, label=r'kernel')
+#      #
+#      ax.plot(A, P3d_1h / np.max(P3d_1h), 'b--', lw=2, label=r'$P_\text{3d}^\text{1h}$')
+#      ax.plot(A, A*dP1h_da/np.max(A*dP1h_da), 'b', lw=2, label=r'integrand 1h')
+#      #
+#      ax.plot(A, P3d_2h / np.max(P3d_2h), 'g--', lw=2, label=r'$P_\text{3d}^\text{2h}$')
+#      ax.plot(A, A*dP2h_da/np.max(A*dP2h_da), 'g', lw=2, label=r'integrand 2h')
+#      #
+#      ax.legend(loc=3)
+#      ax.set_xscale('log', nonposx='clip')
+#      #ax.set_yscale('log', nonposy='clip')
+#      ax.set_xlabel(r'scale factor $a$')
+#      ax.set_ylabel(r'$d C_{\ell='+str(int(l))+'} / d\ln a$')
+#      #
+#      path = "./figures/pn2d/dp2d_dlna_"+self.name+".pdf"
+#      #fig.savefig(path, bbox_inches='tight')
+#      '''
+#
+#      fig=plt.figure(1)
+#      ax=fig.add_subplot(111)
+#      #
+#      # factors in the integrands
+#      #ax.plot(Z, dChidZ * W**2/Chi**2 / np.max(dChidZ * W**2/Chi**2), 'k', lw=2, label=r'kernel')
+#      #ax.plot(Z, P3d_1h / np.max(P3d_1h), 'b--', lw=2, label=r'$P_\text{3d}^\text{1h}$')
+#      #ax.plot(Z, P3d_2h / np.max(P3d_2h), 'g--', lw=2, label=r'$P_\text{3d}^\text{2h}$')
+#      #
+#      # normalized integrands
+##      ax.plot(Z, dP1h_dz / np.max(dP1h_dz), 'b', lw=2, label=r'1h')
+##      ax.plot(Z, dP2h_dz / np.max(dP2h_dz), 'g', lw=2, label=r'2h')
+##      if hasattr(self.Weight, 'fdPshotNoise_da'):
+##         ax.plot(Z, dPshot_dz / np.max(dPshot_dz), 'r', lw=2, label=r'shot')
+##         ax.plot(Z, (dP1h_dz+dP2h_dz+dPshot_dz) / np.max(dP1h_dz+dP2h_dz+dPshot_dz), 'k', lw=2, label=r'1h+2h+shot')
+##      else:
+##         ax.plot(Z, (dP1h_dz+dP2h_dz) / np.max(dP1h_dz+dP2h_dz), 'k', lw=2, label=r'1h+2h')
+#      #
+#      # non-normalized ingredients
+#      ax.plot(Z, dP1h_dz, 'b', lw=2, label=r'1h')
+#      ax.plot(Z, dP2h_dz, 'g', lw=2, label=r'2h')
+#      if hasattr(self.Weight, 'fdPshotNoise_da'):
+#         ax.plot(Z, dPshot_dz, 'r', lw=2, label=r'shot')
+#         ax.plot(Z, dP1h_dz+dP2h_dz+dPshot_dz, 'k', lw=2, label=r'1h+2h+shot')
+#      else:
+#         ax.plot(Z, dP1h_dz+dP2h_dz, 'k', lw=2, label=r'1h+2h')
+#      #
+#      ax.legend(loc=4)
+#      #ax.set_xscale('log', nonposx='clip')
+#      ax.set_yscale('log', nonposy='clip')
+#      ax.set_xlabel(r'redshift $z$')
+#      ax.set_ylabel(r'$d C_{\ell='+str(int(l))+'} / dz$')
+#      #
+#      path = "./figures/pn2d/dp2d_dz"+self.name+".pdf"
+#      #fig.savefig(path, bbox_inches='tight')
+#   
+#      '''
+#      fig=plt.figure(2)
+#      ax=fig.add_subplot(111)
+#      #
+#      ax.plot(Z, dP1h_dz / np.max(dP1h_dz), 'b', lw=2, label=r'1h')
+#      #
+#      ax.plot(Z, dP2h_dz / np.max(dP2h_dz), 'g', lw=2, label=r'2h')
+#      #
+#      ax.legend(loc=4)
+#      #ax.set_xscale('log', nonposx='clip')
+#      #ax.set_yscale('log', nonposy='clip')
+#      ax.set_xlabel(r'redshift $z$')
+#      ax.set_ylabel(r'$d C_{\ell='+str(int(l))+'} / dz$ [arbitrary unit]')
+#      #
+#      path = "./figures/pn2d/dp2d_dz_summary"+self.name+".pdf"
+#      #fig.savefig(path, bbox_inches='tight')
+#      '''
+#
+#      plt.show()
 
 
    def plotdPdz_color(self):
