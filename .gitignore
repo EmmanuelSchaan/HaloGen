@@ -1,1 +1,10 @@
-./*.pyc
+# files to exclude
+*.pyc
+*.swp
+
+# Mac OS generated files
+.DS_Store
+.DS_Store?
+
+# directories to exclude
+old/

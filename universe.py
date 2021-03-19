@@ -4,117 +4,152 @@ from headers import *
 
 class Universe(object):
 
-   def __init__(self):
-      """Required variables: h, OmC, OmB, OmM, path_lin_matter_power, a_obs
-      """
+   def __init__(self, name="", params=None):
+      self.name = name
+
+      # all cosmological parameters
+      if params is None:
+         # neutrino masses
+         self.Mnu = 0.06 # eV, minimum possible masses
+         self.normalHierarchy = True
+         self.nuMasses = self.computeNuMasses(self.Mnu, normal=self.normalHierarchy)
+
+         self.params = {
+                  'output': 'dTk vTk mPk',#'lCl tCl pCl mPk',
+                  #'l_max_scalars': 2000,
+                  #'lensing': 'yes',
+                  'A_s': 2.3e-9,
+                  'n_s': 0.9624,
+                  'h': 0.6711,
+                  'N_ur': 3.046,
+                  'omega_b': 0.022068,
+                  'Omega_cdm': 0.32,
+                  'Omega_k': 0.,
+                  'P_k_max_1/Mpc': 10.,
+                  #'N_ncdm': 3,
+                  #'m_ncdm': str(self.nuMasses[0])+','+str(self.nuMasses[1])+','+str(self.nuMasses[2]),
+                  #'deg_ncdm': '1, 1, 1',
+                  'non linear': 'halofit',
+                  'z_max_pk': 100.
+                  }
+      else:
+         self.params = params
       
+      # run CLASS
+      self.engine = CLASS.ClassEngine(self.params)
+      self.bg = CLASS.Background(self.engine)
+      self.sp = CLASS.Spectra(self.engine)
+      self.th = CLASS.Thermo(self.engine)
+      self.pm = CLASS.Primordial(self.engine)
+
+      # wave vectors computed for power spectrum (h/Mpc)
+      self.kMin = self.sp.P_k_min
+      self.kMax = self.sp.P_k_max
+      self.nK = 1001
+      self.K = np.logspace(np.log10(self.kMin), np.log10(self.kMax), self.nK, 10.)
+
       # physical constants
-      self.G = 6.67e-11   # in SI
-      self.rhoCRIT = 2.7617e11 # critical density today, in (h^-1 solarM) (h^-1 Mpc)^-3
+      self.G = 6.67e-11   # Newton's constant in SI
+      self.c_kms = 299792458. / 1.e3 # light celerity in km/s
+      self.mSun = 1.989e30 # [kg]
+      self.Mpc = 3.086e22 # [m]
       
-      # background universe
-      self.rho0 = self.OmM * self.rhoCRIT # matter density today, in (h^-1 solarM) (h^-1 Mpc)^-3
+      # convert from physical to comoving density
+      # and to (h^-1 solarM) (h^-1 Mpc)^-3
+      self.rho_crit = lambda z: self.bg.rho_crit(z)/(1.+z)**3 * 1.e10
+      self.rho_m = lambda z: self.bg.rho_m(z)/(1.+z)**3 * 1.e10
+      self.rho_cdm = lambda z: self.bg.rho_cdm(z)/(1.+z)**3 * 1.e10
+      self.rho_b = lambda z: self.bg.rho_b(z)/(1.+z)**3 * 1.e10
+      self.rho_g = lambda z: self.bg.rho_g(z)/(1.+z)**3 * 1.e10
+      self.rho_k = lambda z: self.bg.rho_k(z)/(1.+z)**3 * 1.e10
+      self.rho_lambda = lambda z: self.bg.rho_lambda(z)/(1.+z)**3 * 1.e10
+      self.rho_fld = lambda z: self.bg.rho_fld(z)/(1.+z)**3 * 1.e10
+      self.rho_ncdm = lambda z: self.bg.rho_ncdm(z)/(1.+z)**3 * 1.e10
+      self.rho_r = lambda z: self.bg.rho_r(z)/(1.+z)**3 * 1.e10
+      self.rho_ur = lambda z: self.bg.rho_ur(z)/(1.+z)**3 * 1.e10
+      self.rho_tot = lambda z: self.bg.rho_tot(z)/(1.+z)**3 * 1.e10
 
-      # linear power spectrum from CAMB
-      readPlin0 = np.genfromtxt(self.path_lin_matterpower)
-      K0 = readPlin0[:, 0]  # comoving k in units h * Mpc^-1
-      Plin0 = readPlin0[:,1]  # linear power spectrum in (h^-1 Mpc)^3, at redshift 0
-      # number of k points to compute sigma2 (1500 gives the same sigma8 as CAMB)
-      self.Nk = 1500
-      # fit to extend linear power spectrum to higher k than CAMB
-      self.k_eq = 0.0155 # turning point of the linear Plin in (h Mpc^-1)
-      self.k_fit_min = 5.e-4 # in (h Mpc^-1), fit in k
-      self.k_fit_max = 10. # in (h Mpc^-1), fit in k^-3 ln(k)^2
-      # interpolate k, and create k array to compute sigma2
-      fK = UnivariateSpline(np.linspace(0., 1., len(K0)),K0,k=1,s=0)
-      self.K = fK(np.linspace(0., 1., self.Nk)) # new k array
-      # interpolate linear power spectrum
-      self.fPlin0 = UnivariateSpline(K0,Plin0,k=1,s=0) # function for power spectrum
-      self.Plin = self.fPlin0(self.K) # new array for power spectrum
-
-      # read non-linear power spectrum (from CAMB with halofit)
-      #self.path_nonlin_matterpower = "./input/nonlin_matterpower_HillPajer13.dat"
-      #readPnonlin = np.genfromtxt(self.path_nonlin_matterpower)
-      #self.Knonlin = readPnonlin[:, 0]
-      #self.Pnonlin = readPnonlin[:, 1]
+      # convert to (km/s)/(Mpc/h)
+      self.hubble = lambda z: self.bg.hubble_function(z) * self.c_kms / self.bg.h
       
-      # fitting function for the correlation coefficient
-      # between the reconstructed and true velocity
-      # from Mariana's simulations
-      self.fr = lambda k: min(0.92, 0.54/k**0.165)
-      #self.fr = lambda k: min(1., 0.54/k**0.165)
+      # age of universe, in Gyr/h
+      self.time = lambda z: self.bg.time(z) * self.bg.h
+
+   def __str__(self):
+      return self.name
 
 
    ##################################################################################
-   # background universe
+
+   def computeNuMasses(self, mSum, normal=True):
+      '''mSum: sum of neutrino masses in eV
+      normal=True for normal hierarchy
+      output: masses in eV
+      '''
+      dmsq_atm = 2.5e-3 # eV^2
+      dmsq_solar = 7.6e-5 # eV^2
+      if normal:
+         f = lambda m0: m0 + np.sqrt(m0**2+dmsq_solar) + np.sqrt(m0**2+dmsq_solar+dmsq_atm) - mSum
+         m0 = optimize.brentq(f , 0., mSum)
+         result = np.array([m0, np.sqrt(m0**2+dmsq_solar), np.sqrt(m0**2+dmsq_solar+dmsq_atm)])
+      else:
+         f = lambda m0: m0 + np.sqrt(m0**2+dmsq_atm) + np.sqrt(m0**2+dmsq_atm+dmsq_solar) - mSum
+         m0 = optimize.brentq(f , 0., mSum)
+         result = np.array([m0, np.sqrt(m0**2+dmsq_atm), np.sqrt(m0**2+dmsq_atm+dmsq_solar)])
+      return result
+
+
    ##################################################################################
 
-   def rho_z(self, z):
-      """Comoving matter density at redshift z, in (h^-1 solarM) (h^-1 Mpc)^-3
-      """
-      return self.rho0
+   def pLin(self, k, z):
+      '''This is actually Plin.
+      Used for my halo model code
+      '''
+      if k<self.kMin or k>self.kMax:
+         return 0.
+      else:
+         return self.sp.get_pklin(k, z)
 
+   def p2hInterp(self, k, z):
+      '''This is actually Plin.
+      Used for my halo model code
+      '''
+      if k<self.kMin or k>self.kMax:
+         return 0.
+      else:
+         return self.sp.get_pklin(k, z)
+   
+   def p1hInterp(self, k, z):
+      '''Used for my halo model code
+      '''
+      return 0.
+   
+   def pInterp(self, k, z):
+      '''This is actually Pnl.
+      Used for my halo model code
+      '''
+      if k<self.kMin or k>self.kMax:
+         return 0.
+      else:
+         return self.sp.get_pk(k, z)
 
-   def rhocrit_z(self, z):
-      """Comoving critical density at redshift z, in (h^-1 solarM) (h^-1 Mpc)^-3
-      """
-      # critical density per unit physical volume
-      result = self.rhoCRIT * ( self.OmM * (1.+z)**3 + (1. - self.OmM) )
-      # critical density per unit comoving volume
-      result /= (1.+z)**3
-      return result
-   
-   
-   def Hubble(self, a):
-      """a dimless, Hubble in (km s^-1 (h Mpc^-1))
-      """
-      return 100 * ( self.OmM/a**3 + (1. - self.OmM) )**0.5
-   
-   
-   def ComovDist(self, a_min, a_max):
-      """Comoving distance along light cone from a=a_min to a=a_max, a dimless, ComovDist(a) in (h^-1 Mpc)
-      """
-      f = lambda a: 1./ (self.Hubble(a)/3.e5 * a**2)
-      result = integrate.quad(f, a_min, a_max, epsabs=0, epsrel=1.e-5)[0]
-      return result
-   
-   
-   def Lookback(self, a_min, a_max):
-      """Lookback time in Gyr/h
-      """
-      Mpc_to_km = 3.08567758e19
-      f = lambda a: 1./ (self.Hubble(a) * a)
-      result = integrate.quad(f, a_min, a_max, epsabs=0, epsrel=1.e-5)[0]
-      result *= Mpc_to_km / (3600.*24.*365.*1.e9)
-      return result
-   
-   
-   def LinGrowth(self, a):
-      """a dimless, LinGrowth(a) dimless, normalize to 1 for a=1
-      """
-      f = lambda a: 1./(self.Hubble(a) * a)**3
-      result = integrate.quad(f, 0., a, epsabs=0, epsrel=1.e-5)[0]
-      result /= integrate.quad(f, 0., 1., epsabs=0, epsrel=1.e-5)[0] # normalize to 1 for a=1
-      result *= self.Hubble(a)/100.
-      return result
-   
 
    ##################################################################################
    # spherical collapse
    ##################################################################################
 
 
-   def deltaC_z(self, z):
+   def deltaC(self, z):
       """critical density for spherical collapse at redshift z
       from Henry 2000, from Nakamura & Suto 1997
       usual 3.*(12.*pi)**(2./3.) / 20. = 1.686 if OmM=1.
       """
-      x = ( 1./self.OmM - 1. )**(1./3.)
+      x = ( 1./self.bg.Omega0_m - 1. )**(1./3.)
       x /= 1.+z
       dc = 3.*(12.*np.pi)**(2./3.) / 20.
       dc *= 1. - 0.0123* np.log( 1. + x**3 )
       return dc
-   
+
 
    '''
    def DeltaVir(self, z):
@@ -124,8 +159,8 @@ class Universe(object):
       gives 337 at z=0 for OmM= 0.3
       Omega = rhocrit(z)/rho_matter(z)
       """
-      Omega = self.OmM*(1.+z)**3
-      Omega /= self.OmM*(1.+z)**3 + (1. - self.OmM)
+      Omega = self.bg.Omega0_m*(1.+z)**3
+      Omega /= self.bg.Omega0_m*(1.+z)**3 + (1. - self.bg.Omega0_m)
       x = Omega - 1.
       Dvir = 18*np.pi**2 + 82.*x - 39.*x**2
       # convert between rho_m(z) and rho_crit(z)
@@ -138,70 +173,510 @@ class Universe(object):
       from Henry 2000, from Nakamura & Suto 1997
       usual 18*pi**2 if OmM=1.
       """
-      x = ( 1./self.OmM - 1. )**(1./3.)
+      x = ( 1./self.bg.Omega0_m - 1. )**(1./3.)
       x /= 1.+z
       Dvir = 18*np.pi**2 * ( 1. + 0.4093* x**2.71572 )
       return Dvir
    '''
 
 
-   def Deltacrit_z(self, z):
+   def deltaCrit(self, z):
       """ratio of virialized density to critical density at collapse (dimless).
       from Bullock et al 2001, from Bryan & Norman 1998
       usual 18*pi**2 if OmM=1.
-      Omega = rhocrit(z)/rho_matter(z).
+      Omega = rho_matter(z)/rhocrit(z).
       """
-      f = self.OmM * (1.+z)**3 / ( self.OmM * (1.+z)**3 + (1. - self.OmM) )
+      #f = self.bg.Omega0_m * (1.+z)**3 / ( self.bg.Omega0_m * (1.+z)**3 + (1. - self.bg.Omega0_m) )
+      f = self.bg.Omega_m(z)
       return 18.*np.pi**2 + 82.*(f-1.) - 39.*(f-1.)**2
-   
-   
-   def frvir(self, m, z):
+
+
+   def rVir(self, m, z):
       """Comoving virial and scale radii (Mpc/h)
       input mass is mvir (Msun/h)
       """
-      Rvir = ( 3.*m / (4*np.pi*self.rhocrit_z(z)*self.Deltacrit_z(z)) )**(1./3.)  # in h^-1 Mpc
+      Rvir = ( 3.*m / (4*np.pi*self.rho_crit(z)*self.deltaCrit(z)) )**(1./3.)  # in h^-1 Mpc
       return Rvir
 
    ##################################################################################
-   # density fluctuations
+
+   
+   def sigma2V1d(self, m, z, ref='Evrard07'):
+      '''Variance of the 1d LOS random velocities
+      inside a singular isothermal sphere
+      with mass m and physical radius r_vir:
+      sigma_{v1d}^2 = G*m / (2 r_vir)  [(km/s)^2]
+      '''
+      if ref=='Evrard07':
+         # From Eq6 and Table 5 of Evrard+07
+         result = self.hubble(z) * self.bg.h / 100.
+         result *= m / (1.e15 * self.bg.h)
+         result = 982. * result**0.355 # [km/s]
+         result = result**2   # [(km/s)]
+      elif ref=='White01':
+         rVir = self.rVir(m, z)  # comoving [Mpc/h]
+         rVir /= 1.+z   # physical [Mpc/h]
+         # 1d velocity dispersion [(km/s)^2]
+         # for a singular isothermal sphere
+         # with mass m and radius r_vir
+         result = self.G * (m * self.mSun / self.bg.h)
+         result /= 2. * (rVir * self.Mpc / self.bg.h)
+         result /= 1.e6 # convert [(m/s)^2] to [(km/s)^2]
+      return result
+
+   def plotSigma2V1d(self):
+      M = np.logspace(np.log10(1.e10), np.log10(1.e15), 101, 10.) # [Msun/h]
+      Z = np.array([0., 1., 2., 5.])
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         # White+01 version
+         f = lambda m: np.sqrt(self.sigma2V1d(m, z, ref='White01'))  # [km/s]
+         s = np.array(map(f, M))
+         plot=ax.loglog(M, s, label=r'$z=$'+str(np.int(z))+' W01')
+         #
+         # Evrard+07 version
+         f = lambda m: np.sqrt(self.sigma2V1d(m, z, ref='Evrard07'))  # [km/s]
+         s = np.array(map(f, M))
+         ax.loglog(M, s, c=plot[0].get_color(), ls='--', label=r'$z=$'+str(z)+' E07')
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$M$ [$M_\odot/h$]')
+      ax.set_ylabel(r'$\sigma_{v\ \text{1d}}(M, z)$ [km/s]')
+      #
+      plt.show()
+
+
+
+   
+   def sigma2DispFog(self, m, z):
+      '''Variance of the spurious LOS displacements
+      due to the orbital motion inside halos,
+      causing the FOG effect.
+      Sigma_d^2 = sigma_{v 1d}^2 / (aH)^2 # [(Mpc/h)^2],
+      where sigma_{v1d}^2 = G*m / (2 r_vir)
+      for a singular isothermal sphere
+      with mass m and physical radius r_vir.
+      '''
+      #return 0.
+      rVir = self.rVir(m, z)  # comoving [Mpc/h]
+      rVir /= 1.+z   # physical [Mpc/h]
+      # 1d velocity dispersion [(km/s)^2]
+      # for a singular isothermal sphere
+      # with mass m and radius r_vir
+      result = self.G * (m * self.mSun / self.bg.h)
+      result /= 2. * (rVir * self.Mpc / self.bg.h)
+      result /= 1.e6 # convert [(m/s)^2] to [(km/s)^2]
+      #print np.sqrt(result), "km/s"
+      # convert sigma_{v 1d}^2 to sigma_d^2 [(Mpc/h)^2]
+      result *= (1.+z)**2
+      result /= self.hubble(z)**2
+      return result
+
+   def plotSigma2DispFog(self):
+      M = np.logspace(np.log10(1.e10), np.log10(1.e15), 101, 10.) # [Msun/h]
+      Z = np.array([0., 1., 2., 5.])
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         f = lambda m: 1. / np.sqrt(self.sigma2DispFog(m, z))  # [(h/Mpc)]
+         kCut = np.array(map(f, M))
+         ax.loglog(M, kCut, label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$M$ [$M_\odot/h$]')
+      ax.set_ylabel(r'$k_\text{FOG} = 1 / \sigma_d(M, z)$ [$h/$Mpc]')
+      #
+      plt.show()
+
+   def kMaxParaSpectroRes(self, R, z):
+      '''For an experiment with spectral
+      resolving power R = nu / sigma_{nu},
+      sigma_{chi} = c / (a H R) and thus
+      kMax = a H R / c
+      '''
+      return self.hubble(z) * R / (1.+z) / self.c_kms
+
+   def spectralPsfF(self, kPara, R, z):
+      '''Fourier transform of the spectral PSF [dimless]
+      kPara [h/Mpc]
+      R spectral resolving power [dimless]
+      '''
+      kMaxPara = self.kMaxParaSpectroRes(R, z)
+      result = np.exp(-0.5 * kPara**2 / kMaxPara**2)
+      return result
+
+   def plotKMaxParaSpectroRes(self):
+      RR = np.array([40., 100., 150.])
+      Z = np.linspace(0., 7., 101)
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for R in RR[::-1]:
+         f = lambda z: self.kMaxParaSpectroRes(R, z)
+         kMax = np.array(map(f, Z))
+         ax.plot(Z, kMax, label=r'$\mathcal{R}=$'+str(np.int(R)))
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      ax.set_ylim((1.e-2, 1.e-1))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$k_{\parallel\text{max}} \equiv a H \mathcal{R} / c$ [$h$/Mpc]')
+      #
+      plt.show()
+
+
+   def kMaxPerpPsf(self, fwhmPsf, z):
+      '''Wavevector corresponding to 1 sigma
+      of the Gaussian PSF, with the given fwhmPsf [rad]
+      kMax = 1 / (chi(z) * sigma_beam) [h/Mpc]
+      '''
+      # convert from fwhm to sigma
+      s = fwhmPsf / np.sqrt(8. * np.log(2.)) # [rad]
+      return 1. / s / self.bg.comoving_distance(z) # [h/Mpc]
+
+
+   def psfF(self, kPerp, fwhmPsf, z):
+      '''Fourier transform of the PSF [dimless]
+      kPerp [h/Mpc]
+      fwhmPsf [rad]
+      '''
+      kMaxPara = self.kMaxPerpPsf(fwhmPsf, z)
+      result = np.exp(-0.5 * kPerp**2 / kMaxPara**2)
+      return result
+
+
+   def plotKMaxPerpPsf(self):
+      '''For an experiment with a given PSF/beam FWHM,
+      show the maximum wavevector accessible across the LOS k_perp
+      as a function of z.
+      kMax = 1 / (chi(z) * sigma_beam) 
+      '''
+      Z = np.linspace(0., 7., 101)
+      fwhmBeam = np.array([1., 6., 60.]) * np.pi/(180.*60.*60.)   # [arcsec] to [rad]
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for i in range(len(fwhmBeam)):
+         #s = sigmaBeam[i]
+         f = lambda z: self.kMaxPerpPsf(fwhmBeam[i], z)
+         kMax = np.array(map(f, Z))
+         ax.plot(Z, kMax, label=r'PSF FWHM = '+str(np.int(round(fwhmBeam[i]*(180.*3600.)/np.pi)))+r"$ '' $")
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$k_{\perp\text{max}} \equiv 1/ \left(\chi\ \sigma_\text{PSF} \right)$ [$h$/Mpc]')
+      #
+      # have the ticks in scientific format 
+      ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation())
+      # to get more tick marks on the y axis
+      ax.yaxis.set_major_locator(LogLocator(numticks=15))
+      ax.yaxis.set_minor_locator(LogLocator(numticks=15,subs=np.arange(2,10)))
+      #
+      plt.show()
+
+
+   def kFPerp(self, z, fSky=1):
+      '''Fundamental wave vector across the LOS,
+      for a square survey of area 4 pi fSky [sr]:
+      k_f = l_f/chi = sqrt(pi/fsky) / chi [h/Mpc]
+      '''
+      return np.sqrt(np.pi/fSky)  / self.bg.comoving_distance(z)
+
+
+   def plotKFPerp(self):
+      '''For an experiment with a given fsky,
+      show the fundamental wavevector across the LOS as a function of z
+      k_f = l_f/chi = sqrt(pi/fsky) / chi 
+      '''
+      Z = np.linspace(0., 7., 101)
+      # 100 deg^2 is fsky=0.0024
+      FSky = np.array([0.0048, 0.01, 0.1, 1.])
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for fSky in FSky:
+         f = lambda z: self.kFPerp(z, fSky)
+         kF = np.array(map(f, Z))
+         ax.plot(Z, kF, label=r'$f_\text{sky} =$ '+str(fSky)+' ('+str(np.int(fSky*4.*np.pi*(180./np.pi)**2))+r' deg$^2$)')
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$k_{\perp f} \equiv \sqrt{\pi/f_\text{sky}} / \chi$ [$h$/Mpc]')
+      #
+      plt.show()
+
+
+   def kFPara(self, z, dchi=None, dz=None):
+      '''Fundamental wave vector along the LOS,
+      for a survey with depth dhi = c/H dz [Mpc/h]:
+      k_f = 2*pi / dchi [h/Mpc]
+      '''
+      if dchi is None and dz is not None:
+         dchi = self.c_kms/self.hubble(z) * dz
+      return 2.*np.pi / dchi
+
+
+   def plotTradeOffNModes(self):
+      '''For a given spectral resolution R,
+      survey depth Delta z,
+      k_{perp max}=0.1 h/Mpc (to be 2-halo dominated),
+      and k_{para max} determined by the spectral resolution,
+      what fsky is required to get Nmodes=200,
+      ie a 10% measurement of the amplitude of the 2-halo term?
+      '''
+      RR = np.array([40., 150., 300.])
+      Z = np.linspace(0., 7., 101)
+
+      def fSkyReq(z, R, dz=0.5, nModes=200., kPerpMax=0.1):
+         result = nModes / self.bg.comoving_distance(z)**2 / kPerpMax**2
+         result *= np.pi * (1.+z) / (dz * R) 
+         return result
+      
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for R in RR:
+         f = lambda z: fSkyReq(z, R)
+         fSky = np.array(map(f, Z))
+         ax.plot(Z, fSky, label=r'$\mathcal{R}=$'+str(np.int(R)))
+      #
+      # SPHEREx: 100 deg^2
+      ax.axhline(2.*100. * (np.pi/180.)**2 / (4.*np.pi), ls='--', label=r'SPHEREx deep fields')
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((np.min(Z), np.max(Z)))
+      #ax.set_ylim((1.e-2, 1.e-1))
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Required sky fraction $f_\text{sky}$')
+      #
+      ax2=ax.twinx()
+      ylim = ax.get_ylim()
+      ax2.set_ylim((ylim[0] * 4.*np.pi*(180./np.pi)**2, ylim[1] * 4.*np.pi*(180./np.pi)**2))
+      ax2.set_yscale('log', nonposy='clip')
+      ax2.set_ylabel(r'Required sky area [deg$^2$]')
+      #
+      plt.show()
+
+
+
+
+
+   
+   ##################################################################################
+
+   def fK(self, chi):
+      """Comoving transverse distance, as a function of the comoving radial distance chi.
+      Input and output in Mpc/h
+      """
+      if self.bg.Omega0_k == 0.:
+         result = chi
+      # negative Om0_k corresponds to positive curvature
+      elif self.bg.Omega0_k < 0.:
+         Rk = 3.e3 / np.sqrt(-self.bg.Omega0_k) # (c/H0) / sqrt(|Omega0_k|), in Mpc/h
+         result = Rk * np.sin(chi / Rk)
+      # positive Om0_k corresponds to negative curvature
+      elif self.bg.Omega0_k > 0.:
+         Rk = 3.e3 / np.sqrt(self.bg.Omega0_k) # (c/H0) / sqrt(|Omega0_k|), in Mpc/h
+         result = Rk * np.sinh(chi / Rk)
+      return result
+
+   def plotDistances(self, zMax=2.):
+      z = np.linspace(0., zMax, 512)
+      
+      # comoving radial distance
+      plt.plot(z, self.bg.comoving_distance(z), label=r"$\chi$")
+      # comoving angular diameter distance
+      plt.plot(z, self.bg.comoving_transverse_distance(z), ls='-.', label=r"$d_A$")
+      # comoving angular diameter distance 2
+      plt.plot(z, self.bg.angular_diameter_distance(z)*(1.+z), ls='--', label=r"$d_A=D_A/a$")
+      # comoving angular diameter distance 2
+      plt.plot(z, self.fK(self.bg.comoving_distance(z)), '.', label=r"$d_A=f_K(\chi)$")
+      # luminosity distance
+      plt.plot(z, self.bg.luminosity_distance(z), label=r"$d_L$")
+      # physical angular diameter distance
+      plt.plot(z, self.bg.angular_diameter_distance(z), label=r"$D_A$")
+      plt.legend()
+      plt.xlabel(r"$z$")
+      plt.ylabel(r"distance $[h^{-1} \mathrm{Mpc}]$")
+      plt.show()
+   
+      # distance modulus
+      DistMod = 5.*( np.log10(self.bg.luminosity_distance(z)*1.e6*self.bg.h) - 1. )
+      plt.figure(1)
+      ax=plt.subplot(111)
+      ax.plot(z, DistMod)
+      ax.grid()
+      ax.set_title(r'Distance modulus $\mu=5 (log_{10}(d/pc) - 1)$')
+      ax.set_xlabel('redshift z')
+      ax.set_ylabel('distance modulus')
+      plt.show()
+   
+   
+   def printCosmoParams(self):
+      print "h = ", self.bg.h
+      print "Omega0_m = ", self.bg.Omega0_m
+      print "Omega0_lambda = ", self.bg.Omega0_lambda
+      print "Omega0_r = ", self.bg.Omega0_r
+      print "Omega0_k = ", self.bg.Omega0_k
+
+   def plotDensity(self):
+      z = np.linspace(0., 300., 512)
+      plt.loglog(1.+z, self.rho_m(z), label=r"$\rho_m$")
+      plt.loglog(1.+z, self.rho_cdm(z), label=r"$\rho_{cdm}$")
+      plt.loglog(1.+z, self.rho_b(z), label=r"$\rho_{b}$")
+      plt.loglog(1.+z, self.rho_r(z), label=r"$\rho_r$")
+      plt.loglog(1.+z, self.rho_g(z), label=r"$\rho_g$")
+      plt.loglog(1.+z, self.rho_ur(z), label=r"$\rho_{ur}$")
+      #plt.loglog(1.+z, self.rho_ncdm(z), label=r"$\rho_{ncdm}$")
+      plt.loglog(1.+z, self.rho_lambda(z), label=r"$\rho_\Lambda$")
+      plt.loglog(1.+z, self.rho_fld(z), label=r"$\rho_\text{fluid}$")
+      plt.legend()
+      plt.xlabel(r"$1.+z$")
+      plt.ylabel(r"Comoving density [(M$_\odot$/h)/(Mpc/h)$^3$]")
+      plt.show()
+   
+   def plotDensityParameters(self):
+      z = np.linspace(0., 300., 512)
+      plt.loglog(1.+z, self.bg.Omega_m(z), label=r"$\Omega_m$")
+      plt.loglog(1.+z, self.bg.Omega_r(z), label=r"$\Omega_r$")
+      plt.loglog(1.+z, self.bg.Omega_lambda(z), label=r"$\Omega_\Lambda$")
+      plt.loglog(1.+z, self.bg.Omega_fld(z), label=r"$\Omega_\text{fluid}$")
+      plt.legend()
+      plt.xlabel(r"$1.+z$")
+      plt.ylabel("Energy density parameters")
+      plt.show()
+
+   def plotP(self, z=0.):
+      plt.loglog(self.K, self.sp.get_pk(k=self.K, z=z), label='nonlinear')
+      plt.loglog(self.K, self.sp.get_pklin(k=self.K, z=z), label='linear')
+      plt.legend()
+      plt.xlabel(r"$k$ $[h / \mathrm{Mpc}]$")
+      plt.ylabel(r"$P$ $[(\mathrm{Mpc}/h)^3]$")
+      plt.show()
+
+   def plotSigma8(self, zMax=2.):
+      z = np.linspace(0., zMax, 512)
+      plt.plot(1. + z, self.sp.sigma8_z(z))
+      plt.xlabel(r"$1+z$")
+      plt.ylabel(r"$\sigma_8(z)$")
+      plt.show()
+
+   def plotTransfer(self):
+      transfer = self.sp.get_transfer(z=0)
+      print(transfer.dtype.names)
+      plt.subplot(211)
+      plt.plot(transfer['k'], transfer['d_tot'])
+      plt.ylabel("total density transfer")
+      plt.subplot(212)
+      plt.plot(transfer['k'], transfer['t_tot'])
+      plt.xlabel(r"$k$ $[h\mathrm{Mpc}^{-1}]$")
+      plt.ylabel("total velocity transfer")
+      plt.show()
+
+   def plotHubble(self, zMax=2.):
+      z = np.linspace(0., zMax, 512)
+      plt.plot(1. + z, self.hubble(z) * self.bg.h)
+      plt.xlabel(r"$1+z$")
+      plt.ylabel(r"$H(z)$ [km/s/Mpc]")
+      plt.show()
+
+   def plotTime(self, zMax=2.):
+      z = np.linspace(0., zMax, 512)
+      plt.plot(1. + z, self.time(z) / self.bg.h, '-')
+      plt.plot(1. + z, self.bg.time(z), '--')
+      plt.xlabel(r"$1+z$")
+      plt.ylabel(r"$t(z)$ [Gyr]")
+      plt.show()
+
+   def plotLinearGrowthFactor(self, zMax=10.):
+      z = np.linspace(0., zMax, 512)
+      plt.plot(1. + z, self.bg.scale_independent_growth_factor(z), '-', label=r'$D(z)$')
+      plt.plot(1. + z, 1./(1.+z), '--', label=r'$a(z)$')
+      plt.legend(loc=1)
+      plt.xscale('log')
+      plt.yscale('log')
+      plt.xlabel(r"$1+z$")
+      plt.ylabel(r"Linear growth factor $D$")
+      plt.show()
+
+   def plotLinearGrowthRate(self, zMax=10.):
+      z = np.linspace(0., zMax, 512)
+      plt.plot(1. + z, self.bg.scale_independent_growth_rate(z), '-', label=r'$f(z)$')
+      plt.plot(1. + z, self.bg.Omega_m(z)**(5./9.), '--', label=r'$\Omega_m(z)^{5/9}$')
+      plt.legend(loc=4)
+      plt.xscale('log')
+      plt.yscale('log')
+      plt.xlabel(r"$1+z$")
+      plt.ylabel(r"Linear growth rate $f$")
+      plt.show()
+
+   def plotThermo(self):
+      # recombination
+      print "recombination redshift =", self.th.z_rec
+      print "sound horizon at recombination =", self.th.rs_rec, "Mpc/h"
+      print "sound horizon angle at recombination =", self.th.theta_s * 180./np.pi, "deg"
+      # drag
+      print "drag redshift =", self.th.z_drag
+      print "sound horizon at z_drag =", self.th.rs_drag, "Mpc/h"
+      # reionization
+      print "reionization redshift =", self.th.z_reio
+      print "reionization optical depth =", self.th.tau_reio
+   
+   def plotPrimordial(self):
+      plt.loglog(self.K, self.pm.get_pkprim(self.K), label='from CLASS')
+      plt.loglog(self.K, self.sp.A_s * (self.K / self.sp.k_pivot)**(self.sp.n_s-1.), ls='--', label='analytic')
+      plt.legend()
+      plt.xlabel(r"$k$ $[h\mathrm{Mpc}^{-1}]$")
+      plt.ylabel(r"dimless prim. power $\Delta_\mathcal{R}(k)$")
+      plt.show()
+   
+
+
+   ##################################################################################
+   # density perturbations
    ##################################################################################
 
 
-   def Plin_z(self, z):
-      """array for linear power spectrum at redshift z
+   def dlnPlindlnK(self, k, z):
+      """derivative of linear power spectrum wrt k
       """
-      return self.Plin * self.LinGrowth(1./(1.+z))**2
-
-
-   def fPlin_z(self, k, z):
-      """Linear power spectrum, with a fit to extrapolate to high k
-      output is (h^-1 Mpc)^3
-      """
-      if (k < self.k_fit_min):
-         result = self.fPlin0(self.k_fit_min) * (k/self.k_fit_min)
-      elif (k > self.k_fit_max):
-         f = k**(-3) * np.log(k/(8.*self.k_eq))**2
-         result = f * self.fPlin0(self.k_fit_max) / ( self.k_fit_max**(-3) * np.log(self.k_fit_max/(8.*self.k_eq))**2 )
+      e = 0.01
+      kup = k*(1.+e)
+      kdown = k*(1.-e)
+      if kup>self.kMax or kdown<self.kMin:
+         result = 0.
       else:
-         result = self.fPlin0(k)
-      growth = self.LinGrowth(1./(1.+z))**2
-      result *= growth
+         result = self.sp.get_pklin(kup, z) / self.sp.get_pklin(kdown, z)
+         result = np.log(result) / (2.*e)
       return result
-   
-   
-   def fdPlindK_z(self, k, z):
-      """derivative of linear power spectrum, with a fit to extrapolate to high k
-      output is (Mpc/h)^4
+
+   def dlnPnldlnK(self, k, z):
+      """derivative of halofit power spectrum wrt k
       """
-      if (k < self.k_fit_min):
-         result = self.fPlin0(self.k_fit_min) / self.k_fit_min
-      elif (k > self.k_fit_max):
-         f = np.log(k/self.k_eq)/k**4 * (2. - 3.*np.log(k/self.k_eq))
-         result = f * self.fPlin0(self.k_fit_max) / ( self.k_fit_max**(-3) * np.log(self.k_fit_max/self.k_eq)**2 )
+      e = 0.01
+      lup = k*(1.+e)
+      ldown = k*(1.-e)
+      if kup>self.kMax or kdown<self.kMin:
+         result = 0.
       else:
-         result = self.fPlin0.derivatives(k)[1]
-      growth = self.LinGrowth(1./(1.+z))**2
-      result *= growth
+         result = self.sp.get_pk(kup, z) / self.sp.get_pk(kdown, z)
+         result = np.log(result) / (2.*e)
       return result
 
 
@@ -210,12 +685,11 @@ class Universe(object):
       defined by W3d
       R in h^-1 Mpc, comoving scale, output is dimless
       """
-      F = (self.K**3) * self.Plin_z(z) * ( np.array(map(W3d, self.K * R))**2 ) / (2* np.pi**2)  # dimensionless
-      dlnK = ( (self.K[1:]-self.K[:-1]) / self.K[:-1] )   # dimensionless
-      Itrap = np.sum( dlnK * ( F[:-1] + F[1:] ) ) * 0.5
-      return Itrap
-   
-   
+      f = lambda lnk: np.exp(lnk)**3 * self.sp.get_pklin(np.exp(lnk), z) * W3d(np.exp(lnk)*R)**2 / (2* np.pi**2) # dimensionless
+      result = integrate.quad(f, np.log(self.kMin), np.log(self.kMax), epsabs=0., epsrel=1.e-3)[0]
+      return result
+
+
    def nonLinMass(self, z):
       """nonlin mass at z, in Msun/h
       from Takada and Jain 2002/2003
@@ -224,12 +698,11 @@ class Universe(object):
       ma = 1.e11
       mb = 1.e13
       # solve for sigma(m)^2 = deltaC**2
-      R = lambda m: ( 3.* m / (4*np.pi*self.rho_z(z)) )**(1./3.)   # in h^-1 Mpc
-      f = lambda m: self.Sigma2(R(m), z, W3d_sth) - self.deltaC_z(z)**2
+      R = lambda m: ( 3.* m / (4*np.pi*self.rho_m(z)) )**(1./3.)   # in h^-1 Mpc
+      f = lambda m: self.Sigma2(R(m), z, W3d_sth) - self.deltaC(z)**2
       # find mass such that nu(m, z) = 1
       result = optimize.brentq(f , ma, mb)
       return result
-
 
 
    def Sigma2_2d(self, r, z, W2d):
@@ -237,11 +710,9 @@ class Universe(object):
       where sigma^2 = <( delta averaged on bin Dchi )^2>
       r is comoving scale in h^-1 Mpc
       """
-      F = self.K * self.Plin_z(z) * ( np.array(map(W2d, self.K * r))**2 ) / (2* np.pi)
-      dK = self.K[1:]-self.K[0:-1]
-      Itrap = np.sum( dK * ( F[:-1] + F[1:] ) ) * 0.5
-      return Itrap
-
+      f = lambda k: k * self.sp.get_pklin(k, z) * W2d(k*r)**2 / (2* np.pi)
+      result = integrate.quad(f, self.kMin, self.kMax, epsabs=0., epsrel=1.e-3)[0]
+      return result
 
 
    def Sigma2_cone(self, aMin, aMax, theta, W2d):
@@ -251,32 +722,29 @@ class Universe(object):
       output dimless
       """
       z = lambda a: 1./a-1.
-      r = lambda a: self.ComovDist(a, 1.) * theta
-      integrand = lambda a: 3.e5/(self.Hubble(a) * a**2) * self.Sigma2_2d(r(a), z(a), W2d)
-   
+      r = lambda a: self.bg.comoving_distance(z(a)) * theta
+      integrand = lambda a: 3.e5/(self.hubble(a) * a**2) * self.Sigma2_2d(r(a), z(a), W2d)
       result = integrate.quad(integrand, aMin, aMax, epsabs=0., epsrel=1.e-3)[0]
-      chiMin = self.ComovDist(aMax, 1.)
-      chiMax = self.ComovDist(aMin, 1.)
+      chiMin = self.comoving_distance(1./aMax-1.)
+      chiMax = self.comoving_distance(1./aMin-1.)
       result /= (chiMax-chiMin)**2
       return result
-
 
 
    def dlnSigma2_dlnR(self, R, z):
       """R in h^-1 Mpc, comoving scale, output is dimless
       dln(sigma2) / dln(R)
       """
-      F = (self.K**3) * self.Plin_z(z) * 2.*np.array(map(W3d_sth, self.K*R))*np.array(map(dW3d_sth, self.K * R))*(self.K * R) / (2* np.pi**2)  # dimensionless
-      dlnK = ( (self.K[1:]-self.K[:-1]) / self.K[:-1] )   # dimensionless
-      Itrap = np.sum( dlnK * ( F[:-1] + F[1:] ) ) * 0.5
-      result = Itrap / self.Sigma2(R, z, W3d_sth)
+      f = lambda lnk: np.exp(lnk)**3 * self.sp.get_pklin(np.exp(lnk),z) * 2. * W3d_sth(np.exp(lnk)*R) * dW3d_sth(np.exp(lnk)*R) * np.exp(lnk)*R / (2* np.pi**2)  # dimensionless
+      result = integrate.quad(f, np.log(self.kMin), np.log(self.kMax), epsabs=0., epsrel=1.e-3)[0]
+      result /= self.Sigma2(R, z, W3d_sth)
       return result
 
 
    def fdlnSigma_dlnM(self, m, z):
       """dln(sigma)/dln(m)
       """
-      R = (3.*m / (4.*np.pi*self.rho_z(z)))**(1./3.)
+      R = (3.*m / (4.*np.pi*self.rho_m(z)))**(1./3.)
       result = self.dlnSigma2_dlnR(R, z) /6.
       return result
 
@@ -285,9 +753,9 @@ class Universe(object):
    def fnu(self, m, z):
       """nu = dc**2/sigma2(m, z)
       """
-      r = (3.*m / (4.*np.pi*self.rho_z(z)))**(1./3.)
+      r = (3.*m / (4.*np.pi*self.rho_m(z)))**(1./3.)
       s2 = self.Sigma2(r, z, W3d_sth)
-      nu = self.deltaC_z(z)**2 / s2
+      nu = self.deltaC(z)**2 / s2
       return nu
 
 
@@ -308,63 +776,63 @@ class Universe(object):
       Assumes concentration from Duffy et al 2008.
       Used by Tinker mass function
       """
-      
+
       # concentration params from Duffy et al 2008, used by Tinker
       cNFW0 = 5.71
       cNFWam = -0.084
       cNFWaz = -0.47
-      
+
       # from Duffy et al 2008: different pivot mass
       cNFW = cNFW0 * (m/2.e12)**cNFWam * (1.+z)**cNFWaz
       # comoving virial radius and scale radius in h^-1 Mpc
-      Rvir = ( 3.*m / (4*np.pi*self.rhocrit_z(z) * self.Deltacrit_z(z)) )**(1./3.)
+      Rvir = ( 3.*m / (4*np.pi*self.rho_crit(z) * self.deltaCrit(z)) )**(1./3.)
       Rs = Rvir / cNFW
       # NFW scale density (comoving)
       rhoS = m / (4.*np.pi*Rs**3) / (np.log(1.+cNFW) - cNFW/(1.+cNFW))
-      
+
       # comoving reference density
       if ref=="m":   # ie wrt mean density
-         rhoRef = self.rho_z(z)
+         rhoRef = self.rho_m(z)
       elif ref=="c": # ie wrt critical density
-         rhoRef = self.rhocrit_z(z)
+         rhoRef = self.rho_crit(z)
 
       # get R200 and M200
       f = lambda x: -1. + 1./(1.+x) + np.log(1.+x) - value/3.*(rhoRef/rhoS)*x**3
-      x = optimize.brentq(f , 0.1, 100.)
+      #x = optimize.brentq(f , 0.1, 100.)
+      x = optimize.brentq(f , 1.e-3, 1.e3)
       Rnew = x * Rs
       Mnew = 4./3.*np.pi*Rnew**3 * rhoRef * value
-      
+
       return Mnew, Rnew
 
 
    ##################################################################################
    # response of power spectrum to local overdensity
-   
-   def fdlnPdDelta(self, k, z):
+
+   def dlnPlindDelta(self, k, z):
       result = 68./21.
-      result -= 1.
-      result -= k/self.fPlin_z(k, z) * self.fdPlindK_z(k, z) / 3.
+      result -= self.dlnPlindlnK(k, z) / 3.
+      result -= 1.   # this is -1/3 * dlnk^3/dlnk
       return result
-   
-   
-   
-   def testdLnPlindDelta(self, z=0.):
+
+
+
+   def plotdlnPlindDelta(self, z=0.):
       """for the linear power spectrum, dlnP/ddelta is independent of z
       but dP/ddelta is not
       """
-      K = np.logspace(np.log10(1.e-5), np.log10(1.e2), 1001, 10.)
       #
-      f = lambda k: self.fPlin_z(k, z)
-      P = np.array(map(f, K))
+      f = lambda k: self.sp.get_pklin(k, z)
+      P = np.array(map(f, self.K))
       #
-      f = lambda k: self.fdlnPdDelta(k, z)
-      dP = np.array(map(f, K))
-      
+      f = lambda k: self.dlnPlindDelta(k, z)
+      dP = np.array(map(f, self.K))
+
       # dlnP/ddelta
       fig = plt.figure(0)
       ax = plt.subplot(111)
       #
-      ax.semilogx(K, dP, 'b', label=r'$\frac{68}{21} - \frac{1}{3}\frac{d\ln k^3P_\text{lin}}{d\ln k}$')
+      ax.semilogx(self.K, dP, 'b', label=r'$\frac{68}{21} - \frac{1}{3}\frac{d\ln k^3P_\text{lin}}{d\ln k}$')
       ax.axhline(68./21., color='r', label=r'$\frac{68}{21}$')
       #
       ax.legend(loc=4)
@@ -374,14 +842,14 @@ class Universe(object):
       ax.set_xlabel(r'k [h/Mpc]')
       ax.set_ylabel(r'$d\ln P_\text{lin}/d\delta$ [(Mpc/h)$^3$]')
       #fig.savefig('./figures/response_powerspectrum/dLnPlindDelta.pdf', bbox_inches='tight')
-      
+
       # dP/ddelta
       fig = plt.figure(1)
       ax = plt.subplot(111)
       #
-      ax.loglog(K, P*dP, 'b', label=r'$P(k)\left[\frac{68}{21} - \frac{1}{3}\frac{d\ln k^3P_\text{lin}}{d\ln k} \right]$')
-      ax.loglog(K, P*68./21., 'r', label=r'$P(k)\left[\frac{68}{21}\right]$')
-      ax.loglog(K, P, 'k', label=r'$P(k)$')
+      ax.loglog(self.K, P*dP, 'b', label=r'$P(k)\left[\frac{68}{21} - \frac{1}{3}\frac{d\ln k^3P_\text{lin}}{d\ln k} \right]$')
+      ax.loglog(self.K, P*68./21., 'r', label=r'$P(k)\left[\frac{68}{21}\right]$')
+      ax.loglog(self.K, P, 'k', label=r'$P(k)$')
       #
       ax.legend(loc=3)
       ax.grid()
@@ -390,336 +858,268 @@ class Universe(object):
       ax.set_xlabel(r'k [h/Mpc]')
       ax.set_ylabel(r'$dP_\text{lin}/d\delta$ [(Mpc/h)$^3$]')
       #fig.savefig('./figures/response_powerspectrum/dPlindDelta_loglog.pdf', bbox_inches='tight')
-      
+
       plt.show()
 
-   
+
    ##################################################################################
    # Velocity fluctuations
+
    
-   def RMSVelocity(self, R, z, W3d):
-      """R in h^-1 Mpc, comoving scale, output is the rms velocity in (km/s)
+   def v3dRms(self, R, z, W3d):
+      """RMS of the 3d velocity: |v^{3d}|_{RMS} in km/s.
+      Input R in Mpc/h comoving.
+      Assumes linear (Zel'dovich) relation between velocity and density:
+      v = a H(a) f(a) delta(k) / k
+      Uses the linear matter power spectrum.
       """
-      F = (self.K**3) * ( np.array(map(W3d, self.K * R))**2 ) / (2* np.pi**2)  # dimensionless
-      F *= self.Plin_z(z) / self.K**2
-      F *= ( self.OmM*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
-      F *= ( self.Hubble(1./(1.+z))/(1.+z) )**2
-      dlnK = ( (self.K[1:]-self.K[:-1]) / self.K[:-1] )   # dimensionless
-      Itrap = np.sum( dlnK * ( F[:-1] + F[1:] ) ) * 0.5
-      return np.sqrt(Itrap)
-
-
-   def RMSErrorRecVel(self, R, z, W3d):
-      """R in h^-1 Mpc, comoving scale, output is the rms error on reconstructed velocity in (km/s)
-      """
-      CorrCoeff = np.array(map(self.fr, self.K))
-      F = (self.K**3) * ( np.array(map(W3d, self.K * R))**2 ) / (2* np.pi**2)  # dimensionless
-      F *= self.Plin_z(z) / self.K**2
-      F *= 2.* (1. - CorrCoeff)
-      F *= ( self.OmM*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
-      F *= ( self.Hubble(1./(1.+z))/(1.+z) )**2
-      dlnK = ( (self.K[1:]-self.K[:-1]) / self.K[:-1] )   # dimensionless
-      Itrap = np.sum( dlnK * ( F[:-1] + F[1:] ) ) * 0.5
-      return np.sqrt(Itrap)
-
-   def growthLogDerivativeF(self, z):
-      return ( self.OmM*(1.+z)**3 / (self.OmM*(1.+z)**3+(1. - self.OmM)) )**(5./9.)
-
-   def convertVelToDisp(self, z):
-      """multiply a velocity at redshift z by this factor to get the displacement at that redshift
-      v in km/s, displacement in Mpc/h
-      """
-      factor = self.Hubble(z)/(1.+z)*self.growthLogDerivativeF(z)
-      return 1./factor
-   
-   def RMSDisplacement(self, R, z, W3d):
-      """R in h^-1 Mpc, comoving scale, output is the rms displacement in (Mpc/h)
-      """
-      result = self.RMSVelocity(R, z, W3d)
-      result *= self.convertVelToDisp(z)
+      def integrand(lnk):
+         k = np.exp(lnk)
+         result = k**3 / (2* np.pi**2) # d^3k/(2pi)^3 = dlnk*k^3/(2 pi^2) [(h/Mpc)^3]
+         result *= np.abs(W3d(k*R))**2 # window function [dimless]
+         result *= self.sp.get_pklin(k, z)  / k**2 # velocity power spectrum [(Mpc/h)^5]
+         result *= self.bg.scale_independent_growth_rate(z)**2 # f**2
+         result *= (self.hubble(z) / (1.+z))**2 # (a*H(a))**2 [(km/s/(Mpc/h))^2]
+         return result
+      result = integrate.quad(integrand, np.log(self.kMin), np.log(self.kMax), epsabs=0., epsrel=1.e-3)[0]
+      result = np.sqrt(result)
       return result
+
+
+   def disp3dRms(self, R, z, W3d):
+      """RMS of the 3d Lagrangian displacement: |\psi^{3d}|_{RMS} in Mpc/h.
+      Input R in Mpc/h comoving.
+      Assumes linear (Zel'dovich) relation between displacement and density:
+      psi = delta(k) / k
+      Uses the linear matter power spectrum.
+      """
+      def integrand(lnk):
+         k = np.exp(lnk)
+         result = k**3 / (2* np.pi**2) # d^3k/(2pi)^3 = dlnk*k^3/(2 pi^2) [(h/Mpc)^3]
+         result *= np.abs(W3d(k*R))**2 # window function [dimless]
+         result *= self.sp.get_pklin(k, z)  / k**2 # velocity power spectrum [(Mpc/h)^5]
+         return result
+      result = integrate.quad(integrand, np.log(self.kMin), np.log(self.kMax), epsabs=0., epsrel=1.e-3)[0]
+      result = np.sqrt(result)
+      return result
+
+
+   ##################################################################################
+   # Line-of-sight momentum for kSZ
+
+   def fPqr(self, k, z, kMin=1.e-3, kMax=1.e2):
+      """P_{q_r}(k_perp, k_r=0) = 1/2 * P_{q_perp}(k_perp, k_r=0),
+      as computed in Eq 7 of Ma Fry 2002.
+      Here q_r = delta * v_r /c, dimless in real space, unit of volume in Fourier space.
+      This P_{q_r} is a function of k_perp and z,
+      where k_perp is the wave vector across the line of sight,
+      and the radial component of the wave vector k_r is set to zero.
+      k: k_perp in h/Mpc
+      z: redshift
+      output in (Mpc/h)^3.
+      """
+      
+      def integrand(par):
+         x = np.exp(par[0])  # such that |p| = x |k|
+         mu = par[1] # such that mu = cos(theta_{k, p})
+         #
+         result = self.pLin(k*x, z)
+         result *= self.pLin(k*np.sqrt(1.+x**2-2.*x*mu), z)
+         result *= (1.-2.*x*mu) * (1.-mu**2) / (1.+x**2-2.*x*mu)
+         #
+         result *= k / (2.*np.pi)**2
+         #
+         result *= x # do the integral in ln(x) rather than x
+         return result
    
-   # variance of vRadial_RMS^2, the average vRadial^2 on a cylindrical volume
-   # with area "area" in deg2, and between redshifts zMin and zMax
-#   def varRMSVRadial(self, area, zMin, zMax):
+      # compute integral
+      xMin = kMin / k
+      xMax = kMax / k
+      integ = vegas.Integrator([[np.log(xMin), np.log(xMax)], [-1., 1.]])
+      result = integ(integrand, nitn=10, neval=2000)
+#      print result.sdev / result.mean
+#      print result.summary()
+      result = result.mean
+      # rescale with the appropriate growth factor
+      result *= (self.hubble(z) / (1.+z))**2 # (a*H(a))**2 [(km/s/(Mpc/h))^2]
+      result /= (3.e5)**2  # divide by speed of light [(h/Mpc)^2]
+      result *= self.bg.scale_independent_growth_rate(z)**2 # f
+      result *= 0.5  # because P_{q_r} = 1/2 * P_{q_perp}
+      print "- done"
+      return result
+
+   
+   def savePqr(self, nProc=1):
+      # Precompute at z=0
+      nK = 201
+      K = np.logspace(np.log10(self.kMin), np.log10(self.kMax), nK, 10.)
+      result = np.zeros(self.nK)
+      with sharedmem.MapReduce(np=nProc) as pool:
+         f = lambda k: self.fPqr(k, 0., kMin=self.kMin, kMax=self.kMax)
+         result = np.array(pool.map(f, K))
+      path = "./output/pmomentumradial/pmomentumradial_"+".txt"
+      # save result
+      data = np.zeros((nK, 2))
+      data[:,0] = K
+      data[:,1] = result
+      np.savetxt(path, data)
 
 
-#   # variance of vRadial_RMS^2, the average vRadial^2 on a spherical volume
-#   # with radius R in comoving Mpc/h
-#   def varRMSVRadialSpherical(self, R, z, W3d):
-#      
+   def loadPqr(self):
+      # load the z=0 values
+      path = "./output/pmomentumradial/pmomentumradial_"+".txt"
+      data = np.genfromtxt(path)
+      # interpolate
+      fPqr_interp_z0 = interp1d(data[:,0], data[:,1], kind='linear', bounds_error=False, fill_value=0.)
+      # rescale for any redshift
+      def scaling(z):
+         result = (self.hubble(z) / (1.+z) / 3.e5 * self.bg.scale_independent_growth_rate(z))**2
+         result /= (self.hubble(0.) / (1.+0.) / 3.e5 * self.bg.scale_independent_growth_rate(0.))**2
+         result *= self.bg.scale_independent_growth_factor(z)**4
+         result /= self.bg.scale_independent_growth_factor(0.)**4
+         return result
+      self.fPqr_interp = lambda k,z: fPqr_interp_z0(k) * scaling(z)
+
+   
+   
+   
+
+
+
+   ##################################################################################
+
+#   def RMSErrorRecVel(self, R, z, W3d):
+#      """R in h^-1 Mpc, comoving scale, output is the rms error on reconstructed velocity in (km/s)
+#      """
+#      CorrCoeff = np.array(map(self.fr, self.K))
+#      F = (self.K**3) * ( np.array(map(W3d, self.K * R))**2 ) / (2* np.pi**2)  # dimensionless
+#      F *= self.Plin_z(z) / self.K**2
+#      F *= 2.* (1. - CorrCoeff)
+#      F *= ( self.bg.Omega0_m*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
+#      F *= ( self.Hubble(1./(1.+z))/(1.+z) )**2
+#      dlnK = ( (self.K[1:]-self.K[:-1]) / self.K[:-1] )   # dimensionless
+#      Itrap = np.sum( dlnK * ( F[:-1] + F[1:] ) ) * 0.5
+#      return np.sqrt(Itrap)
+#
+#   def convertVelToDisp(self, z):
+#      """multiply a velocity at redshift z by this factor to get the displacement at that redshift
+#      v in km/s, displacement in Mpc/h
+#      """
+#      factor = self.Hubble(z)/(1.+z)*self.growthLogDerivativeF(z)
+#      return 1./factor
+
+#
+##   # variance of vRadial_RMS^2, the average vRadial^2 on a spherical volume
+##   # with radius R in comoving Mpc/h
+##   def varRMSVRadialSpherical(self, R, z, W3d):
+##
+##      def integrand(pars):
+##         k = pars[0]
+##         K = pars[1]
+##         mu = pars[2]
+##         x = K/k
+##         # Put the density instead of velocity!!!
+##         result = self.pLin_z(k, z) / k**2
+##         result *= self.pLin_z(k*np.sqrt(1 - 2.*x*mu + x**2), z) / (k*np.sqrt(1 - 2.*x*mu + x**2))**2
+##
+##         factor = ( self.bg.Omega0_m*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
+##         factor *= ( self.Hubble(1./(1.+z))/(1.+z) )**2 # (a*H)**2
+##
+##         result *= factor**2
+##         result *= W3d(k*x*R)**2
+##         result *= x**2 * k**5
+##         result *= k
+##         result *= 4./ 3. / (2.*np.pi)**4
+##         return result
+##
+##      integ = vegas.Integrator([[1.e-4, 1.e1], [1.e-4, 1.e1], [-1., 1.]])
+##      integ(integrand, nitn=4, neval=1000)
+##      result = integ(integrand, nitn=8, neval=1000)
+##      print result.sdev/result.mean
+##      return result.mean
+###      return result.summary()
+#
+#
+#   def varRMSVSpherical(self, R, z, W3d):
+#      """variance of v_RMS^2, the average v^2 on a spherical volume
+#      with radius R in comoving Mpc/h
+#      """
+#
 #      def integrand(pars):
 #         k = pars[0]
 #         K = pars[1]
 #         mu = pars[2]
-#         x = K/k
+##         x = K/k
 #         # Put the density instead of velocity!!!
-#         result = self.fPlin_z(k, z) / k**2
-#         result *= self.fPlin_z(k*np.sqrt(1 - 2.*x*mu + x**2), z) / (k*np.sqrt(1 - 2.*x*mu + x**2))**2
-#         
-#         factor = ( self.OmM*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
+#         result = self.pLin_z(k, z) / k**2
+#         result *= self.pLin_z(np.sqrt(k**2 - 2.*k*K*mu + K**2), z) / (k**2 - 2.*k*K*mu + K**2)
+#
+#         factor = ( self.bg.Omega0_m*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
 #         factor *= ( self.Hubble(1./(1.+z))/(1.+z) )**2 # (a*H)**2
-#         
+#
 #         result *= factor**2
-#         result *= W3d(k*x*R)**2
-#         result *= x**2 * k**5
-#         result *= k
-#         result *= 4./ 3. / (2.*np.pi)**4
+#         result *= W3d(K*R)**2
+#         result *= K**2 * k**2
+#         result *= 4. / (2.*np.pi)**4
 #         return result
-#   
+#
 #      integ = vegas.Integrator([[1.e-4, 1.e1], [1.e-4, 1.e1], [-1., 1.]])
-#      integ(integrand, nitn=4, neval=1000)
+#      integ(integrand, nitn=8, neval=1000)
 #      result = integ(integrand, nitn=8, neval=1000)
 #      print result.sdev/result.mean
+##      print result.summary()
 #      return result.mean
-##      return result.summary()
-
-
-   def varRMSVSpherical(self, R, z, W3d):
-      """variance of v_RMS^2, the average v^2 on a spherical volume
-      with radius R in comoving Mpc/h
-      """
-
-      def integrand(pars):
-         k = pars[0]
-         K = pars[1]
-         mu = pars[2]
-#         x = K/k
-         # Put the density instead of velocity!!!
-         result = self.fPlin_z(k, z) / k**2
-         result *= self.fPlin_z(np.sqrt(k**2 - 2.*k*K*mu + K**2), z) / (k**2 - 2.*k*K*mu + K**2)
-         
-         factor = ( self.OmM*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
-         factor *= ( self.Hubble(1./(1.+z))/(1.+z) )**2 # (a*H)**2
-         
-         result *= factor**2
-         result *= W3d(K*R)**2
-         result *= K**2 * k**2
-         result *= 4. / (2.*np.pi)**4
-         return result
-      
-      integ = vegas.Integrator([[1.e-4, 1.e1], [1.e-4, 1.e1], [-1., 1.]])
-      integ(integrand, nitn=8, neval=1000)
-      result = integ(integrand, nitn=8, neval=1000)
-      print result.sdev/result.mean
-#      print result.summary()
-      return result.mean
-   
-
-   def plotVarRMSVSpherical(self, z=0.):
-      vMin = 1.e-2 * 1.e9  # (Mpc/h)^3
-      vMax = 1.e1 * 1.e9
-      V = np.logspace(np.log10(vMin), np.log10(vMax), 11, 10.)
-      R = ( 3.*V/(4.*np.pi) )**(1./3.)
-      
-      # We want the v_RMS^2, not the square of the average v,
-      # this is why the scale is 0 Mpc/h
-      f = lambda r: self.RMSVelocity(r*0., z, W3d_sth)**2
-      v2 = np.array(map(f, R))
-      # We want the cosmic variance on v_RMS^2;
-      # now this quantity will depend on the scale r
-      f = lambda r: self.varRMSVSpherical(r, z, W3d_sth)
-      varV2 = np.array(map(f, R))
-      
-      # volume of D56
-      volumeD56 = 700.*(np.pi/180.)**2 # area in sr
-      volumeD56 *= self.ComovDist(1./(1.+0.57), 1.)**2 # area in (Mpc/h)^2
-      volumeD56 *= self.ComovDist(1./(1.+0.7), 1./(1.+0.4)) # volume in (Mpc/h)^3
-      # volume of D56+BOSS N
-      volumeD56BN = volumeD56 * 2700./700.
-      
-      fig=plt.figure(0)
-      ax=fig.add_subplot(111)
-      #
-      ax.plot(V / 1.e9, np.sqrt(varV2)/v2, 'b-')
-      #
-      ax.axvline(volumeD56 / 1.e9, c='k', linestyle='--')
-      ax.axvline(volumeD56BN / 1.e9, c='k', linestyle='--')
-      #
-      ax.set_xscale('log')
-      ax.set_xlabel(r'Volume [Gpc/h]$^3$')
-      ax.set_ylabel(r'$\sigma_{v_\text{RMS}^2} / v_\text{RMS}^2$')
-      #
-#      fig.savefig("./figures/velocities/variance_of_vrms2_spherical.pdf", bbox_inches='tight')
-
-      fig=plt.figure(1)
-      ax=fig.add_subplot(111)
-      #
-      ax.plot(V / 1.e9, np.sqrt(v2), 'b-')
-      ax.plot(V / 1.e9, np.sqrt(np.sqrt(varV2)), 'b-')
-      #
-      ax.set_xscale('log')
-      ax.set_xlabel(r'Volume [Gpc/h]$^3$')
-      ax.set_ylabel(r'$v_\text{RMS}$')
-
-
-      plt.show()
-      return
-
-
-   ##################################################################################
-   # show properties
-   ##################################################################################
-   
-   
-   def testLinearPowerSpectrum(self):
-      
-      # show linear power spectrum; test interpolation
-      K = np.logspace(np.log10(1.e-5), np.log10(1.e2), 10001, 10.)
-      z=0.
-      f = lambda k: self.fPlin_z(k, z)
-      Plin = np.array(map(f, K))
-      fig0 = plt.figure(0)
-      ax = plt.subplot(111)
-      ax.loglog(self.K, self.Plin, 'k.')
-      ax.loglog(K, Plin, 'r')
-      ax.grid()
-#      ax.set_xlim((1.e-3, 1.e0))
-#      ax.set_ylim((1.e1, 1.e5))
-      ax.set_xlabel(r'k [h/Mpc]')
-      ax.set_ylabel(r'$P(k)$ [(Mpc/h)$^3$]')
-      #fig0.savefig('./figures/Plin.pdf')
-      
-      # compute variance of matter overdensity as a function of scale
-      z = 0.
-      fR  = lambda m: (3.*m / (4.*np.pi*self.rho_z(z)))**(1./3.)
-      fS2 = lambda m: self.Sigma2(fR(m), z, W3d_sth)
-      M = np.logspace(np.log10(1.e10), np.log10(1.e16), 101, 10.) # masses in h^-1 solarM
-      R = np.array(map(fR, M))
-      S2 = np.array(map( fS2, M ))
-      # Sigma2 = f(m)
-      fig1 = plt.figure(1)
-      ax = plt.subplot(111)
-      ax.loglog(M, S2, 'r')
-      ax.loglog(M, M/M, 'k')
-      ax.grid()
-      ax.set_xlabel(r'mass $m$ [$M_{sun}/h$]')
-      ax.set_ylabel(r'variance of $\delta_m$, smoothed on a scale $m$')
-      #fig1.savefig('./figures/S2_m.pdf')
-      # Sigma2 = f(r)
-      fig2 = plt.figure(2)
-      ax = plt.subplot(111)
-      ax.loglog(R, S2, 'b')
-      ax.loglog(R, R/R, 'k')
-      ax.grid()
-      ax.set_xlabel(r'scale $R$ [Mpc/h]')
-      ax.set_ylabel(r'variance of $\delta_m$, smoothed on a scale $R$')
-      #fig2.savefig('./figures/S2_r.pdf')
-      
-      plt.show()
-   
-   
-   def testRMSErrorRecVel(self):
-      # input
-      R = 0.   # smoothing scale
-      z = 0.   # redshift
-      W3d = W3d_sth  # choice of window function
-
-      # correlation coefficient
-      CorrCoeff = np.array(map(self.fr, self.K))
-      
-      # velocity power spectrum, normalized to its maximum
-      F = self.Plin_z(z) / self.K**2
-      #F *= 2.* (1. - CorrCoeff)
-      F *= ( self.OmM*(1.+z)**3 )**(2.*5./9.)   # f**2, where f = Omega_matter**5/9
-      F *= self.LinGrowth(1./(1.+z))**2
-      F *= ( self.Hubble(1./(1.+z))/(1.+z) )**2
-      F /= np.max(F)
-      
-      # integrand for RMS velocity, normalized to its maximum
-      G = F * (self.K**3) * ( np.array(map(W3d, self.K * R))**2 ) / (2* np.pi**2)  # dimensionless
-      G /= np.max(G)
-      
-      # integrand for RMS velocity error, normalized to its maximum
-      H = G * 2.* (1. - CorrCoeff)
-   
-      fig=plt.figure(0)
-      ax=plt.subplot(111)
-      #
-      ax.loglog(self.K, F, 'b', label=r'$P_{vv}$')
-      ax.loglog(self.K, G, 'g', label=r'$k^3 P_{vv}$')
-      ax.loglog(self.K, (1-CorrCoeff), 'r', label=r'$(1-r)$')
-      ax.loglog(self.K, H, 'm', label=r'$(1-r(k))k^3 P_{vv}$')
-      #
-      ax.grid()
-      ax.legend(loc=4)
-      ax.set_ylim((1.e-5, 1.))
-      ax.set_xlabel(r'$k$ h/Mpc')
-      #fig.savefig("./figures/velocities/rms_error.pdf")
-   
-      plt.show()
-  
-
-   ##################################################################################
-  
-   
-   def plotDistances(self):
-      
-      Z = np.linspace(0., 10., 501)
-      # comoving distance, i.e. comoving angular diameter distance (flat universe)
-      fcomov = lambda z: self.ComovDist(1./(1.+z), 1.)
-      Comov = np.array(map( fcomov, Z ))
-      # lookback time
-      ftime = lambda z: self.Lookback(1./(1.+z), 1.)
-      Time = np.array(map( ftime, Z ))
-      # proper distance, i.e. physical angular diameter distance (flat universe)
-      Angular = Comov / (1.+Z)
-      # luminosity distance, and distance modulus
-      Lumi = Comov * (1.+Z)
-      DistMod = 5.*( np.log10(Lumi*1.e6*self.h) - 1. )
-      # linear growth factor
-      fLinGrowth = lambda z: self.LinGrowth(1./(1.+z))
-      LinGrowth = np.array(map( fLinGrowth, Z ))
-      
-      plt.figure(0)
-      ax=plt.subplot(111)
-      ax.plot(Z, Comov)
-      ax.grid()
-      ax.set_title('Comoving distance, i.e.comov. ang. diam. dist. (flat universe)')
-      ax.set_xlabel('redshift z')
-      ax.set_ylabel('distance [Mpc/h]')
-      
-      plt.figure(1)
-      ax=plt.subplot(111)
-      ax.plot(Z, Angular)
-      ax.grid()
-      ax.set_title('Physical ang. diam. dist. (flat universe)')
-      ax.set_xlabel('redshift z')
-      ax.set_ylabel('distance [Mpc/h]')
-      
-      plt.figure(2)
-      ax=plt.subplot(111)
-      ax.plot(Z, Lumi)
-      ax.grid()
-      ax.set_title('Luminosity distance')
-      ax.set_xlabel('redshift z')
-      ax.set_ylabel('distance [Mpc/h]')
-      
-      plt.figure(3)
-      ax=plt.subplot(111)
-      ax.plot(Z, DistMod)
-      ax.grid()
-      ax.set_title(r'Distance modulus $\mu=5 (log_{10}(d/pc) - 1)$')
-      ax.set_xlabel('redshift z')
-      ax.set_ylabel('distance modulus')
-      
-      plt.figure(4)
-      ax=plt.subplot(111)
-      ax.plot(Z, Time)
-      ax.grid()
-      ax.set_title(r'Lookback time')
-      ax.set_xlabel('redshift z')
-      ax.set_ylabel('time [Gyr/h]')
-      
-      plt.figure(5)
-      ax=plt.subplot(111)
-      ax.plot(Z, LinGrowth)
-      ax.grid()
-      ax.set_title(r'Linear growth factor')
-      ax.set_xlabel('redshift z')
-      ax.set_ylabel('linear growth factor')
-      
-      plt.show()
+#
+#
+#   def plotVarRMSVSpherical(self, z=0.):
+#      vMin = 1.e-2 * 1.e9  # (Mpc/h)^3
+#      vMax = 1.e1 * 1.e9
+#      V = np.logspace(np.log10(vMin), np.log10(vMax), 11, 10.)
+#      R = ( 3.*V/(4.*np.pi) )**(1./3.)
+#
+#      # We want the v_RMS^2, not the square of the average v,
+#      # this is why the scale is 0 Mpc/h
+#      f = lambda r: self.RMSVelocity(r*0., z, W3d_sth)**2
+#      v2 = np.array(map(f, R))
+#      # We want the cosmic variance on v_RMS^2;
+#      # now this quantity will depend on the scale r
+#      f = lambda r: self.varRMSVSpherical(r, z, W3d_sth)
+#      varV2 = np.array(map(f, R))
+#
+#      # volume of D56
+#      volumeD56 = 700.*(np.pi/180.)**2 # area in sr
+#      volumeD56 *= self.ComovDist(1./(1.+0.57), 1.)**2 # area in (Mpc/h)^2
+#      volumeD56 *= self.ComovDist(1./(1.+0.7), 1./(1.+0.4)) # volume in (Mpc/h)^3
+#      # volume of D56+BOSS N
+#      volumeD56BN = volumeD56 * 2700./700.
+#
+#      fig=plt.figure(0)
+#      ax=fig.add_subplot(111)
+#      #
+#      ax.plot(V / 1.e9, np.sqrt(varV2)/v2, 'b-')
+#      #
+#      ax.axvline(volumeD56 / 1.e9, c='k', linestyle='--')
+#      ax.axvline(volumeD56BN / 1.e9, c='k', linestyle='--')
+#      #
+#      ax.set_xscale('log')
+#      ax.set_xlabel(r'Volume [Gpc/h]$^3$')
+#      ax.set_ylabel(r'$\sigma_{v_\text{RMS}^2} / v_\text{RMS}^2$')
+#      #
+##      fig.savefig("./figures/velocities/variance_of_vrms2_spherical.pdf", bbox_inches='tight')
+#
+#      fig=plt.figure(1)
+#      ax=fig.add_subplot(111)
+#      #
+#      ax.plot(V / 1.e9, np.sqrt(v2), 'b-')
+#      ax.plot(V / 1.e9, np.sqrt(np.sqrt(varV2)), 'b-')
+#      #
+#      ax.set_xscale('log')
+#      ax.set_xlabel(r'Volume [Gpc/h]$^3$')
+#      ax.set_ylabel(r'$v_\text{RMS}$')
+#
+#
+#      plt.show()
+#      return
 
 
    ##################################################################################
@@ -736,7 +1136,7 @@ class Universe(object):
       ax=plt.subplot(111)
       #
       for a in A:
-         fscaling = lambda fsky: self.Sigma2_2d(self.ComovDist(a, self.a_obs) * 2.*np.sqrt(fsky), 1./a-1., W2d_cth) * fsky
+         fscaling = lambda fsky: self.Sigma2_2d(self.bg.comoving_distance(1./a-1.) * 2.*np.sqrt(fsky), 1./a-1., W2d_cth) * fsky
          HSV = np.array(map(fscaling, Fsky))
          ax.loglog(Fsky, HSV, label=r'$z=$'+str(round(1./a-1., 2)))
       #
@@ -746,20 +1146,20 @@ class Universe(object):
       #fig.savefig('./figures/hsv_2d_scaling.pdf')
 
       plt.show()
-      
-      
-      
+
+
+
    def plotHSV_3d_scaling(self):
       # survey volumes
       Vmin = 1.e-3 * (1.e3)**3
       Vmax = 10. * (1.e3)**3
       NV = 51
       V = np.logspace(np.log10(Vmin), np.log10(Vmax), NV, 10.)
-      
+
       # variance of the matter overdensity smoothed over the survey (only used for HSV for 3d cov)
       R = (3.*V/(4.*np.pi))**(1./3.)   # for a spherical survey
-      HSV = np.array( map(lambda r: self.Sigma2(r, 1./self.a_obs-1., W3d_sth), R) ) * V
-      
+      HSV = np.array( map(lambda r: self.Sigma2(r, 0., W3d_sth), R) ) * V
+
       fig=plt.figure(0)
       ax=plt.subplot(111)
       #
@@ -769,297 +1169,192 @@ class Universe(object):
       #
       ax.set_xlabel(r'survey volume [(Gpc/h)$^3$]', fontsize=18)
       ax.set_ylabel(r'$\sigma^2 V$', fontsize=18)
-      fig.savefig('./figures/hsv_3d_scaling.pdf')
-      
-      plt.show()
-
-
-   ##################################################################################
-   
-   
-   def plotRMSVel(self, z=0.):
-      Z = np.linspace(0., 1., 101)
-      
-      f = lambda z: self.RMSVelocity(0., z, W3d_sth)
-      vRMS = np.array(map(f, Z))
-   
-      fig=plt.figure(0)
-      ax=fig.add_subplot(111)
-      #
-      ax.plot(Z, vRMS, 'b', lw=2)
-      #
-      ax.axvspan(0.1, 0.3, alpha=0.3, color='g', label=r'maxBCG')
-      ax.axvline(0.2, color='g')
-      ax.axvspan(0.08, 0.55, alpha=0.3, color='r', label=r'redMaPPer')
-      ax.axvline(0.35, color='r')
-      ax.axvspan(0.4, 0.7, alpha=0.3, color='c', label=r'CMASS')
-      ax.axvline(0.57, color='c')
-      #
-      ax.grid()
-      ax.legend(loc=1)
-      ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'$\sqrt{ \langle v^2 \rangle }$ [km/s]')
-      #fig.savefig("./figures/velocities/vrms_z.pdf")
-   
-      plt.show()
-
-
-   ##################################################################################
-
-   def plotSizeACTDeep(self):
-      # typical size of the ACT Deep footprint
-      theta = 10.*(np.pi/180.)
-      Z = np.linspace(0., 1., 21)
-      
-      f = lambda z: self.ComovDist(1./(1.+z), 1.) * theta
-      Size = np.array(map(f, Z))
-      
-      fig=plt.figure(0)
-      ax=plt.subplot(111)
-      #
-      ax.axvspan(0.1, 0.3, alpha=0.3, color='g', label=r'maxBCG')
-      ax.axvline(0.2, color='g')
-      ax.axvspan(0.08, 0.55, alpha=0.3, color='r', label=r'redMaPPer')
-      ax.axvline(0.35, color='r')
-      ax.axvspan(0.4, 0.7, alpha=0.3, color='c', label=r'CMASS')
-      ax.axvline(0.57, color='c')
-      #
-      ax.plot(Z, Size, 'k', lw=2)
-      #
-      ax.legend(loc=4)
-      ax.set_xlabel(r'$z$')
-      ax.set_ylabel(r'Comoving size [Mpc/h]')
-      #fig.savefig("./figures/velocities/transsize_act_deep.pdf")
-      
-      fig=plt.figure(1)
-      ax=plt.subplot(111)
-      #
-      ax.axhspan(self.ComovDist(1./(1.+0.1), 1.), self.ComovDist(1./(1.+0.3), 1.), alpha=0.3, color='g', label=r'maxBCG')
-      ax.axhline(self.ComovDist(1./(1.+0.2), 1.), color='g')
-      ax.axhspan(self.ComovDist(1./(1.+0.08), 1.), self.ComovDist(1./(1.+0.55), 1.), alpha=0.3, color='r', label=r'redMaPPer')
-      ax.axhline(self.ComovDist(1./(1.+0.35), 1.), color='r')
-      ax.axhspan(self.ComovDist(1./(1.+0.4), 1.), self.ComovDist(1./(1.+0.7), 1.), alpha=0.3, color='c', label=r'CMASS')
-      ax.axhline(self.ComovDist(1./(1.+0.57), 1.), color='c')
-      #
-      ax.set_ylim((0., 2000.))
-      ax.legend(loc=4)
-      ax.set_ylabel(r'Comoving size [Mpc/h]')
-      #fig.savefig("./figures/velocities/longsize_act_deep.pdf")
-      
-      plt.show()
-
-
-   ##################################################################################
-
-
-   def testVelCorrCoeff(self):
-      """check my fitting function for the correlation coefficient
-      between the true and reconstructed velocities
-      """
-   
-      # read correlation coefficient between the reconstructed and true velocity
-      # from Mariana's simulations
-      data = np.genfromtxt("./input/plot_mariana/r.txt")
-
-      fr = lambda k: min(0.92, 0.54/k**0.165)
-      
-      fig=plt.figure(0)
-      ax=plt.subplot(111)
-      #
-      ax.semilogx(data[:,0], data[:,1], 'ko', label=r'from Mariana')
-      ax.semilogx(self.K, 0.92*np.ones_like(self.K), 'r', label=r'$0.92$')
-      ax.semilogx(self.K, 0.54/self.K**0.165, 'r', label=r'$0.54 / k^{0.165}$')
-      ax.semilogx(self.K, np.array(map(fr, self.K)), 'b', lw=2, label=r'fitting function')
-      #
-      ax.grid()
-      ax.legend(loc=1)
-      ax.set_xlim((7.e-3, 2.))
-      ax.set_ylim((0.5, 1.))
-      ax.set_xlabel(r'$k$ Mpc/h')
-      ax.set_ylabel(r'correlation coefficient')
-      ax.set_title(r'smoothing on $5$Mpc/h')
-      #fig.savefig("./figures/velocities/corr_coeff.pdf")
+      #fig.savefig('./figures/hsv_3d_scaling.pdf')
 
       plt.show()
-
-
-
-   def fvelocityCorrelation(self, R, z):
-      """R in h^-1 Mpc, comoving scale, output is the rms velocity in (km/s)
-      """
-      f = lambda k: special.jv(0,k*R)
-      F = np.array(map(f, self.K))
-      
-      F *= (self.K**3) / (2* np.pi**2)
-      F *= self.Plin_z(z) / self.K**2
-      F *= ( self.OmM*(1.+z)**3 / (self.Hubble(1./(1.+z))/self.Hubble(1.))**2 )**(2.*5./9.)   # f**2, where f = Omega_m(z)**5/9
-      F *= ( self.Hubble(1./(1.+z))/(1.+z) )**2
-      dlnK = ( (self.K[1:]-self.K[:-1]) / self.K[:-1] )   # dimensionless
-      Itrap = np.sum( dlnK * ( F[:-1] + F[1:] ) ) * 0.5
-      return Itrap
-
-
-   def fdensityCorrelation(self, R, z):
-      """R in h^-1 Mpc, comoving scale, output is in (km/s)^2
-      """
-      f = lambda k: special.jv(0,k*R)
-      F = np.array(map(f, self.K))
-      
-      F *= (self.K**3) / (2* np.pi**2)
-      F *= self.Plin_z(z)
-      dlnK = ( (self.K[1:]-self.K[:-1]) / self.K[:-1] )   # dimensionless
-      Itrap = np.sum( dlnK * ( F[:-1] + F[1:] ) ) * 0.5
-      return Itrap
-
-
-   def plotCorrelationFunction(self):
-      z = 0.
-      R = np.logspace(np.log10(1.), np.log10(1.e3), 101, 10.)
-      
-      f = lambda r: self.fvelocityCorrelation(r, z)
-      VelCorr = np.array(map(f, R))
-      
-      f = lambda r: self.fdensityCorrelation(r, z)
-      DenCorr = np.array(map(f, R))
-      
-      fig=plt.figure(0)
-      ax=plt.subplot(111)
-      #
-      ax.semilogx(R, VelCorr, 'b')
-      
-      fig=plt.figure(1)
-      ax=plt.subplot(111)
-      #
-      ax.semilogx(R, DenCorr, 'b')
-      
-      plt.show()
-
 
 
 
 ##################################################################################
+##################################################################################
 
 class UnivHillPajer13(Universe):
-   
-   def __init__(self):
-      
-      # redshift of observer
-      self.a_obs = 1.
-      
-      # background universe
-      self.h = 0.697  # H0 = 100.*h km s^-1 Mpc^-1
-      self.OmC = 0.236
-      self.OmB = 0.0461
-      self.OmM = self.OmC + self.OmB
-      
-      # read linear power spectrum from CAMB
-      self.path_lin_matterpower = "./input/lin_matterpower_HillPajer13.dat"
 
-      super(UnivHillPajer13, self).__init__()
+   def __init__(self, name="hillpajer13"):
+      params = {
+               'output': 'dTk vTk mPk',#'lCl tCl pCl mPk',
+#                  'l_max_scalars': 2000,
+#                  'lensing': 'yes',
+               'A_s': 2.3e-9,
+               'n_s': 0.9624,
+               'h': 0.697,
+               'N_ur': 3.046,
+               'Omega_b': 0.0461,
+               'Omega_cdm': 0.236,
+               'Omega_k': 0.,
+               'P_k_max_1/Mpc': 10.,
+               'non linear': 'halofit',
+               'z_max_pk': 100.
+               }
+      super(UnivHillPajer13, self).__init__(name=name, params=params)
 
 
 ##################################################################################
 
 class UnivTinkerEtAl08(Universe):
-   
-   def __init__(self):
-   
-      # redshift of observer
-      self.a_obs = 1.
- 
-      # background universe
-      self.h = 0.7  # H0 = 100.*h km s^-1 Mpc^-1
-      self.OmC = 0.26
-      self.OmB = 0.04
-      self.OmM = self.OmC + self.OmB
-      
-      # read linear power spectrum from CAMB
-      self.path_lin_matterpower = "./input/lin_matterpower_wmap1_TinkerEtAl08.dat"
-      
-      super(UnivTinkerEtAl08, self).__init__()
+
+   def __init__(self, name="tinker08"):
+      params = {
+               'output': 'dTk vTk mPk',#'lCl tCl pCl mPk',
+#                  'l_max_scalars': 2000,
+#                  'lensing': 'yes',
+               'A_s': 2.3e-9,
+               'n_s': 0.9624,
+               'h': 0.7,
+               'N_ur': 3.046,
+               'Omega_b': 0.04,
+               'Omega_cdm': 0.26,
+               'Omega_k': 0.,
+               'P_k_max_1/Mpc': 10.,
+               'non linear': 'halofit',
+               'z_max_pk': 100.
+               }
+      super(UnivTinkerEtAl08, self).__init__(name=name, params=params)
 
 
 ##################################################################################
 
 class UnivSchaanEtAl14(Universe):
-   
-   def __init__(self):
-   
-      # redshift of observer
-      self.a_obs = 1.
-      
-      # background universe
-      self.h = 0.732  # H0 = 100.*h km s^-1 Mpc^-1
-      self.OmM = 0.238
-      self.OmB = 0.042
-      self.OmC = self.OmM - self.OmB
-      
-      # read linear power spectrum from CAMB
-      self.path_lin_matterpower = "./input/lin_matterpower_SchaanEtAl14.dat"
-      
-      super(UnivSchaanEtAl14, self).__init__()
+
+   def __init__(self, name="schaan14"):
+      params = {
+               'output': 'dTk vTk mPk',#'lCl tCl pCl mPk',
+#                  'l_max_scalars': 2000,
+#                  'lensing': 'yes',
+               'A_s': 2.3e-9,
+               'n_s': 0.9624,
+               'h': 0.732,
+               'N_ur': 3.046,
+               'Omega_b': 0.042,
+               'Omega_cdm': 0.196,
+               'Omega_k': 0.,
+               'P_k_max_1/Mpc': 10.,
+               'non linear': 'halofit',
+               'z_max_pk': 100.
+               }
+      super(UnivSchaanEtAl14, self).__init__(name=name, params=params)
 
 
 ##################################################################################
 
 # uses WMAP9 + eCMB parameters
 class UnivHandEtAl13(Universe):
-   
-   def __init__(self):
-      
-      # redshift of observer
-      self.a_obs = 1.
-      
-      # background universe
-      self.h = 0.705  # H0 = 100.*h km s^-1 Mpc^-1
-      self.OmC = 0.227
-      self.OmB = 0.0449
-      self.OmM = self.OmC + self.OmB
-      
-      # read linear power spectrum from CAMB
-      self.path_lin_matterpower = "./input/universe_HandEtAl13/lin_wmap9eCMB_HandEtAl13_matterpower.dat"
-      
-      super(UnivHandEtAl13, self).__init__()
+
+   def __init__(self, name="hand13"):
+      params = {
+               'output': 'dTk vTk mPk',#'lCl tCl pCl mPk',
+#                  'l_max_scalars': 2000,
+#                  'lensing': 'yes',
+               'A_s': 2.3e-9,
+               'n_s': 0.9624,
+               'h': 0.705,
+               'N_ur': 3.046,
+               'Omega_b': 0.0449,
+               'Omega_cdm': 0.227,
+               'Omega_k': 0.,
+               'P_k_max_1/Mpc': 10.,
+               'non linear': 'halofit',
+               'z_max_pk': 100.
+               }
+      super(UnivHandEtAl13, self).__init__(name=name, params=params)
 
 
 ##################################################################################
 
 # uses the OmM and h that Mariana used for her reconstructed velocities
-class UnivMariana(Universe):
-   
-   def __init__(self):
-      
-      # redshift of observer
-      self.a_obs = 1.
-      
-      # background universe
-      self.h = 0.70  # H0 = 100.*h km s^-1 Mpc^-1
-      self.OmM = 0.29
-      self.OmB = 0.0458571
-      self.OmC = self.OmM - self.OmB
-      
-      # read linear power spectrum from CAMB
-      self.path_lin_matterpower = "./input/universe_Mariana/lin_Mariana_matterpower.dat"
-      
-      super(UnivMariana, self).__init__()
+class UnivVargas(Universe):
+
+   def __init__(self, name="vargas"):
+      params = {
+               'output': 'dTk vTk mPk',#'lCl tCl pCl mPk',
+#                  'l_max_scalars': 2000,
+#                  'lensing': 'yes',
+               'A_s': 2.3e-9,
+               'n_s': 0.9624,
+               'h': 0.7,
+               'N_ur': 3.046,
+               'Omega_b': 0.0458571,
+               'Omega_cdm': 0.2441429,
+               'Omega_k': 0.,
+               'P_k_max_1/Mpc': 10.,
+               'non linear': 'halofit',
+               'z_max_pk': 100.
+               }
+      super(UnivMariana, self).__init__(name=name, params=params)
+
 
 
 ##################################################################################
 
 class UnivPlanck15(Universe):
-   
-   def __init__(self):
-      
-      # redshift of observer
-      self.a_obs = 1.
-      
-      # background universe
-      self.h = 0.6712  # H0 = 100.*h km s^-1 Mpc^-1
-      self.OmB = 0.0493
-      self.OmC = 0.267
-      self.OmM = self.OmC + self.OmB
-      
-      # read linear power spectrum from CAMB
-      self.path_lin_matterpower = "./input/universe_Planck15/camb/matterpower_z0_lin.dat"
-      
-      super(UnivPlanck15, self).__init__()
+
+   def __init__(self, name="planck15"):
+      params = {
+               'output': 'dTk vTk mPk',#'lCl tCl pCl mPk',
+#                  'l_max_scalars': 2000,
+#                  'lensing': 'yes',
+               'A_s': 2.3e-9,
+               'n_s': 0.9624,
+               'h': 0.6712,
+               'N_ur': 3.046,
+               'Omega_b': 0.0493,
+               'Omega_cdm': 0.267,
+               'Omega_k': 0.,
+               'P_k_max_1/Mpc': 10.,
+               'non linear': 'halofit',
+               'z_max_pk': 100.
+               }
+      super(UnivPlanck15, self).__init__(name=name, params=params)
+
+
+##################################################################################
+
+class UnivNuWCurv(Universe):
+
+   def __init__(self, name="nuwcurv"):
+
+      # neutrino masses
+      self.Mnu = 0.06 # eV, minimum possible masses
+      self.normalHierarchy = True
+      self.nuMasses = self.computeNuMasses(self.Mnu, normal=self.normalHierarchy)
+
+      params = {
+               # Cosmological parameters
+               'Omega_cdm': 0.267,
+               'Omega_b': 0.0493,
+               'A_s': 2.3e-9,
+               'n_s': 0.9624,
+               'tau_reio': 0.06,
+               'h': 0.6712,
+               #
+               # Massive neutrinos
+               'N_ncdm': 3,
+               'm_ncdm': str(self.nuMasses[0])+','+str(self.nuMasses[1])+','+str(self.nuMasses[2]),
+               'deg_ncdm': '1, 1, 1',
+               #
+               # w0 and wa
+               'Omega_Lambda': 0.,
+               'w0_fld': -1.,
+               'wa_fld': 0.,
+               #
+               # Curvature
+               'Omega_k': 0.,
+               #
+               # parameters
+               'output': 'mPk dTk vTk',#'lCl tCl pCl mPk',
+               'P_k_max_1/Mpc': 10.,
+               'non linear': 'halofit',
+               'z_max_pk': 100.
+               }
+      super(UnivNuWCurv, self).__init__(name=name, params=params)
+

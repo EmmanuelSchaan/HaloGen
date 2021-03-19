@@ -3,12 +3,24 @@ from headers import *
 
 class MassFunction(object):
 
-   def __init__(self, U, save=False):
+   def __init__(self, U, nProc=1, save=False):
+      self.U = U
+      self.nProc = nProc
    
-      # required variables: path_MassFunc, path_B1, path_B2
+      # required variables: self.name, self.nameLatex
+
+      # output directory
+      self.pathOut = "./output/massfunc/"+self.name+"/"
+      if not os.path.exists(self.pathOut):
+         os.makedirs(self.pathOut)
+
+      # figures directory 
+      self.pathFig = "./figures/massfunc/"+self.name+"/"
+      if not os.path.exists(self.pathFig):
+         os.makedirs(self.pathFig)
       
       # masses to compute mass function and biases
-      self.mMin = 1.e10  # in (h^-1 solarM)
+      self.mMin = 1.e4  #1.e10  #1.e4  # in (h^-1 solarM)
       self.mMax = 1.e16  # in (h^-1 solarM)
       self.Nm = 201 # nb of m pts
       self.M = np.logspace(np.log10(self.mMin), np.log10(self.mMax), self.Nm, 10.) # masses in h^-1 solarM
@@ -18,22 +30,29 @@ class MassFunction(object):
       self.aMax = 1.
       self.Na = 101
       self.A = np.linspace(self.aMin, self.aMax, self.Na)
-   
-      # copy U and Proj
-      self.U = U
-      
+      #
+      self.Z = 1./self.A - 1.
+      self.zMin = np.min(self.Z)
+      self.zMax = np.max(self.Z)
+      self.Nz = len(self.Z)
+
       # compute things if necessary
-      if save==True:
+      if save:
          self.Save()
-      
       self.Load()
+
+      # Counterterms from mass cutoffs
+      if save:
+         self.saveMassCounterTerms()
+      self.loadMassCounterTerms()
+
    
    ##################################################################################
    
-   def massfunc(self, m, z):
+   def massfuncForInterp(self, m, z):
       pass
    
-   def b(m, z):
+   def bForInterp(m, z):
       pass
  
    def Save(self):
@@ -42,37 +61,51 @@ class MassFunction(object):
       Massfunc = np.zeros((self.Nm, self.Na))
       B1 = np.zeros((self.Nm, self.Na))
       B2 = np.zeros((self.Nm, self.Na))
-      
-      for ia in range(self.Na):
-         z = 1./self.A[ia] - 1.
-         for im in range(self.Nm):
-            m = self.M[im]
-            # make sure not to get 0
-            Massfunc[im, ia] = max( self.massfunc(m, z), 1.e-300 )
-            B1[im, ia], B2[im, ia] = self.b(m, z)
-         print "- done "+str(ia+1)+" of "+str(self.Na)
-      
-      np.savetxt(self.path_Massfunc, Massfunc)
-      np.savetxt(self.path_B1, B1)
-      np.savetxt(self.path_B2, B2)
+
+      # Evaluate in parallel
+      with sharedmem.MapReduce(np=self.nProc) as pool:
+         for ia in range(self.Na):
+            z = 1./self.A[ia] - 1.
+            # compute mass function
+            f = lambda m: max(self.massfuncForInterp(m, z), 1.e-300)
+            Massfunc[:, ia] = np.array(pool.map(f, self.M))
+            # compute halo biases
+            f = lambda m: self.bForInterp(m, z)
+            result = np.array(pool.map(f, self.M))
+            B1[:, ia] = result[:,0]
+            B2[:, ia] = result[:,1]
+
+            # compute the counterterms accounting
+            # for the low mass cutoff
+
+            print "- done "+str(ia+1)+" of "+str(self.Na)
+
+      np.savetxt(self.pathOut + "_a.txt", self.A)
+      np.savetxt(self.pathOut + "_m.txt", self.M)
+      np.savetxt(self.pathOut + "_massfunc.txt", Massfunc)
+      np.savetxt(self.pathOut + "_b1.txt", B1)
+      np.savetxt(self.pathOut + "_b2.txt", B2)
       return
    
    def Load(self):
       # load sigma, nu, mass function and biases
       print "Loading mass function and biases"
-      self.Massfunc = np.genfromtxt(self.path_Massfunc)
-      self.B1 = np.genfromtxt(self.path_B1)
-      self.B2 = np.genfromtxt(self.path_B2)
+      A = np.genfromtxt(self.pathOut + "_a.txt")
+      M = np.genfromtxt(self.pathOut + "_m.txt")
+      self.Massfunc = np.genfromtxt(self.pathOut + "_massfunc.txt")
+      self.B1 = np.genfromtxt(self.pathOut + "_b1.txt")
+      self.B2 = np.genfromtxt(self.pathOut + "_b2.txt")
       
       # interpolate
-      interp_massfunc = RectBivariateSpline(np.log(self.M), self.A, np.log(self.Massfunc), s=0)
-      self.fmassfunc = lambda m, a: (a>=self.aMin and a<=self.aMax) * np.exp( interp_massfunc(np.log(m), a)[0,0] )
+      interp_massfunc = RectBivariateSpline(np.log(M), A, np.log(self.Massfunc), s=0)
+      #self.fmassfunc = lambda m, a: (a>=self.aMin and a<=self.aMax) * np.exp( interp_massfunc(np.log(m), a)[0,0] )
+      self.massfunc = lambda m, z: (z>=self.zMin and z<=self.zMax) * np.exp( interp_massfunc(np.log(m), 1./(1.+z))[0,0] )
       #
-      interp_b1 = RectBivariateSpline(np.log(self.M), self.A, np.log(self.B1), s=0)
-      self.fb1 = lambda m, a: (a>=self.aMin and a<=self.aMax) * np.exp( interp_b1(np.log(m), a)[0,0] )
+      interp_b1 = RectBivariateSpline(np.log(M), A, np.log(self.B1), s=0)
+      self.b1 = lambda m, z: (z>=self.zMin and z<=self.zMax) * np.exp( interp_b1(np.log(m), 1./(1.+z))[0,0] )
       #
-      interp_b2 = RectBivariateSpline(np.log(self.M), self.A,  self.B2, s=0)
-      self.fb2 = lambda m, a: (a>=self.aMin and a<=self.aMax) * interp_b2(np.log(m), a)[0,0]
+      interp_b2 = RectBivariateSpline(np.log(M), A,  self.B2, s=0)
+      self.b2 = lambda m, z: (z>=self.zMin and z<=self.zMax) * interp_b2(np.log(m), 1./(1.+z))[0,0]
 
 
    def testInterp(self, z=0.):
@@ -84,13 +117,13 @@ class MassFunction(object):
       # interpolated values
       M = np.logspace(np.log10(self.mMin), np.log10(self.mMax), 5*self.Nm, 10.)
       #
-      f = lambda m: self.fmassfunc(m, a)
+      f = lambda m: self.massfunc(m, z)
       RecMassfunc = np.array(map(f, self.M))
       #
-      f = lambda m: self.fb1(m, a)
+      f = lambda m: self.b1(m, z)
       RecB1 = np.array(map(f, self.M))
       #
-      f = lambda m: self.fb2(m, a)
+      f = lambda m: self.b2(m, z)
       RecB2 = np.array(map(f, self.M))
       
       # mass function
@@ -105,6 +138,10 @@ class MassFunction(object):
       ax.legend(loc=3, numpoints=1)
       ax.set_xlabel(r'M [M$_\odot$/h]', fontsize=18)
       ax.set_ylabel(r'$dn/d\ln(m)$', fontsize=18)
+      #
+      fig.savefig(self.pathFig + "n_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
       
       # b1
       fig=plt.figure(1)
@@ -118,7 +155,11 @@ class MassFunction(object):
       ax.legend(loc=3, numpoints=1)
       ax.set_xlabel(r'M [M$_\odot$/h]', fontsize=18)
       ax.set_ylabel(r'$b_1(m)$', fontsize=18)
-      
+      #
+      fig.savefig(self.pathFig + "b1_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
       # b2
       fig=plt.figure(2)
       ax=fig.add_subplot(111)
@@ -131,14 +172,307 @@ class MassFunction(object):
       ax.legend(loc=3, numpoints=1)
       ax.set_xlabel(r'M [M$_\odot$/h]', fontsize=18)
       ax.set_ylabel(r'$b_2(m)$', fontsize=18)
+      #
+      fig.savefig(self.pathFig + "b2_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
 
-      plt.show()
+
+   def plotMassFunc(self):
+      """Useful for comparison with Springel et al 2005.
+      Mass function at different redshifts from my code.
+      """
+      Z = np.array([0., 1.5, 3.06, 5.72, 10.07])
+      M = np.logspace(np.log10(self.mMin), np.log10(self.mMax), 101, 10.) # Msun/h
+      
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         # interpolated function
+         f = lambda m: self.massfunc(m, z) * m**2 / self.U.rho_m(z)
+         # non-interpolated function
+         #f = lambda m: self.massfunc(m, z) * m**2 / self.U.rho_m(z)
+         y = np.array(map(f, M))
+         ax.loglog(M, y, label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=1)
+      ax.set_xlabel(r'M [$M_\odot/h$]')
+      ax.set_ylabel(r'$M_\odot^2 \rho^{-1} dn/dm$ [dimensionless]')
+      ax.set_xlim((1.e10, 1.e16))
+      #ax.set_ylim((1.e-6, 1.e-1))
+      #
+      fig.savefig(self.pathFig + "n_vsSpringel05_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+
+   ##################################################################################
+   # Counter terms to account for the mass cutoffs in integrals
+
+
+   def integralConstraint(self, i, z, mMin=0., mMax=np.inf):
+      '''These integral constraints encode the requirement that:
+      i=0: all the mass is in halos
+      i=1: the linear bias of mass-weighted halos is 1
+      i>1: the higher order bias of mass-weighted halos is 0
+      '''
+      def integrand(lnm):
+         m = np.exp(lnm)
+         result = self.massfunc(m, z)
+         result *= m / self.U.rho_m(z)
+         if i==1:
+            result *= self.b1(m, z)
+         elif i==2:
+            result *= self.b2(m, z)
+         result *= m # because integrating in lnm and not m
+         return result
+      # integration bounds
+      mMin = max(self.mMin, mMin)
+      mMax = min(self.mMax, mMax)
+      result = integrate.quad(integrand, np.log(mMin), np.log(mMax), epsabs=0, epsrel=1.e-3)[0]
+      return result
+
+
+   def plotIntegralConstraintsZ(self):
+      '''Show the integral constraints as a function of redshift
+      '''
+      Z = self.Z.copy()
+      
+      # compute the integral constraints
+      ic = {}
+      for i in range(3):
+         f = lambda z: self.integralConstraint(i, z)
+         ic[i] = np.array(map(f, Z))
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      # Mass constraint
+      plot=ax.plot(Z, ic[0], label=r'Mass')
+      ax.axhline(1., c=plot[0].get_color(), ls='--')
+      #
+      # b1 constraint
+      plot=ax.plot(Z, ic[1], label=r'Linear bias')
+      ax.axhline(1., c=plot[0].get_color(), ls='--')
+      #
+      ## b2 constraint
+      #plot=ax.plot(Z, ic[2], label=r'Quadratic bias')
+      #ax.axhline(0., c=plot[0].get_color(), ls='-.')
+      #
+      ax.legend(loc=1)
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Integral constraints [dimensionless]')
+      #
+      fig.savefig(self.pathFig + "integralconstraints_z_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+
+   def nMinForInterp(self, z, mMin=0., mMax=np.inf):
+      '''Counterterm such that all the mass is in halos
+      '''
+      result = 1. - self.integralConstraint(0., z, mMin, mMax)
+      result *= self.U.rho_m(z) / mMin**2
+      return result
+
+
+   def b1MinForInterp(self, z, mMin=0., mMax=np.inf):
+      '''Counterterm such that the linear bias
+      of mass-weighted halos is 1
+      '''
+      result = 1. - self.integralConstraint(1, z, mMin, mMax)
+      result *= self.U.rho_m(z) / mMin**2
+      result /= self.nMinForInterp(z, mMin, mMax)
+      return result
+
+
+   def b2MinForInterp(self, z, mMin=0., mMax=np.inf):
+      '''Counterterm such that the linear bias
+      of mass-weighted halos is 1
+      '''
+      result = 1. - self.integralConstraint(2, z, mMin, mMax)
+      result *= self.U.rho_m(z) / mMin**2
+      result /= self.nMinForInterp(z, mMin, mMax)
+      return result
+
+
+   def saveMassCounterTerms(self):
+      # mass function and biases
+      print "Computing mass counter terms"
+      NMin = np.zeros(self.Na)
+      B1Min = np.zeros(self.Na)
+      B2Min = np.zeros(self.Na)
+
+      # compute the integral constraints
+      ic = {}
+      for i in range(3):
+         f = lambda z: self.integralConstraint(i, z)
+         ic[i] = np.array(map(f, self.Z))
+      # mass
+      NMin = (1. - ic[0]) * self.U.rho_m(self.Z) / self.mMin**2 
+      # linear bias
+      B1Min = (1. - ic[1]) * self.U.rho_m(self.Z) / self.mMin**2 / NMin
+      # quadratic bias
+      B2Min = (0. - ic[2]) * self.U.rho_m(self.Z) / self.mMin**2 / NMin
+
+      np.savetxt(self.pathOut + "_nMin.txt", NMin)
+      np.savetxt(self.pathOut + "_b1Min.txt", B1Min)
+      np.savetxt(self.pathOut + "_b2Min.txt", B2Min)
+      return
+   
+   def loadMassCounterTerms(self):
+      # load sigma, nu, mass function and biases
+      print "Loading mass counter terms"
+      A = np.genfromtxt(self.pathOut + "_a.txt")
+      self.NMin = np.genfromtxt(self.pathOut + "_nMin.txt")
+      self.B1Min = np.genfromtxt(self.pathOut + "_b1Min.txt")
+      self.B2Min = np.genfromtxt(self.pathOut + "_b2Min.txt")
+      
+      # interpolate
+      interp_nMin = interp1d(A, self.NMin, kind='linear', bounds_error=False, fill_value=0.)
+      self.nMin = lambda z: (z>=self.zMin and z<=self.zMax) * interp_nMin(1./(1.+z))
+      #
+      interp_b1Min = interp1d(A, self.B1Min, kind='linear', bounds_error=False, fill_value=0.)
+      self.b1Min = lambda z: (z>=self.zMin and z<=self.zMax) * interp_b1Min(1./(1.+z))
+      #
+      interp_b2Min = interp1d(A, self.B2Min, kind='linear', bounds_error=False, fill_value=0.)
+      self.b2Min = lambda z: (z>=self.zMin and z<=self.zMax) * interp_b2Min(1./(1.+z))
+
+
+   def plotMassCounterTerms(self):
+      '''Show the counter terms as a function of redshift
+      '''
+      Z = self.Z.copy()
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      # nMin
+      f = lambda z: self.massfunc(self.mMin, z)
+      NMMin = np.array(map(f, Z))
+      plot=ax.plot(Z, self.NMin / NMMin, label=r'$n_\text{min} / n(M_\text{min})$')
+      #
+      # b1Min
+      f = lambda z: self.b1(self.mMin, z)
+      B1MMin = np.array(map(f, Z))
+      plot=ax.plot(Z, self.B1Min / B1MMin, label=r'$b_{1,\text{min}} / b_1(M_\text{min})$')
+      #
+      ax.legend(loc=1)
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Counter terms [dimensionless]')
+      #
+      fig.savefig(self.pathFig + "masscounterterms_z_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+
+   def plotMassConstraintMMin(self):
+      '''Show the mass fractions in the integral vs the counter term
+      '''
+      MMin = np.logspace(np.log10(self.mMin), np.log10(self.mMax), 101, 10.) # [Msun/h]
+      Z = np.array([0., 1., 3., 5.])
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      ax.plot([], [], '-', c='gray', label=r'Bare + Counter term')
+      ax.plot([], [], '--', c='gray', label=r'Bare')
+      ax.plot([], [], '-.', c='gray', label=r'Counter term')
+      #
+      for iZ in range(len(Z)):
+         z = Z[iZ]
+
+         # bare
+         f = lambda mMin: self.integralConstraint(0, z, mMin=mMin)
+         yBare = np.array(map(f, MMin))
+         # counter term
+         f = lambda mMin:self.nMinForInterp(z, mMin=mMin) * mMin**2 / self.U.rho_m(z)
+         yCounterTerm = np.array(map(f, MMin))
+         # Sum
+         yFull = yBare + yCounterTerm
+
+         plot=ax.plot(MMin, yFull, c=plt.cm.cool(iZ/(len(Z)-1.)), ls='-', label=r'$z=$'+str(int(z)))
+         ax.plot(MMin, yBare, c=plot[0].get_color(), ls='--')
+         ax.plot(MMin, yCounterTerm, c=plot[0].get_color(), ls='-.')
+      #
+      ax.axhline(1., c='k', ls='-')
+      #
+      ax.legend(loc=3, fontsize='x-small', labelspacing=0.2)
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((MMin.min(), MMin.max()))
+      ax.set_ylim((1.e-3, 1.2))
+      ax.set_xlabel(r'Minimum halo mass $m_\text{min}$ [$M_\odot/h$]')
+      ax.set_ylabel(r'Mass constraint [dimless]')
+      #
+      fig.savefig(self.pathFig + "massconstraint_mmin_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+
+   def plotBiasConstraintMMin(self):
+      '''Show the bias fractions in the integral vs the counter term
+      '''
+      MMin = np.logspace(np.log10(self.mMin), np.log10(self.mMax), 101, 10.) # [Msun/h]
+      Z = np.array([0., 1., 3., 5.])
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      ax.plot([], [], '-', c='gray', label=r'Bare + Counter term')
+      ax.plot([], [], '--', c='gray', label=r'Bare')
+      ax.plot([], [], '-.', c='gray', label=r'Counter term')
+      #
+      for iZ in range(len(Z)):
+         z = Z[iZ]
+
+         # bare
+         f = lambda mMin: self.integralConstraint(1, z, mMin=mMin)
+         yBare = np.array(map(f, MMin))
+         # counter term
+         def f(mMin):
+            result = self.nMinForInterp(z, mMin=mMin) 
+            result *= self.b1MinForInterp(z, mMin=mMin) 
+            result *= mMin**2 / self.U.rho_m(z)
+            return result
+         yCounterTerm = np.array(map(f, MMin))
+         # Sum
+         yFull = yBare + yCounterTerm
+
+         plot=ax.plot(MMin, yFull, c=plt.cm.cool(iZ/(len(Z)-1.)), ls='-', label=r'$z=$'+str(int(z)))
+         ax.plot(MMin, yBare, c=plot[0].get_color(), ls='--')
+         ax.plot(MMin, yCounterTerm, c=plot[0].get_color(), ls='-.')
+      #
+      ax.axhline(1., c='k', ls='-')
+      #
+      ax.legend(loc=3, fontsize='x-small', labelspacing=0.2)
+      ax.set_xscale('log', nonposx='clip')
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xlim((MMin.min(), MMin.max()))
+      ax.set_ylim((1.e-3, 1.2))
+      ax.set_xlabel(r'Minimum halo mass $m_\text{min}$ [$M_\odot/h$]')
+      ax.set_ylabel(r'Linear bias constraint [dimless]')
+      #
+      fig.savefig(self.pathFig + "biasconstraint_mmin_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+
+
 
 
 ##################################################################################
-
+##################################################################################
 
 class MassFuncPS(MassFunction):
+
+   def __init__(self, U, nProc=1, save=False):
+      self.name = 'ps'
+      self.nameLatex = 'Press-Schechter'
+
+      super(MassFuncPS, self).__init__(U, nProc=nProc, save=save)
 
    def f(self, nu, z):
       """returns f(nu) for the Sheth-Tormen mass function
@@ -147,50 +481,56 @@ class MassFuncPS(MassFunction):
       f /= np.sqrt(2.*np.pi*nu)
       return f
    
-   def b(self, m, z):
+   def bForInterp(self, m, z):
       """only b1 implemented
       """
       nu = self.U.fnu(m, z)
-      return 1 + (nu-1) / self.U.deltaC_z(z), 0.
+      return 1 + (nu-1) / self.U.deltaC(z), 0.
    
-   def massfunc(self, m, z):
+   def massfuncForInterp(self, m, z):
       """dn/dm
       """
       nu = self.U.fnu(m, z)
-      f = self.U.rho_z(z)/m**2
+      f = self.U.rho_m(z)/m**2
       f *= nu * self.f(nu, z)
       f *= self.U.fdlnnu_dlnm(m, z)
       return f
-   
-   def __init__(self, U, save=False):
-      # paths for saving/loading data
-      self.path_Massfunc = "./output/massfunc/PS_Massfunc.txt"
-      self.path_B1 = "./output/massfunc/PS_B1.txt"
-      self.path_B2 = "./output/massfunc/PS_B2.txt"
-      #
-      super(MassFuncPS, self).__init__(U, save=save)
-
 
 
 ##################################################################################
+##################################################################################
 
 class MassFuncST(MassFunction):
-   
+
+   def __init__(self, U, nProc=1, save=False):
+      self.name = 'st'
+      self.nameLatex = 'Sheth-Tormen'
+
+      # params for Sheth-Tormen
+      # different from Sheth & Tormen 1999, q = 0.707
+      self.p = .3
+      #self.q = .707 # from Takada & Jain 2002
+      self.q = .75  # from Takada & Jain 2003
+      # amplitude, function of p only, to have "int f(nu) dnu = 1"
+      self.A_p = 1./( 1. + special.gamma(0.5-self.p)/(2**self.p * np.sqrt(np.pi)) )
+
+      super(MassFuncST, self).__init__(U, nProc=nProc, save=save)
+
    def f(self, nu, z):
       """returns f(nu) for the Sheth-Tormen mass function
       """
       f = self.A_p
       f *= 1 + (self.q*nu)**(-self.p)
       f *= np.sqrt( self.q*nu / (2.*np.pi) )
-      f *= exp( -0.5 * self.q*nu )
+      f *= np.exp( -0.5 * self.q*nu )
       f /= nu  # to get f(nu) and not nu*f(nu)
       return f
 
-   def b(self, m, z):
+   def bForInterp(self, m, z):
       """returns bias1 and bias2 for the Sheth-Tormen mass function
       """
       nu = self.U.fnu(m, z)
-      dc = self.U.deltaC_z(z)
+      dc = self.U.deltaC(z)
       #
       b1 = 1. + (self.q*nu - 1.)/dc
       b1 += 2.*self.p / ( dc * (1. + (self.q*nu)**self.p) )
@@ -200,38 +540,27 @@ class MassFuncST(MassFunction):
       
       return b1, b2
 
-   def massfunc(self, m, z):
+   def massfuncForInterp(self, m, z):
       """dn/dm
       """
       nu = self.U.fnu(m, z)
-      f = self.U.rho_z(z)/m**2
+      f = self.U.rho_m(z)/m**2
       f *= nu * self.f(nu, z)
       f *= self.U.fdlnnu_dlnm(m, z)
       return f
 
-   def __init__(self, U, save=False):
-      # params for Sheth-Tormen
-      # different from Sheth & Tormen 1999, q = 0.707
-      self.p = .3
-      #self.q = .707 # from Takada & Jain 2002
-      self.q = .75  # from Takada & Jain 2003
-      # amplitude, function of p only, to have "int f(nu) dnu = 1"
-      self.A_p = 1./( 1. + special.gamma(0.5-self.p)/(2**self.p * np.sqrt(np.pi)) )
-
-      # paths for saving/loading data
-      self.path_Massfunc = "./output/massfunc/ST_Massfunc.txt"
-      self.path_B1 = "./output/massfunc/ST_B1.txt"
-      self.path_B2 = "./output/massfunc/ST_B2.txt"
-      #
-      super(MassFuncST, self).__init__(U, save=save)
 
 
+##################################################################################
 ##################################################################################
 
 
 class MassFuncTinker(MassFunction):
    
-   def __init__(self, U, save=False):
+   def __init__(self, U, nProc=1, save=False):
+      self.name = 'tinker'
+      self.nameLatex = 'Tinker'
+
       # copy U and Proj
       self.U = U
       
@@ -248,12 +577,8 @@ class MassFuncTinker(MassFunction):
       self.cNFW0 = 5.71
       self.cNFWam = -0.084
       self.cNFWaz = -0.47
-      # paths for saving/loading data
-      self.path_Massfunc = "./output/massfunc/Tinker_Massfunc.txt"
-      self.path_B1 = "./output/massfunc/Tinker_B1.txt"
-      self.path_B2 = "./output/massfunc/Tinker_B2.txt"
-      #
-      super(MassFuncTinker, self).__init__(U, save=save)
+      
+      super(MassFuncTinker, self).__init__(U, nProc=nProc, save=save)
 
 
    def f(self, sigma, z):
@@ -272,15 +597,15 @@ class MassFuncTinker(MassFunction):
    def Tinker_massfunc_m200d(self, m, z):
       """dn/dm200d; input m=m200d here
       """
-      r = (3.*m / (4.*np.pi*self.U.rho_z(z)))**(1./3.)
+      r = (3.*m / (4.*np.pi*self.U.rho_m(z)))**(1./3.)
       sigma = np.sqrt( self.U.Sigma2(r, z, W3d_sth) )
       #
       f = self.f(sigma, z)
-      f *= self.U.rho_z(z)/m**2
+      f *= self.U.rho_m(z)/m**2
       f *= abs(self.U.fdlnSigma_dlnM(m, z))
       return f
    
-   def massfunc(self, m, z):
+   def massfuncForInterp(self, m, z):
       """dn/dm, including the jacobian dm200_d/dm; m=m_vir here
       """
       m200d = self.U.massRadiusConversion(m, z, 200., 'm')[0]
@@ -313,9 +638,9 @@ class MassFuncTinker(MassFunction):
       return b1
    
    
-   def b(self, m, z):
+   def bForInterp(self, m, z):
       # Tinker's convention: nu = dc/sigma
-      R = (3.*m / (4.*np.pi*self.U.rho_z(z)))**(1./3.)
+      R = (3.*m / (4.*np.pi*self.U.rho_m(z)))**(1./3.)
       dc = 1.686  # from Tinker et al 2010
       nu = dc / np.sqrt( self.U.Sigma2(R, z, W3d_sth) )
       # first order bias
@@ -362,7 +687,7 @@ class MassFuncTinker(MassFunction):
       #
       fig5 = plt.figure(5)
       ax = plt.subplot(111)
-      ax.loglog(M, M**2/self.U.rho_z(z) * Tinker_massfunc, 'g', label='my code')
+      ax.loglog(M, M**2/self.U.rho_m(z) * Tinker_massfunc, 'g', label='my code')
       ax.loglog(X, Y, 'r', label='Tinker et al 2008')
       ax.grid()
       ax.set_xlabel(r'$M_{200,d}$ [$M_{sun}$/h]')

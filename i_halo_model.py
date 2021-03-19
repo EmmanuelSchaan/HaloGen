@@ -10,7 +10,7 @@ class IHaloModel():
 
    ##################################################################################
 
-   def f(self, i, Profiles, z, nbias=0, mMin=None, test=False):
+   def f(self, i, Profiles, z, nbias=0, mMin=None, mMax=None, test=False):
       """integrals Mij, and their modified versions when nbias is included
       from theory: nbias = 0 or 1
       K is the size j array of moduli [k1, ..., kj]
@@ -19,17 +19,17 @@ class IHaloModel():
       a = 1./(z+1.)
       
       # mass function
-      massfunc = lambda m: self.MassFunc.fmassfunc(m, a)
+      massfunc = lambda m: self.MassFunc.massfunc(m, a)
       # bias if necessary
       if i==1:
-         bias = lambda m: self.MassFunc.fb1(m, a)
+         bias = lambda m: self.MassFunc.b1(m, a)
       elif i==2:
-         bias = lambda m: self.MassFunc.fb2(m, a)
+         bias = lambda m: self.MassFunc.b2(m, a)
       else :
          bias = lambda m: 1.
       # extra bias if necessary
       if nbias<>0:
-         extrabias = lambda m: self.MassFunc.fb1(m, a)**nbias
+         extrabias = lambda m: self.MassFunc.b1(m, a)**nbias
       else :
          extrabias = lambda m: 1.
       # profiles
@@ -62,11 +62,17 @@ class IHaloModel():
 
       # integration bounds
       mMinIntegral = np.max([ Profiles[j][0].mMin for j in range(len(Profiles)) ])
-      mMinIntegral = np.max([mMinIntegral, mMin, self.MassFunc.mMin])
+      mMinIntegral = np.max([mMinIntegral, self.MassFunc.mMin])
+      if mMin is not None:
+         mMinIntegral = max(mMinIntegral, mMin)
+      #
       mMaxIntegral = np.min([ Profiles[j][0].mMax for j in range(len(Profiles)) ])
       mMaxIntegral = np.min([mMaxIntegral, self.MassFunc.mMax])
+      if mMax is not None:
+         mMaxIntegral = min(mMaxIntegral, mMax)
+
       # compute integral
-      integral = integrate.quad(integrand, np.log(mMinIntegral), np.log(mMaxIntegral), epsabs=0, epsrel=1.e-2)[0]
+      integral = integrate.quad(integrand, np.log(mMinIntegral), np.log(mMaxIntegral), epsabs=0, epsrel=1.e-3)[0]
 
       # correction factor?
       if i==1 and len(Profiles)==1 and Profiles[0][0].use_correction_factor==1:
@@ -80,7 +86,7 @@ class IHaloModel():
       # integrand in lnm, for speed
       def integrand(lnm):
          m = np.exp(lnm)
-         result = self.MassFunc.fmassfunc(m, a) * self.MassFunc.fb1(m, a) * m / self.U.rho_z(1./a-1.)
+         result = self.MassFunc.massfunc(m, a) * self.MassFunc.b1(m, a) * m / self.U.rho_m(1./a-1.)
          result *= m # because integrating in lnm and not m
          return result
 
@@ -94,7 +100,10 @@ class IHaloModel():
       fig=plt.figure(0)
       ax=fig.add_subplot(111)
       #
-      ax.plot(1./A-1., CorrFactor, 'b')
+      ax.plot(1./A-1., 1./CorrFactor-1., 'b')
+      #
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'Fractional correction')
       
       plt.show()
 
