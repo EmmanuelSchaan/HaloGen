@@ -215,11 +215,13 @@ lfLya['Cassata11'].plotLf(xLim=(1.e41, 1.e44), yLim=(1.e-5, 0.1))
 # Plot: mean intensity
 '''
 unit = 'Jy/sr'
-#lfHa['Sobral12'].plotMeanIntensity(lfs=[lfHa[key] for key in lfHa.keys()], unit=unit)
-#lfOiii['Colbert13'].plotMeanIntensity(lfs=[lfOiii[key] for key in lfOiii.keys()], unit=unit)
+lfHa['Sobral12'].plotMeanIntensity(lfs=[lfHa[key] for key in lfHa.keys()], unit=unit)
+lfOiii['Colbert13'].plotMeanIntensity(lfs=[lfOiii[key] for key in lfOiii.keys()], unit=unit)
+'''
 lfCii['Popping16'].plotMeanIntensity(unit=unit)
-#lfCO['Popping16'].plotMeanIntensity(unit=unit)
-#lfLya['Cassata11'].plotMeanIntensity(unit=unit)
+'''
+lfCO['Popping16'].plotMeanIntensity(unit=unit)
+lfLya['Cassata11'].plotMeanIntensity(unit=unit)
 '''
 
 ##################################################################################
@@ -228,7 +230,9 @@ lfCii['Popping16'].plotMeanIntensity(unit=unit)
 '''
 lfHa['Sobral12'].plotnGalEff(lfs=[lfHa[key] for key in lfHa.keys()])
 lfOiii['Colbert13'].plotnGalEff(lfs=[lfOiii[key] for key in lfOiii.keys()])
+'''
 lfCii['Popping16'].plotnGalEff()
+'''
 lfCO['Popping16'].plotnGalEff()
 lfLya['Cassata11'].plotnGalEff()
 '''
@@ -239,7 +243,9 @@ lfLya['Cassata11'].plotnGalEff()
 '''
 lfHa['Sobral12'].plotNGalEffSparsity(lfs=[lfHa[key] for key in lfHa.keys()], exp='SPHEREx', sfr=sfr)
 lfOiii['Colbert13'].plotNGalEffSparsity(lfs=[lfOiii[key] for key in lfOiii.keys()], exp='SPHEREx', sfr=sfr)
+'''
 lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO', sfr=sfr)
+'''
 lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP', sfr=sfr)
 lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx', sfr=sfr)
 '''
@@ -252,18 +258,20 @@ lfHa['Sobral12'].plotNGalEffSparsitySummary()
 '''
 lfHa['Sobral12'].plotShotNoise(lfs=[lfHa[key] for key in lfHa.keys()])
 lfOiii['Colbert13'].plotShotNoise(lfs=[lfOiii[key] for key in lfOiii.keys()])
+'''
 lfCii['Popping16'].plotShotNoise()
+'''
 lfCO['Popping16'].plotShotNoise()
 lfLya['Cassata11'].plotShotNoise()
 '''
 
 ##################################################################################
 # Contributions from each luminosity
-
+'''
 lfHa['Sobral12'].plotdlnAlldlnL()
 #lfHa['Sobral12'].plotdlnMeanIntensitydlnL()
 #lfHa['Sobral12'].plotdlnPshotdlnL()
-
+'''
 
 ##################################################################################
 ##################################################################################
@@ -290,14 +298,6 @@ for key in lfLya.keys():
    profLimLfLya[key] = ProfLIMLF(u, sfr, lfLya[key], trunc=4., a=1.)
 
 
-
-#profLIMLFHaSobral12 = ProfLIMLF(u, sfr, lfHaSobral12, trunc=4.)
-#profLIMLFOiiiMehta15 = ProfLIMLF(u, sfr, lfOiiiMehta15, trunc=4.)
-#profLIMLFHaColbert13 = ProfLIMLF(u, sfr, lfHaColbert13, trunc=4.)
-#profLIMLFOiiiColbert13 = ProfLIMLF(u, sfr, lfOiiiColbert13, trunc=4.)
-#profLIMLFHaCochrane17 = ProfLIMLF(u, sfr, lfHaCochrane17, trunc=4.)
-#
-#
 ## EGG
 #profLimLfHaEgg = ProfLIMLF(u, sfr, lfHaEgg, trunc=4.)
 #profLimLfOiii5007Egg = ProfLIMLF(u, sfr, lfOiii5007Egg, trunc=4.)
@@ -316,7 +316,9 @@ for key in lfLya.keys():
 '''
 profLimLfHa['Cochrane17'].plotLuminosityMassRelation()
 profLimLfOiii['Colbert13'].plotLuminosityMassRelation()
+'''
 profLimLfCii['Popping16'].plotLuminosityMassRelation()
+'''
 profLimLfCO['Popping16'].plotLuminosityMassRelation()
 profLimLfLya['Cassata11'].plotLuminosityMassRelation()
 '''
@@ -403,9 +405,10 @@ pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
 pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
 
 pRsdCO['Popping16'].plotSigmaLumMatchedFilter(specs=comapSpecs)
+'''
 pRsdCii['Popping16'].plotSigmaLumMatchedFilter(specs=concertoSpecs)
-'''
-'''
+
+
 # summary plots
 pList = [pRsdHa['Cochrane17'], pRsdHa['Cochrane17'], pRsdOiii['Colbert13'], pRsdLya['Cassata11'],  pRsdCO['Popping16'], pRsdCii['Popping16']]
 specsList = [spherexSpecs, cdimSpecs, spherexSpecs, hetdexSpecs, comapSpecs, concertoSpecs]
@@ -415,7 +418,7 @@ pRsdHa['Cochrane17'].plotLimVsGalDet(pList, specsList)
 #pList = [pRsdLya['Cassata11']]
 #specsList = [hetdexSpecs]
 #pRsdLya['Cassata11'].plotLimVsGalDet(pList, specsList)
-'''
+
 
 '''
 # in 2d
@@ -428,7 +431,9 @@ pRsdCii['Popping16'].plotSigmaLumMatchedFilter2d(exp='CCAT-P')
 '''
 pRsdHa['Cochrane17'].compareP(ps=[pRsdHa[key] for key in pRsdHa.keys()])
 pRsdOiii['Colbert13'].compareP(ps=[pRsdOiii[key] for key in pRsdOiii.keys()])
+'''
 pRsdCii['Popping16'].compareP()
+'''
 pRsdCO['Popping16'].compareP()
 pRsdLya['Cassata11'].compareP()
 '''
@@ -486,11 +491,11 @@ p.plotRequiredAreaToDetectA(kMax=0.1, exp='SPHEREx', marg=True)
 pRsdCO['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='COMAP', marg=False)
 pRsdCO['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='COMAP', marg=True)
 '''
-'''
+
 # [CII] with CONCERTO
 pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=False)
 pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=True)
-'''
+
 
 
 ##################################################################################

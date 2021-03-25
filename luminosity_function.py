@@ -1721,9 +1721,6 @@ class LFCiiPopping16(LF):
       self.lambdaMicrons = 158.  # [mu]
       self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
 
-      self.lambdaMicrons = 656.28e-3   # [mu]
-      self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
-
       # Luminosity bounds 
       # the measurements only span 1.e40 to 1.e44 [erg/sec]
       self.lMin = 1.e35 / 3.839e33  # convert from [erg/sec] to [Lsun]
