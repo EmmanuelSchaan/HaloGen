@@ -750,22 +750,32 @@ class P3dRsdAuto(object):
 
 
 
-   def plotP(self, z=None, mu=0.):
+   def plotP(self, z=None, mu=0., unit='Lsun/(Mpc/h)^2/sr/Hz'):
+      '''Choice of intensity units:
+      'Lsun/(Mpc/h)^2/sr/Hz'
+      'cgs' for [erg/s/cm^2/sr/Hz]
+      'Jy/sr'
+      '''
+      unitConversion = self.Prof.Lf.convertPowerSpectrumUnit(unit) 
+
       if z is None:
          z = self.Z[0]
 
       # Plin
       f = lambda k: self.U.pLin(k, z)
-      Plin = np.array(map(f, self.K))
+      Plin = np.array(map(f, self.K)) * unitConversion
       # P1h
-      f = lambda k: self.p1h(k, z)
-      P1h = np.array(map(f, self.K))
+      #f = lambda k: self.p1h(k, z)
+      f = lambda k: self.p1hInt[z](k, mu)
+      P1h = np.array(map(f, self.K)) * unitConversion
       # P2h
-      f = lambda k: self.p2h(k, z)
-      P2h = np.array(map(f, self.K))
+      #f = lambda k: self.p2h(k, z)
+      f = lambda k: self.p2hInt[z](k, mu)
+      P2h = np.array(map(f, self.K)) * unitConversion
       # noise bias
-      f = lambda k: self.pShot(z)
-      Pnoise = np.array(map(f, self.K))
+      #f = lambda k: self.pShot(z)
+      f = lambda k: self.pShotInt[z](k, mu)
+      Pnoise = np.array(map(f, self.K)) * unitConversion
       # Ptot
       P = P1h + P2h + Pnoise
 
@@ -782,8 +792,8 @@ class P3dRsdAuto(object):
       #
       ax.grid()
       ax.legend(loc=3)
-      ax.set_xlabel(r'$k$ [h/Mpc]')
-      ax.set_ylabel(r'$P(k)$')
+      ax.set_xlabel(r'$k$ [$h$/Mpc]')
+      ax.set_ylabel(r'$P(k)$ [$'+unit+r'$(Mpc/$h$)$^3$')
       #path = "./figures/pn3d/p_"+self.name+"z_"+str(z)+".pdf"
       #fig.savefig(path, bbox_inches='tight')
       plt.show()
