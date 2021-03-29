@@ -213,13 +213,12 @@ lfLya['Cassata11'].plotLf(xLim=(1.e41, 1.e44), yLim=(1.e-5, 0.1))
 
 ##################################################################################
 # Plot: mean intensity
-'''
+
 unit = 'Jy/sr'
+'''
 lfHa['Sobral12'].plotMeanIntensity(lfs=[lfHa[key] for key in lfHa.keys()], unit=unit)
 lfOiii['Colbert13'].plotMeanIntensity(lfs=[lfOiii[key] for key in lfOiii.keys()], unit=unit)
-'''
 lfCii['Popping16'].plotMeanIntensity(unit=unit)
-'''
 lfCO['Popping16'].plotMeanIntensity(unit=unit)
 lfLya['Cassata11'].plotMeanIntensity(unit=unit)
 '''
@@ -230,9 +229,7 @@ lfLya['Cassata11'].plotMeanIntensity(unit=unit)
 '''
 lfHa['Sobral12'].plotnGalEff(lfs=[lfHa[key] for key in lfHa.keys()])
 lfOiii['Colbert13'].plotnGalEff(lfs=[lfOiii[key] for key in lfOiii.keys()])
-'''
 lfCii['Popping16'].plotnGalEff()
-'''
 lfCO['Popping16'].plotnGalEff()
 lfLya['Cassata11'].plotnGalEff()
 '''
@@ -243,9 +240,7 @@ lfLya['Cassata11'].plotnGalEff()
 '''
 lfHa['Sobral12'].plotNGalEffSparsity(lfs=[lfHa[key] for key in lfHa.keys()], exp='SPHEREx', sfr=sfr)
 lfOiii['Colbert13'].plotNGalEffSparsity(lfs=[lfOiii[key] for key in lfOiii.keys()], exp='SPHEREx', sfr=sfr)
-'''
 lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO', sfr=sfr)
-'''
 lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP', sfr=sfr)
 lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx', sfr=sfr)
 '''
@@ -258,9 +253,7 @@ lfHa['Sobral12'].plotNGalEffSparsitySummary()
 '''
 lfHa['Sobral12'].plotShotNoise(lfs=[lfHa[key] for key in lfHa.keys()])
 lfOiii['Colbert13'].plotShotNoise(lfs=[lfOiii[key] for key in lfOiii.keys()])
-'''
 lfCii['Popping16'].plotShotNoise()
-'''
 lfCO['Popping16'].plotShotNoise()
 lfLya['Cassata11'].plotShotNoise()
 '''
@@ -307,28 +300,13 @@ for key in lfLya.keys():
 ##################################################################################
 # Plot the halo mass-luminosity relation
 
-#import profile
-#reload(profile)
-#from profile import *
-#
-#profLimLfHa['Cochrane17'] = ProfLIMLF(u, sfr, lfHa['Cochrane17'], trunc=4., a=1.)
-
 '''
 profLimLfHa['Cochrane17'].plotLuminosityMassRelation()
 profLimLfOiii['Colbert13'].plotLuminosityMassRelation()
-'''
 profLimLfCii['Popping16'].plotLuminosityMassRelation()
-'''
 profLimLfCO['Popping16'].plotLuminosityMassRelation()
 profLimLfLya['Cassata11'].plotLuminosityMassRelation()
 '''
-
-##################################################################################
-##################################################################################
-
-# halo model integrals
-#iHaloModel = IHaloModel(u, massFunc)
-
 
 ##################################################################################
 ##################################################################################
@@ -386,34 +364,31 @@ p = pRsdHa[key]
 p.plotPMuDpdce(lfHa[key].Z[0], exp='SPHEREx')
 pRsdCO['Popping16'].plotPMuDpdce(2., exp='COMAP')
 pRsdCii['Popping16'].plotPMuDpdce(6., exp='CONCERTO')
-
-
+'''
+'''
 p.plotFourierModes()
 '''
 
 ##################################################################################
 # LIM vs galaxy surveys
-
-# in 3d RSD
 '''
+# in 3d RSD
 pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(specs=cdimSpecs)
 pRsdLya['Cassata11'].plotSigmaLumMatchedFilter(specs=hetdexSpecs)
-
-
 
 pRsdHa['Cochrane17'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
 pRsdOiii['Colbert13'].plotSigmaLumMatchedFilter(specs=spherexSpecs)
 
 pRsdCO['Popping16'].plotSigmaLumMatchedFilter(specs=comapSpecs)
-'''
+
 pRsdCii['Popping16'].plotSigmaLumMatchedFilter(specs=concertoSpecs)
-
-
+'''
+'''
 # summary plots
 pList = [pRsdHa['Cochrane17'], pRsdHa['Cochrane17'], pRsdOiii['Colbert13'], pRsdLya['Cassata11'],  pRsdCO['Popping16'], pRsdCii['Popping16']]
 specsList = [spherexSpecs, cdimSpecs, spherexSpecs, hetdexSpecs, comapSpecs, concertoSpecs]
 pRsdHa['Cochrane17'].plotLimVsGalDet(pList, specsList)
-
+'''
 
 #pList = [pRsdLya['Cassata11']]
 #specsList = [hetdexSpecs]
@@ -431,9 +406,7 @@ pRsdCii['Popping16'].plotSigmaLumMatchedFilter2d(exp='CCAT-P')
 '''
 pRsdHa['Cochrane17'].compareP(ps=[pRsdHa[key] for key in pRsdHa.keys()])
 pRsdOiii['Colbert13'].compareP(ps=[pRsdOiii[key] for key in pRsdOiii.keys()])
-'''
 pRsdCii['Popping16'].compareP()
-'''
 pRsdCO['Popping16'].compareP()
 pRsdLya['Cassata11'].compareP()
 '''
@@ -455,8 +428,8 @@ p.plotMassContributionP(mu=0.5)
 '''
 p.plotPTermsZ(mu=0.)
 p.plotPTermsZ(mu=0.5)
-'''
-'''
+
+
 for key in lfHa.keys():
    pRsdHa[key].plotPTermsZ(mu=0.)
    pRsdHa[key].plotPTermsZ(mu=0.5)
@@ -465,16 +438,6 @@ for key in lfHa.keys():
 
 ##################################################################################
 # Fisher forecast for f
-
-
-## SPHEREx specs: fractional uncertainty on f
-#z = p.Z[0]
-#dz = 0.5 # 1.
-#R = 40.  # 150.
-#fSky = 100. * (np.pi/180.)**2 / (4.*np.pi)   # convert [sq deg] to [sr]
-#fwhmPsf = 6. * np.pi/(180.*3600.)   # convert [arcsec] to [rad]
-#print p.sFOverFFisher(z, R, fwhmPsf, fSky, dz)
-
 
 '''
 # Halpha with SPHEREx
@@ -485,17 +448,17 @@ for key in lfHa.keys():
 #p.plotRequiredAreaToDetectAUnmarginalized(2, kMax=0.1, exp='SPHEREx')
 p.plotRequiredAreaToDetectA(kMax=0.1, exp='SPHEREx', marg=False)
 p.plotRequiredAreaToDetectA(kMax=0.1, exp='SPHEREx', marg=True)
-'''
-'''
+
+
 # CO with COMAP
 pRsdCO['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='COMAP', marg=False)
 pRsdCO['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='COMAP', marg=True)
-'''
+
 
 # [CII] with CONCERTO
 pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=False)
 pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=True)
-
+'''
 
 
 ##################################################################################
@@ -503,16 +466,6 @@ pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=Tr
 # RSD cross power spectrum
 
 
-#key = 'Cochrane17'
-#profHa = ProfLIMLF(u, sfr, lfHa[key], trunc=4., a=1.1)
-#key = 'Mehta15'
-#profOiii = ProfLIMLF(u, sfr, lfOiii[key], trunc=4., a=0.8)
-#
-#pHaOiii = P3dRsdCross(u, profHa, profOiii, massFunc, r=0.65, nProc=3)
-#pHaOiii.plotCorrCoeff(Z=[1., 2.])
-
-
-'''
 # Example with high correlation coefficients: Ha - Oiii
 # line correlation coefficient from Mehta+15
 pHaOiii = P3dRsdCross(u, profLimLfHa['Cochrane17'], profLimLfOiii['Mehta15'], massFunc, r=0.65, nProc=3)
@@ -522,7 +475,7 @@ pHaOiii.plotCorrCoeff(Z=[1., 2.])
 # line correlation coefficient from EGG
 pLyaCO = P3dRsdCross(u, profLimLfLya['Cassata11'], profLimLfCO['Popping16'], massFunc, r=0.088, nProc=3)
 pLyaCO.plotCorrCoeff(Z=[3., 4.])
-'''
+
 
 
 

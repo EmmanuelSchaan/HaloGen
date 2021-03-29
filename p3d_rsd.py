@@ -40,7 +40,7 @@ class P3dRsdAuto(object):
       self.Z = self.Prof.Lf.Z
    
       # create folder if needed
-      directory = "./output/p_rsd/"
+      directory = "./output/p3d_rsd/"
       if not os.path.exists(directory):
          os.makedirs(directory)
 
@@ -3021,7 +3021,7 @@ class P3dRsdCross(P3dRsdAuto):
       self.Z = self.Prof.Lf.Z
    
       # create folder if needed
-      directory = "./output/p_rsd/"
+      directory = "./output/p3d_rsd/"
       if not os.path.exists(directory):
          os.makedirs(directory)
 
@@ -3035,7 +3035,7 @@ class P3dRsdCross(P3dRsdAuto):
       '''
       def integrand(lnm):
          m = np.exp(lnm)
-         result = self.MassFunc.massfunc(m, 1./(1.+z))
+         result = self.MassFunc.massfunc(m, z)
          result *= self.Prof.u(k, m, z, mu) * self.Prof2.u(k, m, z, mu)
          result *= m # because integrating in lnm and not m
          return result
@@ -3214,18 +3214,18 @@ class P3dRsdCross(P3dRsdAuto):
       
 
       for iMu in range(len(Mu)):
-         ax.plot([], [], c='k', ls=Ls[iMu], label=r'$\mu=$'+str(Mu[iMu]))
-         ax2.plot([], [], c='k', ls=Ls[iMu], label=r'$\mu=$'+str(Mu[iMu]))
+         ax.plot([], [], c='gray', ls=Ls[iMu], label=r'$\mu=$'+str(Mu[iMu]))
+         ax2.plot([], [], c='gray', ls=Ls[iMu], label=r'$\mu=$'+str(Mu[iMu]))
 
       # expected r corr coeff in the shot noise regime
-      ax.axhline(self.r, c='gray', alpha=0.3)
-      ax2.axhline(1. - self.r**2, c='gray', alpha=0.3)
+      ax.axhline(self.r, c='r', alpha=0.1)
+      ax2.axhline(1. - self.r**2, c='r', alpha=0.1)
       
 
       # Clean up r plot
       ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
       ax.set_xlim((0.01, 1.e2))
-      ax.set_ylim((0., 1.))
+#      ax.set_ylim((0., 1.))
       ax.set_xscale('log', nonposx='clip')
       ax.set_xlabel(r'$k$ [$h/$Mpc]')
       ax.set_ylabel(r'$r_{12}(k, \mu, z)$')
@@ -3244,7 +3244,7 @@ class P3dRsdCross(P3dRsdAuto):
       # Clean up 1-r**2 plot
       ax2.legend(loc=4, fontsize='x-small', labelspacing=0.1)
       ax2.set_xlim((0.01, 1.e2))
-      ax2.set_ylim((0., 1.))
+#      ax2.set_ylim((0., 1.))
       ax2.set_xscale('log', nonposx='clip')
       ax2.set_xlabel(r'$k$ [$h/$Mpc]')
       ax2.set_ylabel(r'$1 - r^2_{12}(k, \mu, z)$')
