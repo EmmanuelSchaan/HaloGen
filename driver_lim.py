@@ -465,7 +465,7 @@ pRsdCii['Popping16'].plotRequiredAreaToDetectA(kMax=0.1, exp='CONCERTO', marg=Tr
 ##################################################################################
 # RSD cross power spectrum
 
-
+'''
 # Example with high correlation coefficients: Ha - Oiii
 # line correlation coefficient from Mehta+15
 pHaOiii = P3dRsdCross(u, profLimLfHa['Cochrane17'], profLimLfOiii['Mehta15'], massFunc, r=0.65, nProc=3)
@@ -475,7 +475,7 @@ pHaOiii.plotCorrCoeff(Z=[1., 2.])
 # line correlation coefficient from EGG
 pLyaCO = P3dRsdCross(u, profLimLfLya['Cassata11'], profLimLfCO['Popping16'], massFunc, r=0.088, nProc=3)
 pLyaCO.plotCorrCoeff(Z=[3., 4.])
-
+'''
 
 
 

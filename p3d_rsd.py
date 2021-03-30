@@ -3225,7 +3225,7 @@ class P3dRsdCross(P3dRsdAuto):
       # Clean up r plot
       ax.legend(loc=3, fontsize='x-small', labelspacing=0.1)
       ax.set_xlim((0.01, 1.e2))
-#      ax.set_ylim((0., 1.))
+      ax.set_ylim((0., 1.))
       ax.set_xscale('log', nonposx='clip')
       ax.set_xlabel(r'$k$ [$h/$Mpc]')
       ax.set_ylabel(r'$r_{12}(k, \mu, z)$')
@@ -3244,7 +3244,7 @@ class P3dRsdCross(P3dRsdAuto):
       # Clean up 1-r**2 plot
       ax2.legend(loc=4, fontsize='x-small', labelspacing=0.1)
       ax2.set_xlim((0.01, 1.e2))
-#      ax2.set_ylim((0., 1.))
+      ax2.set_ylim((0., 1.))
       ax2.set_xscale('log', nonposx='clip')
       ax2.set_xlabel(r'$k$ [$h/$Mpc]')
       ax2.set_ylabel(r'$1 - r^2_{12}(k, \mu, z)$')
