@@ -76,7 +76,7 @@ class B3dRsdAuto(object):
 ##################################################################################
 ##################################################################################
 
-class B3dRsdCross(P3dRsdAuto):
+class B3dRsdCross(B3dRsdAuto):
 
    def __init__(self, U, Prof, Prof2, Prof3, MassFunc, name="", nProc=1):
       # copy classes
@@ -85,7 +85,7 @@ class B3dRsdCross(P3dRsdAuto):
       self.MassFunc = MassFunc
       self.Prof = Prof
       self.Prof2 = Prof2
-      self.r = r
+      self.Prof3 = Prof3
       self.nProc = nProc
       self.name = str(self.Prof) + '_' + str(self.Prof2) + name
 
@@ -119,15 +119,15 @@ class B3dRsdCross(P3dRsdAuto):
    # Power spectrum ingredients
 
 
-   def b1h(self, k1, k2, k3, z, mu1=0., mu2=0., mu3=0., mMin=0., mMax=np.inf):
+   def b1h(self, k1, k2, k3, z, mMin=0., mMax=np.inf):
       '''Includes FOGs
       '''
       def integrand(lnm):
          m = np.exp(lnm)
          result = self.MassFunc.massfunc(m, z)
-         result *= self.Prof.u(k1, m, z, mu1) 
-         result *= self.Prof2.u(k2, m, z, mu2)
-         result *= self.Prof3.u(k3, m, z, mu3)
+         result *= self.Prof.u(k1, m, z) 
+         result *= self.Prof2.u(k2, m, z)
+         result *= self.Prof3.u(k3, m, z)
          result *= m # because integrating in lnm and not m
          return result
       # integration bounds
@@ -135,5 +135,6 @@ class B3dRsdCross(P3dRsdAuto):
       mMax = min(self.mMax, mMax)
       result = integrate.quad(integrand, np.log(mMin), np.log(mMax), epsabs=0, epsrel=1.e-2)[0]
       return result
+
 
 

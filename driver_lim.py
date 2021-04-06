@@ -478,6 +478,24 @@ pLyaCO.plotCorrCoeff(Z=[3., 4.])
 '''
 
 
+##################################################################################
+##################################################################################
+# Bispectrum
 
+#import b3d_rsd
+#reload(b3d_rsd)
+#from b3d_rsd import *
+#
+## Matter density profile
+#profMatter = ProfNFW(u)
+#
+## the bispectrum between matter - Ha - Lya
+#b3d = B3dRsdCross(u, profLimLfHa['Cochrane17'], profLimLfLya['Cassata11'], profMatter, massFunc, nProc=3)
+#
+#b3d.b1h(1.e-5, 1.e-5, 1.e-5, 3.)
 
-
+'''
+# Compute the amplitude of the matter - LIM - LIM bispectrum
+# 1-halo term only
+print profLimLfHa['Cochrane17'].b1hMatLimLimAmplitude(2.)
+'''

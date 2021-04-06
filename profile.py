@@ -1845,6 +1845,31 @@ class ProfLIMLF(Profile):
          result = 0.
       return result
 
+
+   def b1hMatLimLimAmplitude(self, z, mMin=0., mMax=np.inf):
+      '''Amplitude of the 1-halo bispectrum
+      of matter - LIM - LIM,
+      ie limit when k1=k2=k3=0.
+      The unit has two powers of LIM intensity,
+      so intensity unit conversions are the same as for the power spectrum.
+      '''
+
+      def integrand(lnm):
+         m = np.exp(lnm)
+         result = self.Sfr.MassFunc.massfunc(m, z)
+         result *= m / self.U.rho_m(z) # matter density
+         result *= self.meanHaloLum(m, z)**2 # LIM^2
+         result *= (3.e5 / self.U.hubble(z) / 4. * np.pi * self.Lf.nuHz)**2  # *[(Mpc/h/sr/Hz)^2]
+         result *= m # because integrating in lnm and not m
+         return result
+      # integration bounds
+      mMin = np.max([self.mMin, self.Sfr.MassFunc.mMin, mMin])
+      mMax = np.min([self.mMax, self.Sfr.MassFunc.mMax, mMax])
+      print mMin, mMax
+      result = integrate.quad(integrand, np.log(mMin), np.log(mMax), epsabs=0, epsrel=1.e-2)[0]
+      return result
+
+
    ##################################################################################
    # Plots
 
