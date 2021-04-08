@@ -1859,7 +1859,7 @@ class ProfLIMLF(Profile):
          result = self.Sfr.MassFunc.massfunc(m, z)
          result *= m / self.U.rho_m(z) # matter density
          result *= self.meanHaloLum(m, z)**2 # LIM^2
-         result *= (3.e5 / self.U.hubble(z) / 4. * np.pi * self.Lf.nuHz)**2  # *[(Mpc/h/sr/Hz)^2]
+         result *= (3.e5 / self.U.hubble(z) / (4. * np.pi * self.Lf.nuHz))**2  # *[(Mpc/h/sr/Hz)^2]
          result *= m # because integrating in lnm and not m
          return result
       # integration bounds
