@@ -81,6 +81,8 @@ class IHaloModel():
 
 
    ##################################################################################
+   # Trick to "fix" the fact that the mass integral for the 2-halo term
+   # doesn't converge.
 
    def correction_factor_m11(self, a):
       # integrand in lnm, for speed
@@ -108,4 +110,6 @@ class IHaloModel():
       plt.show()
 
 
+   ##################################################################################
+   #
 

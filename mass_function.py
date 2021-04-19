@@ -139,7 +139,7 @@ class MassFunction(object):
       ax.set_xlabel(r'M [M$_\odot$/h]', fontsize=18)
       ax.set_ylabel(r'$dn/d\ln(m)$', fontsize=18)
       #
-      fig.savefig(self.pathFig + "n_"+self.name+".pdf", bbox_inches='tight')
+      fig.savefig(self.pathFig + "test_n_"+self.name+".pdf", bbox_inches='tight')
       fig.clf()
       #plt.show()
       
@@ -156,7 +156,7 @@ class MassFunction(object):
       ax.set_xlabel(r'M [M$_\odot$/h]', fontsize=18)
       ax.set_ylabel(r'$b_1(m)$', fontsize=18)
       #
-      fig.savefig(self.pathFig + "b1_"+self.name+".pdf", bbox_inches='tight')
+      fig.savefig(self.pathFig + "test_b1_"+self.name+".pdf", bbox_inches='tight')
       fig.clf()
       #plt.show()
 
@@ -173,12 +173,38 @@ class MassFunction(object):
       ax.set_xlabel(r'M [M$_\odot$/h]', fontsize=18)
       ax.set_ylabel(r'$b_2(m)$', fontsize=18)
       #
-      fig.savefig(self.pathFig + "b2_"+self.name+".pdf", bbox_inches='tight')
+      fig.savefig(self.pathFig + "test_b2_"+self.name+".pdf", bbox_inches='tight')
       fig.clf()
       #plt.show()
 
 
    def plotMassFunc(self):
+      Z = np.array([0., 1.5, 3.06, 5.72, 10.07])
+      M = np.logspace(np.log10(self.mMin), np.log10(self.mMax), 101, 10.) # Msun/h
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         # interpolated function
+         f = lambda m: self.massfunc(m, z)
+         # non-interpolated function
+         #f = lambda m: self.massfunc(m, z) * m**2 / self.U.rho_m(z)
+         y = np.array(map(f, M))
+         ax.loglog(M, y, label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'M [$M_\odot/h$]')
+      ax.set_ylabel(r'$dn/d\text{ln}m$ [(Mpc/h)$^{-3}$]')
+      ax.set_xlim((1.e10, 1.e16))
+      ax.set_ylim((1.e-27, 1.e-10))
+      #
+      fig.savefig(self.pathFig + "dndlnm_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+
+   def plotMassFuncVsSpringel05(self):
       """Useful for comparison with Springel et al 2005.
       Mass function at different redshifts from my code.
       """
@@ -207,6 +233,36 @@ class MassFunction(object):
       #plt.show()
 
 
+   def plotB1(self):
+      Z = np.array([0., 1.5, 3.06, 5.72, 10.07])
+      M = np.logspace(np.log10(self.mMin), np.log10(self.mMax), 101, 10.) # Msun/h
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         # interpolated function
+         f = lambda m: self.b1(m, z)
+         # non-interpolated function
+         #f = lambda m: self.massfunc(m, z) * m**2 / self.U.rho_m(z)
+         y = np.array(map(f, M))
+         ax.semilogx(M, y, label=r'$z=$'+str(z))
+      #
+      ax.axhline(1., c='gray', alpha=0.5)
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'M [$M_\odot/h$]')
+      ax.set_ylabel(r'$b_1(m, z)$ [dimless]')
+      ax.set_xlim((1.e10, 1.e16))
+      ax.set_ylim((0., 10.))
+      #
+      fig.savefig(self.pathFig + "b1_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+
+
+
    ##################################################################################
    # Counter terms to account for the mass cutoffs in integrals
 
@@ -217,6 +273,9 @@ class MassFunction(object):
       i=1: the linear bias of mass-weighted halos is 1
       i>1: the higher order bias of mass-weighted halos is 0
       '''
+      # integration bounds
+      mMin = max(self.mMin, mMin)
+      mMax = min(self.mMax, mMax)
       def integrand(lnm):
          m = np.exp(lnm)
          result = self.massfunc(m, z)
@@ -227,9 +286,6 @@ class MassFunction(object):
             result *= self.b2(m, z)
          result *= m # because integrating in lnm and not m
          return result
-      # integration bounds
-      mMin = max(self.mMin, mMin)
-      mMax = min(self.mMax, mMax)
       result = integrate.quad(integrand, np.log(mMin), np.log(mMax), epsabs=0, epsrel=1.e-3)[0]
       return result
 
