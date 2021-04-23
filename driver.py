@@ -40,7 +40,6 @@ u = UnivPlanck15()
 #massFunc = MassFuncST(u, save=False)
 massFunc = MassFuncTinker(u, save=False)
 
-massFunc.plotB1()
 '''
 massFunc.plotMassFunc()
 massFunc.plotB1()

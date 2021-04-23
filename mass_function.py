@@ -195,9 +195,30 @@ class MassFunction(object):
       #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'M [$M_\odot/h$]')
-      ax.set_ylabel(r'$dn/d\text{ln}m$ [(Mpc/h)$^{-3}$]')
+      ax.set_ylabel(r'$dn/dm$ [(Mpc/h)$^{-3}$]')
       ax.set_xlim((1.e10, 1.e16))
       ax.set_ylim((1.e-27, 1.e-10))
+      #
+      fig.savefig(self.pathFig + "dndm_"+self.name+".pdf", bbox_inches='tight')
+      fig.clf()
+      #plt.show()
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for z in Z:
+         # interpolated function
+         f = lambda m: self.massfunc(m, z) * m
+         # non-interpolated function
+         #f = lambda m: self.massfunc(m, z) * m**2 / self.U.rho_m(z)
+         y = np.array(map(f, M))
+         ax.loglog(M, y, label=r'$z=$'+str(z))
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'M [$M_\odot/h$]')
+      ax.set_ylabel(r'$dn/d\text{ln}m$ [(Mpc/h)$^{-3}$]')
+      ax.set_xlim((1.e10, 1.e16))
+      ax.set_ylim((1.e-10, 1.))
       #
       fig.savefig(self.pathFig + "dndlnm_"+self.name+".pdf", bbox_inches='tight')
       fig.clf()
@@ -261,11 +282,8 @@ class MassFunction(object):
       #plt.show()
 
 
-
-
    ##################################################################################
    # Counter terms to account for the mass cutoffs in integrals
-
 
    def integralConstraint(self, i, z, mMin=0., mMax=np.inf):
       '''These integral constraints encode the requirement that:
