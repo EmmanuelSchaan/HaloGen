@@ -1865,7 +1865,6 @@ class ProfLIMLF(Profile):
       # integration bounds
       mMin = np.max([self.mMin, self.Sfr.MassFunc.mMin, mMin])
       mMax = np.min([self.mMax, self.Sfr.MassFunc.mMax, mMax])
-      print mMin, mMax
       result = integrate.quad(integrand, np.log(mMin), np.log(mMax), epsabs=0, epsrel=1.e-2)[0]
       return result
 
