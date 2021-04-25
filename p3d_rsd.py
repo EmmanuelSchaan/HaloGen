@@ -1199,6 +1199,10 @@ class P3dRsdAuto(object):
             #ax.loglog(self.K, p2h, ls='-', c=plot[0].get_color())
             ax.loglog(self.K, pShot, ls=':', c=plot[0].get_color(), lw=1)
       #
+      ax.plot([], [], ls='-', c='gray', alpha=0.5, label=r'total')
+      ax.plot([], [], ls=(0, (10, 3)), c='gray', alpha=0.5, label=r'1h')
+      ax.plot([], [], ls=':', c='gray', alpha=0.5, label=r'shot')
+      #
       ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$k$ [$h$/Mpc]')
       ax.set_ylabel(r'$P(k,z, \mu)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')

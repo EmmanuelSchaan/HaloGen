@@ -425,11 +425,12 @@ p.plotMassContributionP(mu=0.5)
 ##################################################################################
 # Show the 2h/1h/shot noise terms
 
+
 '''
 p.plotPTermsZ(mu=0.)
 p.plotPTermsZ(mu=0.5)
-
-
+'''
+'''
 for key in lfHa.keys():
    pRsdHa[key].plotPTermsZ(mu=0.)
    pRsdHa[key].plotPTermsZ(mu=0.5)
