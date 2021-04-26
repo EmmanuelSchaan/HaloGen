@@ -1093,7 +1093,7 @@ class P3dRsdAuto(object):
       for iM in range(len(M))[::-1]:
          m = M[iM]
          #
-         ax.fill_between(K, P[iM,:], P[iM+1,:], facecolor=plt.cm.YlOrRd(1.*iM/(len(M)-1.)), edgecolor='', label=r'$M\leqslant$'+floatSciForm(m, round=1)+r' $M_\odot/h$')
+         ax.fill_between(K, P[iM,:], P[iM+1,:], facecolor=plt.cm.YlOrRd(1.*iM/(len(M)-1.)), edgecolor='', label=r'$m\leqslant$'+floatSciForm(m, round=1)+r' $M_\odot/h$')
 
       #
       ax.legend(loc=3, fontsize=12, labelspacing=0.1, handlelength=0.5)
@@ -1149,14 +1149,14 @@ class P3dRsdAuto(object):
       for iM in range(len(M)-1)[::-1]:
          m = M[iM]
          #
-         ax.plot(K, P[iM,:], ls='--', c=plt.cm.YlOrRd((iM+1.)/(len(M)-1.)), label=floatSciForm(M[iM], round=1)+r'$\leqslant M<$'+floatSciForm(M[iM+1], round=1)+r' $M_\odot/h$')
+         ax.plot(K, P[iM,:], ls='--', c=plt.cm.YlOrRd((iM+1.)/(len(M)-1.)), label=floatSciForm(M[iM], round=1)+r'$\leqslant m<$'+floatSciForm(M[iM+1], round=1)+r' $M_\odot/h$')
       #
       ax.legend(loc=3, fontsize=12, labelspacing=0.1, handlelength=0.5)
       ax.set_xscale('log', nonposx='clip')
       ax.set_yscale('log', nonposy='clip')
       ax.set_xlim((np.min(K), np.max(K)))
       #ax.set_ylim((1.e-14, 1.e-7))
-      ax.set_ylim((10., 5.e7))
+      ax.set_ylim((0.1, 5.e7))
       ax.set_xlabel(r'$k$ [$h$/Mpc]')
       #ax.set_ylabel(r'$P(k, \mu='+str(mu)+', z='+str(z)+')$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')
       ax.set_ylabel(r'$P(k, \mu, z)$ [(Jy/sr)$^2$ (Mpc/$h$)$^3$]')

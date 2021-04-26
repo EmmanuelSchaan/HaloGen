@@ -194,8 +194,9 @@ lf.plotSchechterProperties()
 #   try: lfOiii[key].plotLf()
 #   except: pass
 
+
 '''
-lfHa['Cochrane17'].plotLf(lfs=[lfHa[key] for key in lfHa.keys()])
+lfHa['Cochrane17'].plotLf(lfs=[lfHa[key] for key in lfHa.keys()], yLim=(1.e-10, 1.))
 lfOiii['Colbert13'].plotLf(lfs=[lfOiii[key] for key in lfOiii.keys()])
 
 # check that I reproduce fig 9 in Popping+16

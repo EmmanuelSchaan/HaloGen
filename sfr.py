@@ -537,7 +537,7 @@ class Sfr(object):
          cdf /= cdf[-1]
          axb2.plot(M, cdf, c=plot[0].get_color())
       #
-      ax2.legend(loc=1, fontsize='small', labelspacing=0.2)
+      ax2.legend(loc=2, fontsize='small', labelspacing=0.2)
       ax2.set_xscale('log', nonposx='clip')
       ax2.set_ylim((0., 0.5))
       ax2.set_title(r'$d\text{ln}P^\text{1h}(z) / d\text{ln} m$')
