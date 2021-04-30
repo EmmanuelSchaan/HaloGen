@@ -176,6 +176,23 @@ lfLya['Cassata11'] = LFLyaCassata11(u)
 #print lfOiiiMehta15.computeCorrCoeffHaOIII()
 #lfOiiiMehta15.plotBivariateLf()
 
+
+##################################################################################
+# Plot the frequencies / wavelengths as a function of redshift
+
+lfHa['Sobral12'].plotFreqWavelengths(lfs=[lfHa['Sobral12'], 
+                                          lfOiii['Colbert13'], 
+                                          lfCii['Popping16'], 
+                                          lfCO['Popping16'], 
+                                          LFCOPopping16(u, 2), 
+                                          LFCOPopping16(u, 3), 
+                                          LFCOPopping16(u, 4), 
+                                          LFCOPopping16(u, 5), 
+                                          LFCOPopping16(u, 6), 
+                                          lfLya['Cassata11']], 
+                                          nuRef=353.e9)
+
+
 ##################################################################################
 # General properties of Schechter functions
 '''
@@ -239,11 +256,11 @@ lfLya['Cassata11'].plotnGalEff()
 # Plot: NGalEff
 
 '''
-lfHa['Sobral12'].plotNGalEffSparsity(lfs=[lfHa[key] for key in lfHa.keys()], exp='SPHEREx', sfr=sfr)
-lfOiii['Colbert13'].plotNGalEffSparsity(lfs=[lfOiii[key] for key in lfOiii.keys()], exp='SPHEREx', sfr=sfr)
-lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO', sfr=sfr)
-lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP', sfr=sfr)
-lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx', sfr=sfr)
+lfHa['Sobral12'].plotNGalEffSparsity(lfs=[lfHa[key] for key in lfHa.keys()], exp='SPHEREx', sfr=sfr, a=1.)
+lfOiii['Colbert13'].plotNGalEffSparsity(lfs=[lfOiii[key] for key in lfOiii.keys()], exp='SPHEREx', sfr=sfr, a=1.)
+lfCii['Popping16'].plotNGalEffSparsity(exp='CONCERTO', sfr=sfr, a=1.)
+lfCO['Popping16'].plotNGalEffSparsity(exp='COMAP', sfr=sfr, a=0.6)
+lfLya['Cassata11'].plotNGalEffSparsity(exp='SPHEREx', sfr=sfr, a=1.)
 '''
 '''
 lfHa['Sobral12'].plotNGalEffSparsitySummary()

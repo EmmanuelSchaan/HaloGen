@@ -16,6 +16,7 @@ class LF(object):
       #self.nameLatex   # which line and which paper reference
       #self.refLatex # paper reference
       #self.lineName # which line this is
+      #self.lineNameLatex # which line this is
       #self.lambdaMicrons = 656.28e-3   # [mu]
       #self.nuHz = 299792458. / self.lambdaMicrons * 1.e6 # [Hz]
       #self.lMin
@@ -371,6 +372,37 @@ class LF(object):
 
    ##################################################################################
 
+
+   def plotFreqWavelengths(self, lfs=None, nuRef=None, lambdaMicronsRef=None):
+
+      if lfs is None:
+         lfs = [self]
+
+      A = np.logspace(np.log10(0.1), np.log10(1.), 101, 10.)
+      Z = 1./A-1.
+
+      fig=plt.figure(0)
+      ax=fig.add_subplot(111)
+      #
+      for iLf in range(len(lfs)):
+         lf = lfs[iLf]
+         nu = lf.nuHz * A
+         ax.loglog(Z, nu, label=lf.lineNameLatex)
+      #
+      if nuRef is not None:
+         ax.axhline(nuRef, ls='--', label=str(nuRef/1.e9)+'GHz')
+      if lambdaMicronsRef is not None:
+         ax.axhline(3.e8/lambdaMicronsRef*1.e6, ls='--', label=floatExpForm(lambdaMicronsRef)+r'$\mu$m')
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$z$')
+      ax.set_ylabel(r'$\nu$ [Hz]')
+      ax.set_xlim((np.min(Z), 100.))
+      #
+      plt.show()
+         
+
+
    def plotLf(self, lfs=None, xLim=None, yLim=None, unit='cgs'):
       
       if lfs is None:
@@ -620,7 +652,7 @@ class LF(object):
 #      #plt.show()
 
 
-   def plotNGalEffSparsity(self, lfs=None, exp='SPHEREx', sfr=None):
+   def plotNGalEffSparsity(self, lfs=None, exp='SPHEREx', sfr=None, a=1.):
       if lfs is None:
          lfs = [self]
 
@@ -681,16 +713,11 @@ class LF(object):
          # hence the voxel comoving volume
          vVox = (self.U.bg.comoving_distance(Z) * thetaPix)**2 * dChi  # [(Mpc/h)^3]
          #print "vVox=", vVox, "(Mpc/h)^3"
-         Ls = ['--', '-.']
-         Alpha = [0.6, 1.]
-         for iAlpha in range(len(Alpha)):
-            alpha = Alpha[iAlpha]
-            ls = Ls[iAlpha]
-            f = lambda z: sfr.nHEff(z, alpha1=alpha, alpha2=alpha) 
-            n = np.array(map(f, Z))
-            n *= vVox
-            ax.plot(Z, n, ls=ls, c='gray', lw=1, alpha=0.3, label=r'halos, $\gamma=$'+str(alpha))
-
+         #
+         f = lambda z: sfr.nHEff(z, alpha1=a, alpha2=a) 
+         n = np.array(map(f, Z))
+         n *= vVox
+         ax.plot(Z, n, ls='--', c='gray', lw=1, alpha=0.3, label=r'halos, $\gamma=$'+str(a))
       #
       ax.axhline(1., c='gray', alpha=0.5)
       #
