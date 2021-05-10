@@ -50,22 +50,40 @@ class Projection(object):
 
    ##################################################################################
    
-   def plotW(self):
-      
-      # choice of weight function
-      n = 2 # n of n-pt function
-      nW = n
-      nd = 2*n-2.
+   def plotW(self, ws=None):
+      if ws is None:
+         ws = [self]
       
       # range to plot
       Na = 501
       A = np.linspace(self.aMin, self.aMax, Na)
       Z = 1./A - 1.
       ComovDistToObs = np.array( map( self.U.bg.comoving_distance, Z ) )
-      W = np.array( map( lambda a: self.f(a), A ) )
-      
       H_A = self.U.hubble(1./A-1.) / 3.e5   # inverse hubble length: H/c in (h Mpc^-1)
       
+      
+      # projection kernel W
+      fig=plt.figure(-1)
+      ax=plt.subplot(111)
+      #
+      for w in ws:
+         W = np.array( map( lambda a: w.f(a), A ) )
+         ax.plot(Z, W/H_A, lw=2, label=w.name)
+      #
+      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$z$', fontsize=22)
+      ax.set_ylabel(r'$W(z)$', fontsize=22)
+      #
+      #fig.savefig("./figures/weight/W_cmblens.pdf")
+      plt.show()
+
+
+      '''
+      # choice of weight function
+      n = 2 # n of n-pt function
+      nW = n
+      nd = 2*n-2.
+
       # compute weight for n-pt function
       F_a = 1. / (H_A * A**2)
       F_a *= W**nW / ComovDistToObs**nd
@@ -74,17 +92,8 @@ class Projection(object):
       F_z *= W**nW / ComovDistToObs**nd
       #
       F_chi = W**nW / ComovDistToObs**nd
-      
-      #return Z, W/H_A
-      
-      # projection kernel W
-      fig=plt.figure(-1)
-      ax=plt.subplot(111)
-      ax.plot(Z, W/H_A, 'b', lw=2)
-      ax.set_xlabel(r'$z$', fontsize=22)
-      ax.set_ylabel(r'$W (z)$', fontsize=22)
-      #fig.savefig("./figures/weight/W_cmblens.pdf")
-      '''
+
+
       # projection kernel W
       fig=plt.figure(0)
       ax=plt.subplot(111)
@@ -163,7 +172,6 @@ class Projection(object):
       ax.legend(loc=4)
       '''
       
-      plt.show()
 
 
 
