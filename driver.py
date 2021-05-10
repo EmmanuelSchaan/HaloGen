@@ -130,7 +130,10 @@ from p2d import *
 
 
 # auto
-p2d_cmblens = P2dAuto(u, p3d_d, w_cmblens, nProc=3, save=False)
+
+p2d_cmblenshalofit = P2dAuto(u, u, w_cmblens, nProc=3, name='halofit', save=False)
+
+p2d_cmblens = P2dAuto(u, p3d_d, w_cmblens, nProc=3, save=True)
 p2d_y = P2dAuto(u, p3d_y, w_y, nProc=3, save=False)
 p2d_gallens = P2dAuto(u, p3d_d, w_gallens, nProc=3, save=False)
 p2d_cmass = P2dAuto(u, p3d_d, w_cmass, pNoise=lambda l:1./w_cmass.ngal, nProc=3, save=False)

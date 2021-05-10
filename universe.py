@@ -35,6 +35,15 @@ class Universe(object):
       else:
          self.params = params
       
+      # Set a redshift range, for using the power spectrum
+      self.nZ = 501
+      self.zMin = 1.e-3
+      try:
+         self.zMax = self.params['z_max_pk']
+      except:
+         self.zMax = 10.
+      self.Z = np.linspace(self.zMin, self.zMax, self.nZ)
+
       # run CLASS
       self.engine = CLASS.ClassEngine(self.params)
       self.bg = CLASS.Background(self.engine)
@@ -110,7 +119,7 @@ class Universe(object):
       else:
          return self.sp.get_pklin(k, z)
 
-   def p2hInterp(self, k, z):
+   def p2hInt(self, k, z):
       '''This is actually Plin.
       Used for my halo model code
       '''
@@ -119,12 +128,15 @@ class Universe(object):
       else:
          return self.sp.get_pklin(k, z)
    
-   def p1hInterp(self, k, z):
+   def p1hInt(self, k, z):
       '''Used for my halo model code
       '''
-      return 0.
+      if k<self.kMin or k>self.kMax:
+         return 0.
+      else:
+         return self.sp.get_pk(k, z) - self.sp.get_pklin(k, z)
    
-   def pInterp(self, k, z):
+   def pInt(self, k, z):
       '''This is actually Pnl.
       Used for my halo model code
       '''
@@ -132,6 +144,21 @@ class Universe(object):
          return 0.
       else:
          return self.sp.get_pk(k, z)
+
+   def p1hBareInt(self, k, z):
+      return self.p1hInt(k, z)
+
+   def p1hCounterTermInt(self, k, z):
+      return 0.
+
+   def p2hBareInt(self, k, z):
+      return self.p2hInt(k, z)
+
+   def p2hCounterTermInt(self, k, z):
+      return 0.
+
+   def p2hCorrectedInt(self, k, z):
+      return self.p2hInt(k, z)
 
 
    ##################################################################################
