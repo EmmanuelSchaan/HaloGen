@@ -3,11 +3,12 @@ from headers import *
 
 class Projection(object):
 
-   def __init__(self, U, name="", nProc=1):
+   def __init__(self, U, name="", nameLatex="", nProc=1):
       # copy U
       self.U = U
-      self.name=name
-      self.nProc=nProc
+      self.name = name
+      self.nameLatex = nameLatex
+      self.nProc = nProc
       #self.aMin
       #self.aMax
 
@@ -50,28 +51,58 @@ class Projection(object):
 
    ##################################################################################
    
-   def plotW(self, ws=None):
+   def plotW(self, ws=None, ls=None, zMin=None, zMax=None):
       if ws is None:
          ws = [self]
-      
+      if ls is None:
+         ls = ['-' for w in ws]
+      if zMin is None:
+         zMin = 1./self.aMax - 1.
+      if zMax is None:
+         zMax = 1./self.aMin - 1.
+
       # range to plot
       Na = 501
-      A = np.linspace(self.aMin, self.aMax, Na)
+#      A = np.linspace(self.aMin, self.aMax, Na)
+#      Z = 1./A - 1.
+#      Z = np.linspace(zMin, zMax, Na)
+#      A = 1. / (1. + Z)
+      A = np.linspace(1./(1.+zMax), 1./(1.+zMin), Na)
       Z = 1./A - 1.
       ComovDistToObs = np.array( map( self.U.bg.comoving_distance, Z ) )
       H_A = self.U.hubble(1./A-1.) / 3.e5   # inverse hubble length: H/c in (h Mpc^-1)
       
       
-      # projection kernel W
+      # W(z)
       fig=plt.figure(-1)
       ax=plt.subplot(111)
       #
-      for w in ws:
+      for iW in range(len(ws)):
+         w = ws[iW]
+         #
          W = np.array( map( lambda a: w.f(a), A ) )
-         ax.plot(Z, W/H_A, lw=2, label=w.name)
+         ax.plot(Z, W/H_A, lw=2, ls=ls[iW], label=w.nameLatex)
       #
-      ax.legend(loc=2, fontsize='x-small', labelspacing=0.1)
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
       ax.set_xlabel(r'$z$', fontsize=22)
+      ax.set_ylabel(r'$W(z)$', fontsize=22)
+      #
+      #fig.savefig("./figures/weight/W_cmblens.pdf")
+      plt.show()
+
+
+      # W(chi)
+      fig=plt.figure(0)
+      ax=plt.subplot(111)
+      #
+      for iW in range(len(ws)):
+         w = ws[iW]
+         #
+         W = np.array( map( lambda a: w.f(a), A ) )
+         ax.plot(ComovDistToObs, W/H_A, lw=2, ls=ls[iW], label=w.nameLatex)
+      #
+      ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
+      ax.set_xlabel(r'$\chi$', fontsize=22)
       ax.set_ylabel(r'$W(z)$', fontsize=22)
       #
       #fig.savefig("./figures/weight/W_cmblens.pdf")
@@ -182,10 +213,10 @@ class WeightY(Projection):
    """Compton-y projection
    """
    
-   def __init__(self, U, name='y'):
+   def __init__(self, U, name='y', nameLatex=r'$y$'):
       self.aMin = 0.2   # min bound for integral over a
       self.aMax = 1.-0.005   # max bound for integral over a
-      super(WeightY, self).__init__(U, name=name)
+      super(WeightY, self).__init__(U, name=name, nameLatex=nameLatex)
    
    def fForInterp(self, a):
       """Compton y projection kernel
@@ -200,10 +231,10 @@ class WeightKsz(Projection):
    """Projection for kSZ, to convert the radial momentum q_r into dT/T
    """
    
-   def __init__(self, U, name='ksz'):
+   def __init__(self, U, name='ksz', nameLatex=r'kSZ'):
       self.aMin = 1./(1.+10.)   # min bound for integral over a
       self.aMax = 1.-0.005   # max bound for integral over a
-      super(WeightKsz, self).__init__(U, name=name)
+      super(WeightKsz, self).__init__(U, name=name, nameLatex=nameLatex)
 
    def fForInterp(self, a):
       """kSZ projection kernel:
@@ -240,15 +271,16 @@ class WeightLensSingle(Projection):
    """Lensing projection: single source. The default is z_source = 1.
    """
    
-   def __init__(self, U, z_source=1., name='lens'):
+   def __init__(self, U, z_source=1., name='lens', nameLatex=r'$\kappa$'):
       # a for mass func, biases, and projection
       self.z_source = z_source
       self.a_source = 1./(1.+z_source)
       #
-      self.aMin = max(self.a_source, 1./11.)   # don't go further than z=10
+      #self.aMin = max(self.a_source, 1./11.)   # don't go further than z=10
+      self.aMin = self.a_source
       epsilon = 1.e-5
       self.aMax = 1.-epsilon
-      super(WeightLensSingle, self).__init__(U, name=name)
+      super(WeightLensSingle, self).__init__(U, name=name, nameLatex=nameLatex)
    
    
    def fForInterp(self, a):
@@ -310,7 +342,7 @@ class WeightLensOguriTakada11(Projection):
    """lensing projection: source distribution from Oguri & Takada 2011
    """
    
-   def __init__(self, U, z_source=1., name='lens'):
+   def __init__(self, U, z_source=1., name='lens', nameLatex=r'$\kappa_\text{Oguri Takada 11}$'):
       # parameters for source distribution (Oguri & Takada 2011)
       self.z0 = z_source/3. # should be <z_source>/3
       self.nz0 = 20.   # width of integral over sources
@@ -318,7 +350,7 @@ class WeightLensOguriTakada11(Projection):
       self.aMin = 1./( 1. + self.nz0 * self.z0 ) # integrate far enough to get all the sources
       epsilon = 1.e-5
       self.aMax = 1.-epsilon
-      super(WeightLensOguriTakada11, self).__init__(U, name=name)
+      super(WeightLensOguriTakada11, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
    def fdpdz(self, z):
@@ -362,7 +394,7 @@ class WeightLensHandEtAl13(Projection):
    """lensing projection: source distribution from Hand et al 2013
    """
    
-   def __init__(self, U, name='lens'):
+   def __init__(self, U, name='lens', nameLatex=r'$\kappa_\text{Hand 13}$'):
       # source distribution (eq6 from Hand et al 2013)
       A = 0.688
       a = 0.531
@@ -377,7 +409,7 @@ class WeightLensHandEtAl13(Projection):
       epsilon = 1.e-5
       self.aMax = 1.-epsilon
    
-      super(WeightLensHandEtAl13, self).__init__(U, name=name)
+      super(WeightLensHandEtAl13, self).__init__(U, name=name, nameLatex=nameLatex)
 
    def fSingleSource(self, a, aSource):
       """lensing projection kernel
@@ -457,7 +489,7 @@ class WeightLensDasEtAl13(Projection):
    """lensing projection: source distribution from Das Errard Spergel 2013
    """
    
-   def __init__(self, U, name='lens'):
+   def __init__(self, U, name='lens', nameLatex=r'$\kappa_\text{Das 13}$'):
       # source distribution (eq11 from Das Errard Spergel 2013)
       z0 = 0.69   # ie median z is 1
       self.fdpdz = lambda z: 1.5 * z**2/z0**3 * np.exp(-(z/z0)**1.5)
@@ -465,7 +497,7 @@ class WeightLensDasEtAl13(Projection):
       self.aMin = 1./(1.+10.)  # arbitrary for now
       epsilon = 1.e-5
       self.aMax = 1.-epsilon
-      super(WeightLensDasEtAl13, self).__init__(U, name=name)
+      super(WeightLensDasEtAl13, self).__init__(U, name=name, nameLatex=nameLatex)
    
    def fSingleSource(self, a, aSource):
       """lensing projection kernel
@@ -520,7 +552,7 @@ class WeightLensDasEtAl13(Projection):
 
 class WeightLensCustom(Projection):
    
-   def __init__(self, U, fdndz, m=lambda z: 0., zMinG=1.e-4, zMaxG=2., name='lens', nProc=1):
+   def __init__(self, U, fdndz, m=lambda z: 0., zMinG=1.e-4, zMaxG=2., name='lens', nameLatex=r'$\kappa$', nProc=1):
       '''Here zMinG and zMaxG are those of the galaxy sample,
       not those of the resulting lensing kernel.
       m is the shear multiplicative bias.
@@ -542,7 +574,7 @@ class WeightLensCustom(Projection):
       # dpdz normalized such that int dz dpdz = 1
       self.fdpdz = lambda z: self.fdndz(z) / self.ngal
    
-      super(WeightLensCustom, self).__init__(U, name=name, nProc=nProc)
+      super(WeightLensCustom, self).__init__(U, name=name, nameLatex=nameLatex, nProc=nProc)
 
    
 #   def fForInterp(self, a):
@@ -624,7 +656,7 @@ class WeightLensCIBSchmidt15(Projection):
    is the relevant source distribution for CIB lensing
    """
    
-   def __init__(self, U, z0=1., alpha=1., name='lens'):
+   def __init__(self, U, z0=1., alpha=1., name='lens', nameLatex=r'$\kappa_\text{CIB Schmidt 15}$'):
       # a for mass func, biases, and projection
       self.aMin = 1./( 1. + 10. ) # integrate far enough to get all the sources
       epsilon = 1.e-5
@@ -636,7 +668,7 @@ class WeightLensCIBSchmidt15(Projection):
       norm = integrate.quad(fdpdzNonNormalized, 1./self.aMax, 1./self.aMin, epsabs=0, epsrel=1.e-4)[0]
       self.fdpdz = lambda z: fdpdzNonNormalized(z) / norm
       #
-      super(WeightLensCIBSchmidt15, self).__init__(U, name=name)
+      super(WeightLensCIBSchmidt15, self).__init__(U, name=name, nameLatex=nameLatex)
    
    
    def fSingleSource(self, a, aSource):
@@ -701,7 +733,7 @@ class WeightLensCIBPullen17(Projection):
    is the relevant source distribution for CIB lensing
    """
    
-   def __init__(self, U, nu=353, name='lens'):
+   def __init__(self, U, nu=353, name='lens', nameLatex=r'$\kappa_\text{Pullen 17}$'):
       # a for mass func, biases, and projection
       self.aMin = 1./( 1. + 5. ) # integrate far enough to get all the sources
       epsilon = 1.e-5
@@ -715,7 +747,7 @@ class WeightLensCIBPullen17(Projection):
       norm = integrate.quad(fdpdzNonNormalized, 1./self.aMax, 1./self.aMin, epsabs=0, epsrel=1.e-4)[0]
       self.fdpdz = lambda z: fdpdzNonNormalized(z) / norm
       
-      super(WeightLensCIBPullen17, self).__init__(U, name=name)
+      super(WeightLensCIBPullen17, self).__init__(U, name=name, nameLatex=nameLatex)
       
    
    def fSingleSource(self, a, aSource):
@@ -781,13 +813,13 @@ class WeightCIBPlanck15(Projection):
    and make the projection kernel trivial
    """
    
-   def __init__(self, U, name='cibplanck'):
+   def __init__(self, U, name='cibplanck', nameLatex=r'CIB Planck 15 XXIII'):
       # a for mass func, biases, and projection
       self.aMin = 1./(1.+10.)  # arbitrary for now
       epsilon = 1.e-5
       self.aMax = 1.-epsilon
    
-      super(WeightCIBPlanck15, self).__init__(U, name=name)
+      super(WeightCIBPlanck15, self).__init__(U, name=name, nameLatex=nameLatex)
    
    def fForInterp(self, a):
       return self.U.bg.comoving_distance(1./a-1.)**2
@@ -801,7 +833,7 @@ class WeightTracer(Projection):
    requires defining b(z) and dn/dz(z)
    """
    
-   def __init__(self, U, name='d'):
+   def __init__(self, U, name='d', nameLatex=r'Tracer'):
       self.name = name
       # normalization of dn/dz, ie number of galaxies per unit steradian
       self.ngal = integrate.quad(self.dndz, 1./self.aMax-1., 1./self.aMin-1., epsabs=0., epsrel=1.e-2)[0]
@@ -810,7 +842,7 @@ class WeightTracer(Projection):
       # print number of gal per square arcmin
       print(self.name+": "+str(np.round(self.ngal_per_arcmin2, 2))+"gal/arcmin^2")
       
-      super(WeightTracer, self).__init__(U, name=name)
+      super(WeightTracer, self).__init__(U, name=name, nameLatex=nameLatex)
 
    def b(self, z):
       """tracer bias
@@ -953,7 +985,7 @@ class WeightTracerCMASS(WeightTracer):
    """Projected number density of CMASS DR12 galaxies
    """
 
-   def __init__(self, U, name='cmass'):
+   def __init__(self, U, name='cmass', nameLatex=r'CMASS DR12'):
       self.aMin = 1./(1.+0.7)   # min bound for integral over a
       self.aMax = 1./(1.+0.4)   # max bound for integral over a
 
@@ -968,7 +1000,7 @@ class WeightTracerCMASS(WeightTracer):
       f = UnivariateSpline(Z, Dndz, k=1, s=0)
       self.dndz = lambda z: f(z) * (z>=np.min(Z)) * (z<=np.max(Z))
 
-      super(WeightTracerCMASS, self).__init__(U, name=name)
+      super(WeightTracerCMASS, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
 ##################################################################################
@@ -978,7 +1010,7 @@ class WeightTracerWISE(WeightTracer):
    """Projected number density of WISE galaxies
    """
    
-   def __init__(self, U, name='wise'):
+   def __init__(self, U, name='wise', nameLatex=r'WISE'):
       self.aMin = 1./(1.+1.)   # min bound for integral over a
       self.aMax = 1.-0.005   # max bound for integral over a
    
@@ -993,7 +1025,7 @@ class WeightTracerWISE(WeightTracer):
       f = UnivariateSpline(Z, Dndz, k=1, s=0)
       self.dndz = lambda z: f(z) * (z>=np.min(Z)) * (z<=np.max(Z))
 
-      super(WeightTracerWISE, self).__init__(U, name=name)
+      super(WeightTracerWISE, self).__init__(U, name=name, nameLatex=nameLatex)
 
 ##################################################################################
 ##################################################################################
@@ -1003,7 +1035,7 @@ class WeightTracerLSSTGold(WeightTracer):
    From the LSST Science book, chapter 3 and 13.
    """
    
-   def __init__(self, U, name='lsstgold', iLim=25.3):
+   def __init__(self, U, name='lsstgold', nameLatex=r'LSST Gold', iLim=25.3):
       self.aMin = 1./(1.+3.)   # min bound for integral over a
       self.aMax = 1.-0.005   # max bound for integral over a
       
@@ -1021,7 +1053,7 @@ class WeightTracerLSSTGold(WeightTracer):
       # the normalization to ngal below is approximate, but correct to better than 1%
       self.dndz = lambda z: self.ngal * (z/self.z0)**2 * np.exp(-z/self.z0) / (2.*self.z0)
 
-      super(WeightTracerLSSTGold, self).__init__(U, name=name)
+      super(WeightTracerLSSTGold, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
    def magnificationBias(self, z):
@@ -1062,7 +1094,7 @@ class WeightTracerLSSTSourcesSchaanKrauseEifler16(WeightTracer):
    as in Schaan Krause Eifler +16.
    """
    
-   def __init__(self, U, name='lsstsources', zMin=0.005, zMax=4., ngal=26.):
+   def __init__(self, U, name='lsstsources', nameLatex=r'LSST sources Schaan 16', zMin=0.005, zMax=4., ngal=26.):
       self.zMin = zMin
       self.zMax = zMax
       self.aMin = 1./(1.+self.zMax)   # min bound for integral over a
@@ -1087,7 +1119,7 @@ class WeightTracerLSSTSourcesSchaanKrauseEifler16(WeightTracer):
       # where ngal = number of gals per unit steradian
       self.dndz = lambda z: self.ngal * f(z) / norm
 
-      super(WeightTracerLSSTSources, self).__init__(U, name=name)
+      super(WeightTracerLSSTSources, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
 
@@ -1128,7 +1160,7 @@ class WeightTracerLSSTSourcesDESCSRDV1(WeightTracer):
    as in the DESC SRD v1.
    """
    
-   def __init__(self, U, name='lsstsources', zMin=0.005, zMax=4., ngal=27.):
+   def __init__(self, U, name='lsstsources', nameLatex=r'LSST Sources DESC SRD v1', zMin=0.005, zMax=4., ngal=27.):
       self.zMin = zMin
       self.zMax = zMax
       self.aMin = 1./(1.+self.zMax)   # min bound for integral over a
@@ -1152,7 +1184,7 @@ class WeightTracerLSSTSourcesDESCSRDV1(WeightTracer):
       # where ngal = number of gals per unit steradian
       self.dndz = lambda z: self.ngal * f(z) / norm
 
-      super(WeightTracerLSSTSourcesDESCSRDV1, self).__init__(U, name=name)
+      super(WeightTracerLSSTSourcesDESCSRDV1, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
 
@@ -1196,7 +1228,7 @@ class WeightTracerDESIBGS(WeightTracer):
    BGS: expect 2.5e13 Msun halos, from DESI Final Design Report, fig 3.4
    """
 
-   def __init__(self, U, name='desibgs'):
+   def __init__(self, U, name='desibgs', nameLatex=r'DESI BGS'):
       
       # read dn/dz
       # nGalBin [gal / sq deg]
@@ -1227,7 +1259,7 @@ class WeightTracerDESIBGS(WeightTracer):
       # tracer bias
       self.b = lambda z: 1.34 / U.bg.scale_independent_growth_factor(z)
 
-      super(WeightTracerDESIBGS, self).__init__(U, name=name)
+      super(WeightTracerDESIBGS, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
 ##################################################################################
@@ -1239,7 +1271,7 @@ class WeightTracerDESILRG(WeightTracer):
    LRG: expect 2.e13 Msun halos from CMASS galaxies
    """
 
-   def __init__(self, U, name='desilrg'):
+   def __init__(self, U, name='desilrg', nameLatex=r'DESI LRG'):
       
       # read dn/dz
       # nGalBin [gal / sq deg]
@@ -1270,7 +1302,7 @@ class WeightTracerDESILRG(WeightTracer):
       # tracer bias
       self.b = lambda z: 1.7 / U.bg.scale_independent_growth_factor(z)
 
-      super(WeightTracerDESILRG, self).__init__(U, name=name)
+      super(WeightTracerDESILRG, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
 ##################################################################################
@@ -1282,7 +1314,7 @@ class WeightTracerDESIELG(WeightTracer):
    ELG: expect 2.e11 Msun halos; DESI Cosmo Sim Req Doc mentions 1.e11Msun as minimum mass
    """
 
-   def __init__(self, U, name='desielg'):
+   def __init__(self, U, name='desielg', nameLatex=r'DESI ELG'):
       
       # read dn/dz
       # nGalBin [gal / sq deg]
@@ -1313,7 +1345,7 @@ class WeightTracerDESIELG(WeightTracer):
       # tracer bias
       self.b = lambda z: 0.84 / U.bg.scale_independent_growth_factor(z)
 
-      super(WeightTracerDESIELG, self).__init__(U, name=name)
+      super(WeightTracerDESIELG, self).__init__(U, name=name, nameLatex=nameLatex)
 
 ##################################################################################
 
@@ -1324,7 +1356,7 @@ class WeightTracerDESIQSO(WeightTracer):
    QSO: guess 5.e12 Msun halos.
    """
 
-   def __init__(self, U, name='desiqso'):
+   def __init__(self, U, name='desiqso', nameLatex=r'DESI QSO'):
       
       # read dn/dz
       # nGalBin [gal / sq deg]
@@ -1355,7 +1387,7 @@ class WeightTracerDESIQSO(WeightTracer):
       # tracer bias
       self.b = lambda z: 1.2 / U.bg.scale_independent_growth_factor(z)
 
-      super(WeightTracerDESIQSO, self).__init__(U, name=name)
+      super(WeightTracerDESIQSO, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
 ##################################################################################
@@ -1369,7 +1401,7 @@ class WeightTracerSPHEREx(WeightTracer):
    Ex: iSample = [0], iSample = [4], iSample = [0,1,2]
    """
 
-   def __init__(self, U, name='spherex', ISample=0):
+   def __init__(self, U, name='spherex', nameLatex=r'SPHEREx', ISample=0):
       
       # sample chosen
       self.ISample = ISample
@@ -1432,7 +1464,7 @@ class WeightTracerSPHEREx(WeightTracer):
       # interpolate tracer bias
       self.b = interp1d(zMean, bias, kind='linear', bounds_error=False, fill_value=0.)
 
-      super(WeightTracerSPHEREx, self).__init__(U, name=name)
+      super(WeightTracerSPHEREx, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
 
@@ -1444,7 +1476,7 @@ class WeightTracerCustom(WeightTracer):
    requires defining functions b(z) and dn/dz(z)
    """
    
-   def __init__(self, U, b, dndz, zMin=1.e-4, zMax=2., name='dcustom'):
+   def __init__(self, U, b, dndz, zMin=1.e-4, zMax=2., name='dcustom', nameLatex=r'Tracer'):
       self.aMin = 1./(1.+zMax)
       self.aMax = 1./(1.+zMin)
       
@@ -1455,7 +1487,7 @@ class WeightTracerCustom(WeightTracer):
       # where ngal = number of gals per unit steradian
       self.dndz = dndz
       
-      super(WeightTracerCustom, self).__init__(U, name=name)
+      super(WeightTracerCustom, self).__init__(U, name=name, nameLatex=nameLatex)
 
 
 ##################################################################################
@@ -1470,7 +1502,7 @@ class WeightCIBPenin12(Projection):
    available at http://irfu.cea.fr/Sap/Phocea/Page/index.php?id=537
    """
    
-   def __init__(self, U, nu=217.e9, fluxCut=160.e-3, name='cibpenin12'):
+   def __init__(self, U, nu=217.e9, fluxCut=160.e-3, name='cibpenin12', nameLatex=r'CIB Penin 12'):
       self.U = U
       self.nu = nu   # in Hz
       self.fluxCut = fluxCut  # in Jy
@@ -1542,7 +1574,7 @@ class WeightCIBPenin12(Projection):
       forjNu4 = UnivariateSpline(self.A, self.JNu4, k=1, s=0)
       self.jNu4 = lambda a: forjNu4(a) * (a>=self.aMin)*(a<=self.aMax)
    
-      super(WeightCIBPenin12, self).__init__(U, name=name+'_'+str(int(nu/1.e9))+'GHZ')
+      super(WeightCIBPenin12, self).__init__(U, name=name+'_'+str(int(nu/1.e9))+'GHZ', nameLatex=nameLatex)
 
    def fForInterp(self, a):
       """projection kernel
