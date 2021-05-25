@@ -179,7 +179,7 @@ lfLya['Cassata11'] = LFLyaCassata11(u)
 
 ##################################################################################
 # Plot the frequencies / wavelengths as a function of redshift
-
+'''
 lfHa['Sobral12'].plotFreqWavelengths(lfs=[lfHa['Sobral12'], 
                                           lfOiii['Colbert13'], 
                                           lfCii['Popping16'], 
@@ -191,7 +191,7 @@ lfHa['Sobral12'].plotFreqWavelengths(lfs=[lfHa['Sobral12'],
                                           LFCOPopping16(u, 6), 
                                           lfLya['Cassata11']], 
                                           nuRef=353.e9)
-
+'''
 
 ##################################################################################
 # General properties of Schechter functions
@@ -519,7 +519,13 @@ print b3d.b1h(1.e-5, 1.e-5, 1.e-5, 2.)
 '''
 # Compute the amplitude of the matter - LIM - LIM bispectrum
 # 1-halo term only
-print "amplitude"
+print "B1h_{mat, LIM, LIM} amplitude"
 print profLimLfHa['Cochrane17'].b1hMatLimLimAmplitude(2.)
 '''
+
+# Compute the amplitude of the LIM trispectrum
+# 1-halo term only
+print "T1h_LIM amplitude"
+print profLimLfHa['Cochrane17'].t1hLimAmplitude(2.)
+
 

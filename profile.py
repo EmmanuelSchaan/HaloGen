@@ -1846,6 +1846,31 @@ class ProfLIMLF(Profile):
       return result
 
 
+   ##################################################################################
+
+
+   def t1hLimAmplitude(self, z, mMin=0., mMax=np.inf):
+      '''Amplitude of the 1-halo trispectrum of LIM
+      ie limit when k1=k2=k3=k4=0.
+      The unit has four powers of LIM intensity
+      so intensity unit conversions are the same as power spectrum squared.
+      [(intensity unit)^4 (Mpc/h)^9] = [Lsun^4 * (Mpc/h) / sr^4 / Hz^4]
+      '''
+
+      def integrand(lnm):
+         m = np.exp(lnm)
+         result = self.Sfr.MassFunc.massfunc(m, z) # [(Mpc/h)^-3 / (Msun/h)]
+         result *= self.meanHaloLum(m, z)**4 # [Lsun^4]
+         result *= (3.e5 / self.U.hubble(z) / (4. * np.pi * self.Lf.nuHz))**4  # *[(Mpc/h/sr/Hz)^4]
+         result *= m # because integrating in lnm and not m [Msun/h]
+         return result
+      # integration bounds
+      mMin = np.max([self.mMin, self.Sfr.MassFunc.mMin, mMin])
+      mMax = np.min([self.mMax, self.Sfr.MassFunc.mMax, mMax])
+      result = integrate.quad(integrand, np.log(mMin), np.log(mMax), epsabs=0, epsrel=1.e-2)[0]
+      return result
+
+
    def b1hMatLimLimAmplitude(self, z, mMin=0., mMax=np.inf):
       '''Amplitude of the 1-halo bispectrum
       of matter - LIM - LIM,
