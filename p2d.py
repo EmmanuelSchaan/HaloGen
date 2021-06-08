@@ -758,10 +758,10 @@ class P2dCross(P2dAuto):
       self.L = np.genfromtxt("./input/Lc.txt") # center of the bins for l
       
       # create directory if needed
-      self.pathOut = "./output/p2d/p2dauto_"+self.name+"/"
+      self.pathOut = "./output/p2d/p2dcross_"+self.name+"/"
       if not os.path.exists(self.pathOut):
          os.makedirs(self.pathOut)
-      self.pathFig = "./figures/p2d/p2dauto_"+self.name+"/"
+      self.pathFig = "./figures/p2d/p2dcross_"+self.name+"/"
       if not os.path.exists(self.pathFig):
          os.makedirs(self.pathFig)
       
