@@ -36,7 +36,7 @@ w_combined.f = lambda a:  w2.f(a) + alpha * w1.f(a) - (1.+alpha) * w0.f(a)
 
 ##################################################################################
 # Plots
-'''
+
 Na = 501
 A = np.linspace(1.-1.e-5, 1./(1.+1100.), Na)
 Z = 1./A - 1.
@@ -62,7 +62,8 @@ ax.plot(ComovDistToObs, W/H_A, lw=1, ls='--', label=w0.nameLatex)
 #
 # Null combination
 W = np.array( map( lambda a: w_combined.f(a), A ) )
-ax.plot(ComovDistToObs, W/H_A, lw=2, ls='-', label=w_combined.nameLatex)
+#ax.plot(ComovDistToObs, W/H_A, lw=2, ls='-', label=w_combined.nameLatex)
+ax.fill_between(ComovDistToObs, 0.*W/H_A, W/H_A, facecolor='r', edgecolor='', label=w_combined.nameLatex)
 #
 #ax.legend(loc=1, fontsize='x-small', labelspacing=0.1)
 ax.set_xlabel(r'$\chi$ [Mpc/$h$]', fontsize=22)
@@ -72,7 +73,7 @@ ax.set_ylim((0., 0.5))
 #
 #fig.savefig("./figures/weight/W_cmblens.pdf")
 plt.show()
-'''
+
 
 
 
@@ -96,7 +97,7 @@ p2d_nulllenscmblens = P2dCross(u, u, w2, w_combined, nProc=3, name='halofit', sa
 
 ##################################################################################
 
-
+'''
 fig=plt.figure(0)
 ax=fig.add_subplot(111)
 #
@@ -126,5 +127,5 @@ ax.set_xlabel(r'L')
 ax.set_ylabel(r'$C_L^{\kappa_\text{CMB} \kappa_\text{Null}} / C_L^{\kappa_\text{CMB}}$')
 
 plt.show()
-
+'''
 
