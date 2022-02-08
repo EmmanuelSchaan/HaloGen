@@ -20,7 +20,7 @@ class P3dRsdAuto(object):
 
 
       # k moduli, to precompute
-      self.K = np.logspace(np.log10(1.e-3), np.log10(1.e2), 101, 10.)
+      self.K = np.logspace(np.log10(1.e-3), np.log10(1.), 31, 10.)
       self.nK = len(self.K)
       self.kMin = np.min(self.K)
       self.kMax = np.max(self.K)
@@ -765,16 +765,16 @@ class P3dRsdAuto(object):
       f = lambda k: self.U.pLin(k, z)
       Plin = np.array(map(f, self.K)) * unitConversion
       # P1h
-      #f = lambda k: self.p1h(k, z)
-      f = lambda k: self.p1hInt[z](k, mu)
+      f = lambda k: self.p1h(k, z, mu)
+      #f = lambda k: self.p1hInt[z](k, mu)
       P1h = np.array(map(f, self.K)) * unitConversion
       # P2h
-      #f = lambda k: self.p2h(k, z)
-      f = lambda k: self.p2hInt[z](k, mu)
+      f = lambda k: self.p2h(k, z, mu)
+      #f = lambda k: self.p2hInt[z](k, mu)
       P2h = np.array(map(f, self.K)) * unitConversion
       # noise bias
-      #f = lambda k: self.pShot(z)
-      f = lambda k: self.pShotInt[z](k, mu)
+      f = lambda k: self.pShot(z)
+      #f = lambda k: self.pShotInt[z](k, mu)
       Pnoise = np.array(map(f, self.K)) * unitConversion
       # Ptot
       P = P1h + P2h + Pnoise
@@ -785,7 +785,7 @@ class P3dRsdAuto(object):
       ax.loglog(self.K, P, 'k', lw=4, label=r'$P_\text{tot}$')
       ax.loglog(self.K, P2h, 'b-', lw=2, label=r'$P_\text{2h}$')
       #ax.loglog(self.K, self.Prof.bias(1./(1.+z))**2 * Plin, 'b--', lw=2, label=r'$b_\text{eff}^2 P_\text{lin}$')
-      ax.loglog(self.K, Plin, 'k--', lw=2, label=r'$P_\text{lin}$')
+      #ax.loglog(self.K, Plin, 'k--', lw=2, label=r'$P_\text{lin}$')
       ax.loglog(self.K, P1h, 'r-', lw=2, label=r'$P_\text{1h}$')
       ax.loglog(self.K, Pnoise, 'g-', lw=2, label=r'$P_\text{noise}$')
 

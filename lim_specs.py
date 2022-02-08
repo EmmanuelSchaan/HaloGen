@@ -45,6 +45,8 @@ class LimSpecs(object):
          self.pixelAngularArea = (1. * np.pi/180./3600.)**2 # [sr]
          self.fwhmPsf = 2. * np.pi/180./3600.   # assume two pixels per PSF FWHM
 
+      elif exp=='ESA_M7':
+         pass
 
 
       self.R = self.RR[0]
