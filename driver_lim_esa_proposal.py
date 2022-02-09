@@ -385,11 +385,18 @@ p = pRsdCii[key]
 # Frequencies
 NuGHz = np.array([300., 330., 365., 400., 445., 490., 540., 600.])
 
-# White noise power spectrum [(Jy/sr)^2 (Mpc/h)^3] for fsky=0.1
-N_fsky0p1 = np.array([1.6e+08, 1.9e+08, 2.2e+08, 2.5e+08, 3.0e+08, 3.7e+08, 4.7e+08, 6.5e+08])
+SigmaIVox_fsky1 = np.array([25.249, 27.994, 31.077, 34.371, 39.434, 46.073, 55.723, 70.357]) * 1.e3   # [Jy/sz]
+SigmaIVox_fsky0p1 = np.array([5.646, 6.26, 6.949, 7.686, 8.818, 10.302, 12.46, 15.732]) * 1.e3  # [Jy/sr]
+VVox = np.array([16.462, 15.667, 14.713, 13.746, 12.513, 11.309, 10.027, 8.586]) # [(Mpc/h)^3]
+N_fsky1 = SigmaIVox_fsky1**2 * VVox # [(Jy/sr)^2 (Mpc/h)^3]
+N_fsky0p1 = SigmaIVox_fsky0p1**2 * VVox # [(Jy/sr)^2 (Mpc/h)^3]
 
-# White noise power spectrum [(Jy/sr)^2 (Mpc/h)^3] for fsky=1
-N_fsky1 = np.array([3.2e+09, 3.7e+09, 4.3e+09, 4.9e+09, 5.9e+09, 7.3e+09, 9.5e+09, 1.3e+10])
+
+
+## White noise power spectrum [(Jy/sr)^2 (Mpc/h)^3] for fsky=0.1
+#N_fsky0p1 = np.array([1.6e+08, 1.9e+08, 2.2e+08, 2.5e+08, 3.0e+08, 3.7e+08, 4.7e+08, 6.5e+08])
+## White noise power spectrum [(Jy/sr)^2 (Mpc/h)^3] for fsky=1
+#N_fsky1 = np.array([3.2e+09, 3.7e+09, 4.3e+09, 4.9e+09, 5.9e+09, 7.3e+09, 9.5e+09, 1.3e+10])
 
 # Redshift of each band
 Z = np.array([5.33, 4.75, 4.21, 3.75, 3.27, 2.88, 2.52, 2.17])
@@ -408,7 +415,7 @@ BeamComov = BeamArcmin * (np.pi/180./60.) * Chi
 
 #for iZ in range(len(Z)):
 #for iZ in range(len(Z))[::-1]:
-for iZ in range(len(Z))[3:]:
+for iZ in range(len(Z))[3:6]:
 #for iZ in [2]:
    z = Z[iZ]
    n_fsky0p1 = N_fsky0p1[iZ]
