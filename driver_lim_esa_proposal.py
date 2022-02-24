@@ -413,9 +413,14 @@ BeamComov = BeamArcmin * (np.pi/180./60.) * Chi
 #p.plotP(z=Z[0], unit='Jy/sr')
 
 
-#for iZ in range(len(Z)):
+# save to file
+data = np.zeros((len(p.K), len(Z)+1))
+data[:,0] = p.K.copy()  # [h/Mpc]
+
+
+for iZ in range(len(Z)):
 #for iZ in range(len(Z))[::-1]:
-for iZ in range(len(Z))[3:6]:
+#for iZ in range(len(Z))[3:6]:
 #for iZ in [2]:
    z = Z[iZ]
    n_fsky0p1 = N_fsky0p1[iZ]
@@ -442,8 +447,10 @@ for iZ in range(len(Z))[3:6]:
    f = lambda k: p.pTot(k, z) * unitConversion
    Ptot = np.array(map(f, p.K))
 
-   # Detector noise
+   # save to file
+   data[:,1+iZ] = Ptot.copy() # [(Jy/sr)^2(Mpc/h)^3]
 
+   # Detector noise
    detNoise_fsky0p1 = n_fsky0p1 * np.exp(p.K**2 * sigmaBeam**2)
    detNoise_fsky1 = n_fsky1 * np.exp(p.K**2 * sigmaBeam**2)
 
@@ -472,7 +479,9 @@ for iZ in range(len(Z))[3:6]:
    #plt.show()
    fig.clf()
 
-
+# save file
+path = "./output/p3d_rsd/p3d_"+p.name+"_esa_proposal.txt"
+np.savetxt(path, data)
 
 
 
